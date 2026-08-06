@@ -1,34 +1,36 @@
 ---
 name: caged-persistence
-description: Persist new pi skills and pi packages (extensions) across caged volume resets by baking them into the caged seed. Use when creating a new skill (write it to caged/seed/agent/skills/) or installing a pi extension (add it to caged/seed/agent/settings.json packages[]). The named volume /pi-agent survives container restarts, but a completely fresh volume is seeded only from what the image ships, so baked content is the durable source of truth.
+description: Persist pi skills and packages (extensions) by writing them into the caged seed. `~/.pi/agent` is a LIVE bind mount of `caged/seed/agent`, so anything pi writes there (new skills under seed/agent/skills/, package entries in seed/agent/settings.json packages[], even auth.json) lands in the host repo immediately — no rebuild or volume-copy step needed. Use when creating a new skill or installing a pi extension and wanting it in every future caged run.
 ---
 
 # caged persistence
 
-In caged, everything under `~/.pi` (`/pi-agent/.pi`) lives on the named
-volume `caged-pi-agent`. It **persists across container restarts/recreates**
-— but only until the volume is wiped (`podman volume rm caged-pi-agent`). A
-brand-new empty volume is seeded from the image's contents at
-`/pi-agent/.pi` (`COPY seed` in the `Containerfile`).
+In caged, `~/.pi/agent` (`/pi-agent/.pi/agent`) is a **live bind mount** of the
+host directory `caged/seed/agent`. Everything pi writes there is synced back to
+the host repo at the same moment — config edits, new skills, extension
+packages, even `auth.json` (which is gitignored). There is no named volume to
+wipe and nothing to re-seed: the seed *is* the source of truth on the host.
 
-Two kinds of assets should therefore be added to the **caged repo's `seed/`
-directory**, not merely to the live volume, if they must survive a fresh
-volume:
+What is durable automatically:
 
-1. **New pi skills** — `SKILL.md` files (and their script helpers) under
-   `caged/seed/agent/skills/`
-2. **Pi packages / extensions** — entries in `caged/seed/agent/settings.json`
-   → `packages[]`
+1. **New pi skills** — `SKILL.md` files (and their script helpers) written
+   under `seed/agent/skills/` exist in the repo on the next `git diff`.
+2. **Pi packages / extensions** — entries in `seed/agent/settings.json`
+   → `packages[]`.
 
-Anything else (API keys, auth tokens, session data, scratch files) is
-runtime state and belongs in the live volume only.
+Runtime state that must **not** be committed to git:
+
+- `seed/agent/auth.json` — pi api keys / tokens (see `.gitignore`)
+- `$CAGED_WORKSPACE/sessions/` — pi session data, mounted at
+  `/pi-agent/.pi/agent/sessions` per project, lives next to the code
+- API keys / scratch files — never put them in `/workspace`
 
 ## When to use
 
 - You are about to create a new skill and want it in every future caged run.
 - You are about to `pi install` an extension (npm / git / local path) and
-  want it baked in.
-- The user asks to "make this persistent" / "survive a volume reset".
+  want it to persist across container restarts.
 
-If the user says "just for this run" or "don't touch the seed", operate on
-the live volume only and skip this skill.
+Because the seed is live, persistence is the default: just create or edit the
+file under `caged/seed/agent/`. If the user says "don't touch the seed", write
+to a non-seed location (e.g. `/workspace`) instead and skip this skill.
