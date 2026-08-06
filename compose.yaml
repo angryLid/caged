@@ -38,6 +38,12 @@ services:
       GITLAB_TOKEN: ${GITLAB_TOKEN:-}
       GITLAB_HOST: ${GITLAB_HOST:-}
       GLAB_SEND_TELEMETRY: "false"
+      # acli (official Atlassian CLI) — config dir on the live ~/.pi mount so
+      # `acli jira auth login` state survives restarts (gitignored, like
+      # auth.json). Pass the API token via JIRA_API_TOKEN (same pattern as
+      # GITLAB_TOKEN) or interactively via stdin at login; never in the repo.
+      JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
+      ACLI_CONFIG_DIR: /agent-home/.pi/agent/acli
       XDG_CONFIG_HOME: /tmp/.config
       # Keep home-derived caches OUT of the live .pi mount and off the rootfs:
       # only ~/.pi is a writable host mount; scratch caches go to /tmp (tmpfs).

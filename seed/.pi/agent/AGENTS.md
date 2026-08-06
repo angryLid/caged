@@ -58,6 +58,20 @@ the provider keys, never stored in the repo. `XDG_CONFIG_HOME` points at
 `/tmp`, so `glab auth login` state does not survive a restart; use the env
 token instead.
 
+## acli (Atlassian CLI)
+
+`acli` (official Atlassian CLI, v1.3.22) is baked into the image for Jira
+Cloud work (`acli jira workitem ...`, project/admin commands). Authenticate
+with an API token read from stdin:
+
+    echo "<API_TOKEN>" | acli jira auth login --site "<site>.atlassian.net" --email "you@example.com" --token
+
+or interactively with `acli jira auth login --web` (OAuth; needs a browser).
+`ACLI_CONFIG_DIR=/agent-home/.pi/agent/acli` (gitignored), so login state
+survives restarts but tokens never enter the repo. API tokens come from
+https://id.atlassian.com/manage-profile/security/api-tokens — never ask for
+them in plain text in the workspace.
+
 ## chrome-devtools MCP (optional)
 
 An MCP server for host Chrome's DevTools protocol is configured. It requires

@@ -56,6 +56,29 @@ RUN set -eux; \
     && rm -rf /tmp/glab /tmp/glab.tar.gz \
     && glab version
 
+# acli — official Atlassian Command Line Interface (Jira Cloud, Confluence,
+# Bitbucket, admin APIs; https://developer.atlassian.com/cloud/acli/).
+# Single static Go binary packaged as a .deb. Atlassian only publishes
+# `latest`-style URLs, so the pin comes from the versioned pool/... filename
+# + sha256 taken from Atlassian's own apt repo Packages index
+# (acli.atlassian.com/linux/deb) — if that exact version disappears from the
+# repo, the build fails loudly instead of silently installing newer code.
+ARG ACLI_VERSION=1.3.22
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) sha=a19714a3ba5df60334b9d28d2664ce29619a2896a447f68aa6fded66d7b67abd;; \
+      arm64) sha=5ebed8959c041fa2d2a6db600b73377648979bce8972a0e9d6c0fdaade6fecb7;; \
+      *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    curl -fsSL -o /tmp/acli.deb \
+      "https://acli.atlassian.com/linux/deb/pool/stable/a/ac/acli_${ACLI_VERSION}-stable_linux_${TARGETARCH}.deb"; \
+    echo "${sha}  /tmp/acli.deb" | sha256sum -c -; \
+    dpkg-deb -x /tmp/acli.deb /tmp/acli \
+    && install -m 0755 /tmp/acli/usr/bin/acli /usr/local/bin/acli \
+    && rm -rf /tmp/acli /tmp/acli.deb \
+    && acli --version
+
 # Non-root runtime user + persistent dirs.
 # The node base image ships a `node` user at UID 1000; we free that UID up
 # for our own `pi` user so "uid 1000" stays stable across base image updates.

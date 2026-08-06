@@ -178,6 +178,30 @@ For a self-hosted instance also set `GITLAB_HOST=https://gitlab.example.com`.
 read-only rootfs; `glab auth login` output therefore does **not** survive a
 container restart — the env token is the supported path.
 
+## acli (Atlassian CLI)
+
+[`acli`](https://developer.atlassian.com/cloud/acli/) — Atlassian's official
+command line interface (Jira Cloud, Confluence, Bitbucket, admin APIs) — is
+baked into the image (v1.3.22, pinned `ARG ACLI_VERSION` in the
+Containerfile). Atlassian only publishes `latest`-style URLs, so the pin is
+enforced via the versioned `.deb` filename + the sha256 taken from
+Atlassian's own apt repo `Packages` index, mirroring the `glab` pattern.
+
+Authenticate with an API token (created at
+`id.atlassian.com/manage-profile/security/api-tokens`) read from stdin:
+
+```sh
+echo "$JIRA_API_TOKEN" | \
+  podman compose -f /path/to/caged/compose.yaml run --rm pi \
+    acli jira auth login --site "mysite.atlassian.net" --email you@example.com --token
+```
+
+`ACLI_CONFIG_DIR` points at `/agent-home/.pi/agent/acli` — on the live
+`~/.pi` mount, so login state survives restarts while the token stays out of
+git (`seed/.pi/agent/acli/` is ignored, like `auth.json`). No secret env var
+is needed; unlike `glab` there is no env-token passthrough, so authenticating
+once per setup is the supported path.
+
 ## Environment knobs
 
 `compose.yaml` interpolates these from the calling shell; defaults listed.
