@@ -49,14 +49,27 @@
       ]
     },
     "local-llm": {
-      "baseUrl": "$LOCAL_LLM_BASE_URL",
+      "baseUrl": "http://host.docker.internal:8765/v1",
       "api": "openai-completions",
       "authHeader": true,
       "apiKey": "$LOCAL_API_KEY",
       "models": [
         {
           "id": "Coding",
-          "name": "Coding (Local llm-cs)",
+          "name": "Coding (Local)",
+          "reasoning": true,
+          "contextWindow": 270000,
+          "maxTokens": 16384
+        },
+        {
+          "id": "gemma-4-31B",
+          "name": "Gemma 4 31B (Local)",
+          "contextWindow": 270000,
+          "maxTokens": 16384
+        },
+        {
+          "id": "kat-coder-v2.5-dev",
+          "name": "Kat Coder v2.5 Dev (Local)",
           "reasoning": true,
           "contextWindow": 270000,
           "maxTokens": 16384

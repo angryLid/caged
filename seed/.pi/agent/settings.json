@@ -4,5 +4,8 @@
     "npm:pi-mcp-adapter"
   ],
   "lastChangelogVersion": "0.83.0",
-  "theme": "dark"
+  "theme": "dark",
+  "defaultProvider": "local-llm",
+  "defaultModel": "Coding",
+  "defaultThinkingLevel": "medium"
 }

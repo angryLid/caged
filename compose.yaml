@@ -31,7 +31,6 @@ services:
       VOLCENGINE_API_KEY: ${VOLCENGINE_API_KEY:-}
       MY_OPENROUTER_API_KEY: ${MY_OPENROUTER_API_KEY:-}
       LOCAL_API_KEY: ${LOCAL_API_KEY:-}
-      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-}
       # Keep home-derived caches OUT of the live .pi mount and off the rootfs:
       # only ~/.pi is a writable host mount; scratch caches go to /tmp (tmpfs).
       npm_config_cache: /tmp/.npm

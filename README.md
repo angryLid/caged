@@ -120,12 +120,16 @@ round-trip.
 
 `models.json` references keys by env var name (`$MY_DEEPSEEK_API_KEY`,
 `$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`, and for the local
-provider `$LOCAL_API_KEY` + `$LOCAL_LLM_BASE_URL`); pi expands these from
-the container environment at runtime. Pass them when starting:
+provider `$LOCAL_API_KEY`); pi expands these from the container
+environment at runtime. The local provider's `baseUrl` is the host
+`caddy-dev-server` proxy `http://host.docker.internal:8765/v1`, which
+forwards to the internal LLM gateway with the Host header rewritten to
+the upstream hostname (that hostname lives only in the host's Caddyfile,
+never in this repo). Pass the keys when starting:
 
 ```sh
 MY_DEEPSEEK_API_KEY=sk-... VOLCENGINE_API_KEY=ark-... \
-  LOCAL_API_KEY=... LOCAL_LLM_BASE_URL=http://... \
+  LOCAL_API_KEY=... \
   podman compose -f /path/to/caged/compose.yaml up
 ```
 
@@ -166,7 +170,6 @@ that's expected, not a caged bug.
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
 | `LOCAL_API_KEY` | *(unset)* | Local LLM provider key (passed into container) |
-| `LOCAL_LLM_BASE_URL` | *(unset)* | Local LLM base URL, e.g. `http://llm.local/v1` (passed into container) |
 
 ## Runtime hardening (applied by compose.yaml)
 

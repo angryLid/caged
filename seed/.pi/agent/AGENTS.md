@@ -30,12 +30,16 @@ image managed by podman). Behave accordingly.
 
 `~/.pi/agent/models.json` (`/agent-home/.pi/agent/models.json`) defines the
 model providers — currently DeepSeek, Volcengine Ark Coding, OpenRouter,
-and a local provider whose base URL + key come entirely from the container
-env (`$LOCAL_LLM_BASE_URL`, `$LOCAL_API_KEY`).
+and a local provider. The local provider's `baseUrl` is the host
+`caddy-dev-server` proxy `http://host.docker.internal:8765/v1` (forwards
+to the internal LLM gateway with the Host header rewritten to the
+upstream hostname — the upstream hostname lives only in the host's
+Caddyfile, never in this repo); its API key comes from the container env
+(`$LOCAL_API_KEY`).
 The `apiKey` fields reference environment variables
 (`$MY_DEEPSEEK_API_KEY`, `$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`,
 `$LOCAL_API_KEY`) that pi expands from the container environment at
-runtime. The real keys and the local endpoint are provided by the operator
+runtime. The real keys are provided by the operator
 via container env vars — **they never belong in `/workspace`**. If a
 provider is missing its key, tell the user which env var needs to be set
 rather than fabricating one.
