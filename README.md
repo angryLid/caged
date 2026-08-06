@@ -52,11 +52,11 @@ Both commands mount the **directory you run them from** as `/workspace`.
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
 | `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
-| `/pi-agent/.pi` (`~/.pi`) | `<caged>/seed/.pi` (`$CAGED_PI_HOME`) | rw | **pi's live config home** — maps 1:1 to `seed/.pi`; everything pi configures lands back on the host |
-| `/pi-agent/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
-| `/pi-agent/.pi/agent/sessions` | `$CAGED_WORKSPACE/sessions` on the host | rw | **pi session data — per-project, on the host** |
+| `/agent-home/.pi` (`~/.pi`) | `<caged>/seed/.pi` (`$CAGED_PI_HOME`) | rw | **pi's live config home** — maps 1:1 to `seed/.pi`; everything pi configures lands back on the host |
+| `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
+| `/agent-home/.pi/agent/sessions` | `$CAGED_WORKSPACE/sessions` on the host | rw | **pi session data — per-project, on the host** |
 
-`$HOME` is `/pi-agent` and only `~/.pi` (`/pi-agent/.pi`) is a live bind mount
+`$HOME` is `/agent-home` and only `~/.pi` (`/agent-home/.pi`) is a live bind mount
 of `caged/seed/.pi` — one level of indirection below `$HOME`, so the repo tree
 only ever reflects pi's config home, never stray `$HOME` state. Whatever pi
 writes under `~/.pi` (settings, models, mcp.json, skills, even `auth.json`)
@@ -82,7 +82,7 @@ written the first time you authenticate, so don't worry if it doesn't exist
 yet.
 
 **Session data lives per-project on the host** as a nested mount
-(`/pi-agent/.pi/agent/sessions` is masked by it): when you run `caged compose
+(`/agent-home/.pi/agent/sessions` is masked by it): when you run `caged compose
 … up` from `~/folder`, pi's sessions are written to `~/folder/sessions/`
 (podman-compose creates the directory if missing). Deleting `seed/.pi/agent`
 or `auth.json` does **not** touch your sessions or your API keys' cached
@@ -123,7 +123,7 @@ For interactive TUI auth flows that don't use `models.json`, pi stores
 credentials in `auth.json` inside the agent dir:
 
 pi stores credentials in `auth.json` inside the agent dir
-(`/pi-agent/.pi/agent/auth.json` on the volume). Two options:
+(`/agent-home/.pi/agent/auth.json` on the volume). Two options:
 
 ```sh
 podman compose -f /path/to/caged/compose.yaml run --rm pi pi auth
@@ -151,7 +151,7 @@ that's expected, not a caged bug.
 |---|---|---|
 | `CAGED_IMAGE` | `caged:latest` | image tag to run |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
-| `CAGED_PI_HOME` | `./seed/.pi` (relative to the compose file) | host dir bind-mounted at `/pi-agent/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
+| `CAGED_PI_HOME` | `./seed/.pi` (relative to the compose file) | host dir bind-mounted at `/agent-home/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
@@ -160,7 +160,7 @@ that's expected, not a caged bug.
 
 ## Runtime hardening (applied by compose.yaml)
 
-* `--read-only` — root filesystem immutable (only `/workspace`, `~/.pi` (`/pi-agent/.pi`), and `/tmp` writable)
+* `--read-only` — root filesystem immutable (only `/workspace`, `~/.pi` (`/agent-home/.pi`), and `/tmp` writable)
 * `--tmpfs /tmp` — scratch, `noexec,nosuid`
 * `--cap-drop ALL` — container process gets zero kernel capabilities
 * `--security-opt no-new-privileges` — no setuid-style privilege escalation

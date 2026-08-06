@@ -15,7 +15,7 @@ services:
       - no-new-privileges
     userns_mode: keep-id
     environment:
-      HOME: /pi-agent
+      HOME: /agent-home
       # Model provider keys. pi expands these $NAME references found in
       # seed/.pi/agent/models.json from the container env at runtime. Pass your
       # real values when starting, e.g.:
@@ -33,7 +33,7 @@ services:
     working_dir: /workspace
     volumes:
       - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)
-      - ${CAGED_PI_HOME:-./seed/.pi}:/pi-agent/.pi:rw  # live ~/.pi: seed/.pi maps 1:1 to pi's config home (synced both ways)
-      - ${CAGED_WORKSPACE:-$PWD}/sessions:/pi-agent/.pi/agent/sessions  # pi sessions → per-project on host
+      - ${CAGED_PI_HOME:-./seed/.pi}:/agent-home/.pi:rw  # live ~/.pi: seed/.pi maps 1:1 to pi's config home (synced both ways)
+      - ${CAGED_WORKSPACE:-$PWD}/sessions:/agent-home/.pi/agent/sessions  # pi sessions → per-project on host
     stdin_open: true              # -i
     tty: true                     # -t

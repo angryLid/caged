@@ -13,13 +13,13 @@ the host filesystem beyond the mount, or persist on the host.
 
 | Risk | Mitigation | Status |
 |------|-----------|--------|
-| Read host files | only `/workspace`, `$CAGED_WORKSPACE/sessions` and `caged/seed/.pi` (mounted at `/pi-agent/.pi`, pi's config home) are mounted; no `-v /`, rootfs is read-only | ✅ |
-| Write host files | read-only rootfs; `/workspace` rw and the live `~/.pi` bind at `/pi-agent/.pi` (== `caged/seed/.pi`) rw are the only writable host-backed mounts | ✅ |
+| Read host files | only `/workspace`, `$CAGED_WORKSPACE/sessions` and `caged/seed/.pi` (mounted at `/agent-home/.pi`, pi's config home) are mounted; no `-v /`, rootfs is read-only | ✅ |
+| Write host files | read-only rootfs; `/workspace` rw and the live `~/.pi` bind at `/agent-home/.pi` (== `caged/seed/.pi`) rw are the only writable host-backed mounts | ✅ |
 | Escape via root | runs as UID 1000 non-root with `--userns=keep-id` | ✅ |
 | Gain capabilities | `--cap-drop ALL` + `--security-opt no-new-privileges` | ✅ |
 | Kernel exploit | container seccomp profile (podman default) | ✅ |
 | Exfiltrate secrets via network | **⚠️ intentionally NOT mitigated** — network is fully open by design (pi talks to model providers). See notes below. | ⚠️ |
-| Persistence on host | live `~/.pi` bind `caged/seed/.pi` → `/pi-agent/.pi` (config/auth/skills at `seed/.pi/agent`, sessions at `$CAGED_WORKSPACE/sessions`) | ✅ |
+| Persistence on host | live `~/.pi` bind `caged/seed/.pi` → `/agent-home/.pi` (config/auth/skills at `seed/.pi/agent`, sessions at `$CAGED_WORKSPACE/sessions`) | ✅ |
 | Zombie processes | tini as PID 1 | ✅ |
 
 ## Deliberate trade-offs (accepted risks)
@@ -56,7 +56,7 @@ the host filesystem beyond the mount, or persist on the host.
 
 ```sh
 podman run --rm -it --read-only --cap-drop ALL --security-opt no-new-privileges \
-  --userns=keep-id -v "$PWD/seed/.pi:/pi-agent/.pi" caged:latest sh -c '
+  --userns=keep-id -v "$PWD/seed/.pi:/agent-home/.pi" caged:latest sh -c '
     id
     touch /etc/test 2>&1 | head -1
     touch /tmp/test && echo "tmp writable"

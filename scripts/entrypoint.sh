@@ -3,7 +3,7 @@
 #
 # Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
 #   1. Fail-fast validation BEFORE launching pi. There is deliberately no
-#      config baked into the image: ~/.pi (=/pi-agent/.pi) must be the live
+#      config baked into the image: ~/.pi (=/agent-home/.pi) must be the live
 #      bind mount of the host `seed/.pi` directory (compose.yaml does this).
 #      If the seed is missing, incomplete, or internally inconsistent, we
 #      exit non-zero with a clear message — never let pi start
@@ -15,7 +15,7 @@
 
 set -e
 
-PI_HOME="${HOME:-/pi-agent}/.pi"
+PI_HOME="${HOME:-/agent-home}/.pi"
 AGENT_DIR="$PI_HOME/agent"
 
 fail() {
@@ -27,7 +27,7 @@ fail() {
 
 [ -d "$AGENT_DIR" ] || fail \
     "config dir '$AGENT_DIR' not found — ~/.pi must be the live seed bind." \
-    "Run caged via 'podman compose up' (mounts <caged>/seed/.pi at /pi-agent/.pi), or mount it manually."
+    "Run caged via 'podman compose up' (mounts <caged>/seed/.pi at /agent-home/.pi), or mount it manually."
 
 for f in models.json settings.json AGENTS.md; do
     [ -f "$AGENT_DIR/$f" ] || fail \

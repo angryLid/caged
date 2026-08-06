@@ -5,8 +5,8 @@ description: Persist pi skills and packages (extensions) by writing them into th
 
 # caged persistence
 
-In caged, `~/.pi` (`/pi-agent/.pi`) is a **live bind mount** of the host
-directory `caged/seed/.pi`, so `~/.pi/agent` (`/pi-agent/.pi/agent`) is the
+In caged, `~/.pi` (`/agent-home/.pi`) is a **live bind mount** of the host
+directory `caged/seed/.pi`, so `~/.pi/agent` (`/agent-home/.pi/agent`) is the
 host dir `caged/seed/.pi/agent`. Everything pi writes there is synced back to the host
 repo at the same moment — config edits, new skills, extension packages, even
 `auth.json` (which is gitignored). There is no named volume to wipe and
@@ -23,7 +23,7 @@ Runtime state that must **not** be committed to git:
 
 - `seed/.pi/agent/auth.json` — pi api keys / tokens (see `.gitignore`)
 - `$CAGED_WORKSPACE/sessions/` — pi session data, mounted at
-  `/pi-agent/.pi/agent/sessions` per project, lives next to the code
+  `/agent-home/.pi/agent/sessions` per project, lives next to the code
 - API keys / scratch files — never put them in `/workspace`
 
 ## When to use

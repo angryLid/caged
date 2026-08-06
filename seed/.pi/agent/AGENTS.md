@@ -12,15 +12,15 @@ image managed by podman). Behave accordingly.
 - The root filesystem is **read-only**. Writable areas:
   - `/workspace` — the user's code, mounted from the host working tree.
     Edits you make appear on the host as you write them.
-  - `/pi-agent/.pi` — pi's config home, a LIVE bind mount of the host dir
+  - `/agent-home/.pi` — pi's config home, a LIVE bind mount of the host dir
     `<caged>/seed/.pi` (config, auth, skills). Anything pi writes here (even
     `auth.json` and new skills) lands in the caged repo tree immediately.
-  - `/pi-agent/.pi/agent/sessions` — pi session data, mounted from
+  - `/agent-home/.pi/agent/sessions` — pi session data, mounted from
     `$CAGED_WORKSPACE/sessions` on the host → each project keeps its own
     sessions next to the code.
   - `/tmp` — scratch space, cleared on restart. npm/node caches are pointed
     here (`$npm_config_cache=/tmp/.npm`, `$XDG_CACHE_HOME=/tmp/.cache`).
-  - Everything else under `/pi-agent` (the rest of `$HOME`) is **read-only** —
+  - Everything else under `/agent-home` (the rest of `$HOME`) is **read-only** —
     don't expect to stash state there; use `/tmp` instead.
 - **Network is open**: no egress sandbox beyond the container boundary. You
   may reach model providers, registries, and the general internet directly.
@@ -28,7 +28,7 @@ image managed by podman). Behave accordingly.
 
 ## Provider configuration
 
-`~/.pi/agent/models.json` (`/pi-agent/.pi/agent/models.json`) defines the
+`~/.pi/agent/models.json` (`/agent-home/.pi/agent/models.json`) defines the
 model providers — currently DeepSeek, Volcengine Ark Coding, OpenRouter,
 and a local provider whose base URL + key come entirely from the container
 env (`$LOCAL_LLM_BASE_URL`, `$LOCAL_API_KEY`).

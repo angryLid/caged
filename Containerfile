@@ -6,7 +6,7 @@
 #   * run pi as a non-root, low-privilege user
 #   * network is intentionally OPEN (pi needs to reach model providers)
 #   * all state (config, sessions, downloaded helper tools) lives on a
-#     single volume: /pi-agent
+#     single volume: /agent-home
 #   * user code lives on a separate volume: /workspace
 #   * hardening (read-only rootfs, NO_NEW_PRIVILEGES, cap-drop) is applied
 #     at runtime via compose.yaml, not baked into the image
@@ -33,22 +33,24 @@ RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 # Non-root runtime user + persistent dirs.
 # The node base image ships a `node` user at UID 1000; we free that UID up
 # for our own `pi` user so "uid 1000" stays stable across base image updates.
+# The user's home is /agent-home — named generically (not "pi-agent") so the
+# image stays reusable for other agents/tools that hang state off $HOME.
 RUN userdel -r node 2>/dev/null || true \
-    && useradd --create-home --uid 1000 --shell /bin/bash pi \
-    && mkdir -p /workspace /pi-agent/.pi/agent \
-    && chown -R pi:pi /workspace /pi-agent
+    && useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash pi \
+    && mkdir -p /workspace /agent-home/.pi/agent \
+    && chown -R pi:pi /workspace /agent-home
 
 # pi's config (~/.pi) is intentionally NOT copied into the image: at runtime
-# compose.yaml bind-mounts <caged>/seed/.pi over /pi-agent/.pi (rw), so
+# compose.yaml bind-mounts <caged>/seed/.pi over /agent-home/.pi (rw), so
 # ~/.pi is exactly the host's seed/.pi directory — a single source of truth
 # with no image copy to drift or go stale. Only ~/.pi is a writable host
 # mount; the rest of $HOME stays read-only (rootfs) with caches redirected
 # to /tmp. The entrypoint validates that the bind is in place and fails fast
 # otherwise. Keys stay out of seed/: models.json references $ENV names only.
 
-# HOME=/pi-agent so $HOME/.pi (pi's default config location) lands on the
+# HOME=/agent-home so $HOME/.pi (pi's default config location) lands on the
 # persistent volume.
-ENV HOME=/pi-agent \
+ENV HOME=/agent-home \
     WORKSPACE=/workspace
 
 COPY scripts/entrypoint.sh /usr/local/bin/caged-entrypoint
