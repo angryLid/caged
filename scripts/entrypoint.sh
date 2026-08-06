@@ -10,7 +10,8 @@
 #      half-configured.
 #   2. Best-effort ownership bootstrap (matters for fresh named volumes) and
 #      cache dirs on the /tmp tmpfs (npm/node never touch the RO home).
-#   3. Launch the requested command under tini so spawned bash subprocesses
+#   3. Declarative skills sync (best-effort) at container start.
+#   4. Launch the requested command under tini so spawned bash subprocesses
 #      (pi's bash tool) get reaped properly.
 
 set -e
@@ -57,5 +58,23 @@ for dir in "$PI_HOME" "$PI_HOME/agent" /tmp/.npm /tmp/.cache; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done
+
+# --- 3. declarative skills sync (best-effort) ----------------------------
+#
+# pi scans ~/.pi/agent/skills/ for skills. The skill repos + their symlinks
+# are runtime artifacts (gitignored) that live inside the seed, so we
+# (re)generate them at every container start from the project's skills.json.
+# This is the container "start" half of skills-sync: it clones/pulls each
+# repo into $AGENT_DIR/skills-sync/vendor and (re)links the enabled skills
+# into $AGENT_DIR/skills. Non-fatal — if the network is down or the config
+# is missing, we log a warning and still launch pi.
+if [ -f "$WORKSPACE/skills.json" ] && [ -f "$WORKSPACE/scripts/skills-sync.mjs" ]; then
+    echo "caged: syncing skills (best-effort)..."
+    if ! node "$WORKSPACE/scripts/skills-sync.mjs" --seed "$AGENT_DIR"; then
+        echo "caged: warning: skills sync did not complete (exit $?) — continuing" >&2
+    fi
+else
+    echo "caged: warning: skills.json or skills-sync.mjs not found in \$WORKSPACE — skipping skills sync" >&2
+fi
 
 exec tini -s -- "$@"

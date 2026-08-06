@@ -59,21 +59,40 @@ caged/
 This project ships a small **declarative** mechanism for pulling in external
 agent skills and enabling a subset of them — see `skills.json` at the repo
 root. It is tool-agnostic (works with any agent that reads skills from a
-directory; pi reads the project-local `.pi/skills/`).
+directory).
+
+Skills are installed **into the seed** (`seed/.pi/agent/skills/`), pi's live
+config home that is bind-mounted at `/agent-home/.pi/agent` at runtime. The
+repos are cloned into `seed/.pi/agent/skills-sync/vendor/` and each enabled
+skill is exposed as a relative symlink in `seed/.pi/agent/skills/` pointing
+back into that vendor dir. Keeping the repos inside the seed means the
+relative links stay valid inside the container's mount layout (everything
+under `/agent-home/.pi/agent`).
+
+Because the seed is bind-mounted (not baked into the image) the sync runs at
+**container start** — the entrypoint calls the script with `--seed
+/agent-home/.pi/agent` before launching pi (best-effort; a network hiccup or
+missing config just logs a warning and pi still starts). You can also run it
+by hand, e.g. after editing `skills.json`:
 
 ```bash
-node scripts/skills-sync.mjs          # clone/pull repos + (re)link enabled skills
-node scripts/skills-sync.mjs --dry-run   # preview without changing anything
+node scripts/skills-sync.mjs            # clone/pull repos + (re)link into seed/.pi/agent/skills
+node scripts/skills-sync.mjs --dry-run  # preview without changing anything
 ```
 
 - **`skills.json`** — the source of truth: a `repos[]` list (each with a URL,
   `skillsDir`, and an `enabled` list of skill relative paths) plus a
-  `linkTargets[]` list of dirs to place symlinks (default `.pi/skills`).
-- The script **clones** each repo into `vendor/skills/<name>` (or `git pull`s it),
-  then creates **relative symlinks** into each link target. Stale links are
-  removed, so dropping a skill from `enabled` unlinks it.
-- `vendor/skills/` and `.pi/skills/` are **gitignored** and regenerated — edit
-  `skills.json`, then re-run the script.
+  `linkTargets[]` list of dirs, relative to the seed, to place symlinks
+  (default `skills` → `seed/.pi/agent/skills`).
+- The script **clones** each repo into `seed/.pi/agent/skills-sync/vendor/<name>`
+  (or `git pull`s it), then creates **relative symlinks** into each link
+  target. Stale links are removed, so dropping a skill from `enabled` unlinks it.
+  Hand-written skills committed in `seed/.pi/agent/skills/` (bgm-metadata,
+  caged-persistence, create-post, markdown-link, mdx-notes, skills-sync) are
+  never touched.
+- `seed/.pi/agent/skills-sync/vendor/` and the generated skill symlinks are
+  **gitignored** and regenerated at every container start — edit `skills.json`,
+  then re-run the script (or restart the container).
 
 > pi can also run this for you: ask it to “sync skills” (uses the `skills-sync` skill).
 

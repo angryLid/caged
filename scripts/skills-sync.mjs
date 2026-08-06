@@ -4,19 +4,35 @@
  *
  * Declarative SKILLS sync for ./skills.json
  *
+ * This project is a container image ("caged") that runs @earendil-works/pi-
+ * coding-agent. pi scans ~/.pi/agent/skills/ for skills, and ~/.pi is a live
+ * bind mount of the host `seed/.pi` dir (compose.yaml). So the skills must be
+ * installed INTO the seed — `seed/.pi/agent/skills/` — NOT into the project's
+ * working tree. The sync is therefore wired into the container entrypoint and
+ * runs at every container start (see entrypoint.sh).
+ *
  * What it does:
- *   1. For each repo in skills.json, clone it into vendor/skills/<name> if missing,
- *      otherwise `git pull` it (fast-forward to latest).
- *   2. For each enabled skill, create a RELATIVE symlink inside each link
- *      target dir (default .pi/skills) pointing back into vendor/skills/<name>.
- *   3. Remove stale symlinks that this tool previously created (i.e. links
- *      whose target resolves into vendor/skills/), so removed skills stop loading.
+ *   1. For each repo in skills.json, clone it into
+ *      <seed>/skills-sync/vendor/skills/<name> if missing, otherwise `git pull`
+ *      it (fast-forward to latest). The repos live inside the seed so the
+ *      relative symlinks below stay valid inside the container's mount layout
+ *      (everything under /agent-home/.pi/agent).
+ *   2. For each enabled skill, create a RELATIVE symlink inside
+ *      <seed>/skills (the dir pi scans) pointing back into that vendor dir.
+ *   3. Remove stale symlinks this tool previously created (targets resolving
+ *      into skills-sync/vendor/skills/), so skills removed from config stop
+ *      loading. Hand-written / committed skills in <seed>/skills are left
+ *      untouched.
  *
  * Idempotent and self-healing: on a fresh clone it re-creates everything.
  * Relative symlinks mean nothing is hardcoded to an absolute path.
  *
  * Usage:
- *   node scripts/skills-sync.mjs [--dry-run] [--config skills.json]
+ *   node scripts/skills-sync.mjs [--dry-run] [--config skills.json] [--seed <pi-agent-dir>]
+ *
+ *   --seed   the pi agent config dir that owns the skills. Defaults to
+ *            <project>/seed/.pi/agent. At container start the entrypoint
+ *            passes the live mount: --seed /agent-home/.pi/agent
  *
  * Exit codes:
  *   0  ok
@@ -35,6 +51,14 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const configIdx = args.indexOf("--config");
 const configPath = configIdx >= 0 ? resolve(PROJECT_ROOT, args[configIdx + 1]) : join(PROJECT_ROOT, "skills.json");
+const seedIdx = args.indexOf("--seed");
+const SEED_DIR = seedIdx >= 0
+  ? resolve(args[seedIdx + 1])
+  : join(PROJECT_ROOT, "seed", ".pi", "agent");
+// Repos live inside the seed so symlinks in <seed>/skills stay valid under the
+// container's mount layout (/agent-home/.pi/agent). Config keys below are
+// resolved relative to SEED_DIR.
+const VENDOR_DIR = join(SEED_DIR, "skills-sync", "vendor", "skills");
 
 let exitCode = 0;
 const warn = (msg) => { console.warn(`[warn] ${msg}`); exitCode = Math.max(exitCode, 2); };
@@ -50,12 +74,11 @@ function loadConfig() {
   return JSON.parse(readFileSync(configPath, "utf8"));
 }
 
-// --- 1. clone / pull repos ------------------------------------------------
+// --- 1. clone / pull repos -------------------------------------------------
 function syncRepos(cfg) {
-  const root = join(PROJECT_ROOT, "vendor", "skills");
-  mkdirSync(root, { recursive: true });
+  mkdirSync(VENDOR_DIR, { recursive: true });
   for (const repo of cfg.repos) {
-    const dest = join(root, repo.name);
+    const dest = join(VENDOR_DIR, repo.name);
     if (existsSync(join(dest, ".git"))) {
       console.log(`[pull] ${repo.name}`);
       run("git", ["-C", dest, "pull", "--ff-only", "--quiet"]);
@@ -66,12 +89,12 @@ function syncRepos(cfg) {
   }
 }
 
-// --- 2. resolve enabled skills into absolute source dirs ------------------
+// --- 2. resolve enabled skills into absolute source dirs -------------------
 function resolveSkills(cfg) {
   const manifest = [];
   const seenBasename = new Map();
   for (const repo of cfg.repos) {
-    const repoSrc = join(PROJECT_ROOT, "vendor", "skills", repo.name, repo.skillsDir);
+    const repoSrc = join(VENDOR_DIR, repo.name, repo.skillsDir);
     for (const rel of repo.enabled) {
       const src = join(repoSrc, rel);
       const skillFile = join(src, "SKILL.md");
@@ -91,17 +114,18 @@ function resolveSkills(cfg) {
   return manifest;
 }
 
-// --- 3. (re)link into each target dir -------------------------------------
+// --- 3. (re)link into each target dir --------------------------------------
 function linkTargets(cfg, manifest) {
   for (const t of cfg.linkTargets) {
-    const linkDir = join(PROJECT_ROOT, t.dir);
+    // linkTargets.dir is relative to SEED_DIR (e.g. "skills" -> <seed>/skills)
+    const linkDir = join(SEED_DIR, t.dir);
     mkdirSync(linkDir, { recursive: true });
 
-    // Managed links are those pointing into vendor/skills/. Remove any that
-    // are NOT in the current manifest (skill removed from config) — whether
-    // healthy or broken. readlink works on broken links; realpathSync would not.
+    // Managed links point into skills-sync/vendor/skills/. Remove any that are
+    // NOT in the current manifest (skill removed from config) — whether healthy
+    // or broken. readlink works on broken links; realpathSync would not.
     const wanted = new Set(manifest.map((m) => m.base));
-    const managedTarget = (rawTarget) => rawTarget.includes("vendor" + sep + "skills");
+    const managedTarget = (rawTarget) => rawTarget.includes("skills-sync" + sep + "vendor" + sep + "skills");
     for (const entry of readdirSync(linkDir)) {
       const p = join(linkDir, entry);
       let st;
@@ -147,7 +171,7 @@ function linkTargets(cfg, manifest) {
       if (!dryRun) symlinkSync(rel, linkPath, "dir");
     }
 
-    console.log(`[ok] linked ${manifest.length} skills into ${t.dir}`);
+    console.log(`[ok] linked ${manifest.length} skills into ${t.dir} (${linkDir})`);
   }
 }
 
@@ -156,6 +180,7 @@ function lstatExists(p) { try { lstatSync(p); return true; } catch { return fals
 // --- main ------------------------------------------------------------------
 try {
   const cfg = loadConfig();
+  console.log(`[seed] ${SEED_DIR}`);
   syncRepos(cfg);
   const manifest = resolveSkills(cfg);
   linkTargets(cfg, manifest);
