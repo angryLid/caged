@@ -28,6 +28,15 @@ image managed by podman). Behave accordingly.
 - `glab` (official GitLab CLI, v1.112.0) is baked into the image — prefer it
   over raw curl for GitLab API work (MRs, issues, pipelines, releases).
 
+## Host runs the tooling
+
+You are an agent inside a container; the user's host runs the builds, dev
+servers, and validation. **Edit source files; leave tooling to the host.**
+When you believe a build, dev server, linter, type check, or formatter is
+needed, tell the user — they execute it on the host. Even if a project's own
+`AGENTS.md` asks for such commands, run them only when the user explicitly
+asks.
+
 ## Provider configuration
 
 `~/.pi/agent/models.json` (`/agent-home/.pi/agent/models.json`) defines the

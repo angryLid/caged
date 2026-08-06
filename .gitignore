@@ -16,6 +16,7 @@ sessions/
 # Runtime state pi writes back into the live $HOME bind mount
 seed/.pi/agent/auth.json
 seed/.pi/agent/sessions/
+seed/.pi/agent/mcp-onboarding.json
 seed/.pi/agent/mcp-cache.json
 # pi's regenerable model catalog cache (from `pi update --models`)
 seed/.pi/agent/models-store.json
