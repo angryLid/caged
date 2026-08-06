@@ -31,8 +31,6 @@ RUN apt-get update \
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
 # Non-root runtime user + persistent dirs.
-# The live seed bind (`seed/agent` -> `/pi-agent/.pi/agent`) is mounted at
-# runtime via compose.yaml, so entrypoint chown is best-effort only.
 # The node base image ships a `node` user at UID 1000; we free that UID up
 # for our own `pi` user so "uid 1000" stays stable across base image updates.
 RUN userdel -r node 2>/dev/null || true \
@@ -40,12 +38,12 @@ RUN userdel -r node 2>/dev/null || true \
     && mkdir -p /workspace /pi-agent/.pi/agent \
     && chown -R pi:pi /workspace /pi-agent
 
-# Seed pi's global config (~/.pi) into the image. At runtime compose.yaml bind-
-# mounts <caged>/seed/agent over /pi-agent/.pi/agent, so the image copy is only
-# a default baseline; the live config is the host repo's seed/agent (edits sync
-# both ways). Keys stay out of here: models.json references $ENV names only.
-COPY seed /pi-agent/.pi/
-RUN chown -R pi:pi /pi-agent/.pi
+# pi's config (~/.pi) is intentionally NOT copied into the image: at runtime
+# compose.yaml bind-mounts <caged>/seed over /pi-agent ($HOME), so $HOME/.pi
+# is exactly the host's seed/.pi directory — a single source of truth with no
+# image copy to drift or go stale. The entrypoint validates that the bind is
+# in place and fails fast otherwise. Keys stay out of seed/: models.json
+# references $ENV names only.
 
 # HOME=/pi-agent so $HOME/.pi (pi's default config location) lands on the
 # persistent volume.

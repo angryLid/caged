@@ -10,6 +10,6 @@ node_modules/
 .idea/
 .vscode/
 
-# Runtime state pi writes back into the live seed bind mount
-seed/agent/auth.json
-seed/agent/sessions/
+# Runtime state pi writes back into the live $HOME bind mount
+seed/.pi/agent/auth.json
+seed/.pi/agent/sessions/

@@ -37,7 +37,8 @@ provider is missing its key, tell the user which env var needs to be set
 rather than fabricating one.
 
 To add or change providers/models, edit `models.json` in the volume (or the
-`seed/` directory of the caged source repo and rebuild the image).
+`seed/` directory of the caged source repo (live-mount the seed — no rebuild
+needed; changes take effect on next container start).
 
 ## chrome-devtools MCP (optional)
 

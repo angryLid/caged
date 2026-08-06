@@ -18,12 +18,11 @@ Hardened podman/docker container to run
 caged/
 ├── Containerfile        # image definition (non-root, pinned pi version)
 ├── compose.yaml         # the single runtime entry (podman compose / podman-compose)
-├── seed/                # pi "global config" (~/.pi) — baked into the image;
-│   │                    # seed/agent is bind-mounted LIVE into the container
-│   └── agent/           # models.json (providers), settings.json, mcp.json,
+├── seed/                # pi's home (~/.pi) — LIVE bind-mount source for $HOME
+│   └── .pi/agent/       # models.json (providers), settings.json, mcp.json,
 │                        # AGENTS.md, skills/, scripts/ (CDP helpers)
 ├── scripts/
-│   └── entrypoint.sh    # volume bootstrap + tini, runs as USER pi
+│   └── entrypoint.sh    # seed validation (fail-fast) + tini, runs as USER pi
 └── docs/SECURITY.md     # threat model & accepted trade-offs
 ```
 
@@ -33,8 +32,9 @@ Requirements: podman >= 4 on macOS (or docker with `userns_mode` support) plus
 `podman-compose` (`brew install podman-compose`).
 
 ```sh
-# 1. build (first run or after seed/ changes — compose auto-builds when the
-#    image is missing; force with `podman compose ... build --no-cache`)
+# 1. build (only needed the first time, or when the Containerfile changes —
+#    compose auto-builds when the image is missing; force with
+#    `podman compose ... build --no-cache`)
 cd caged && podman compose build
 
 # 2. interactive TUI — run from the repo you want as the workspace:
@@ -52,39 +52,54 @@ Both commands mount the **directory you run them from** as `/workspace`.
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
 | `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
-| `/pi-agent/.pi/agent` | `<caged>/seed/agent` (`$CAGED_AGENT_SEED`) | rw | **live seed** — pi's config/auth/skills; every write synced back to the host |
+| `/pi-agent` (`$HOME`) | `<caged>/seed` (`$CAGED_HOME`) | rw | **pi's live home** — `seed/` maps 1:1 to `$HOME`, so `~/.pi` *is* `seed/.pi`; everything pi configures lands back on the host |
+| `/pi-agent/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
 | `/pi-agent/.pi/agent/sessions` | `$CAGED_WORKSPACE/sessions` on the host | rw | **pi session data — per-project, on the host** |
 
-The agent config is a *bind mount* of `caged/seed/agent`, not a named volume:
-whatever pi writes under `~/.pi/agent` (settings, models, mcp.json, skills,
-even `auth.json`) lands directly in the repo tree. Iterate on seed files and
-they take effect on the *next* container start — no image rebuild required.
-There is no fresh-volume seeding step, because the seed *is* the live config.
+`$HOME` is `/pi-agent`, so the whole `seed/` tree is the live home mount:
+`~/.pi` *is* `seed/.pi` and `~/.pi/agent` is `seed/.pi/agent`. Whatever pi
+writes under `~/.pi` (settings, models, mcp.json, skills, even `auth.json`)
+lands directly in the repo tree. There is **no baked-in config inside the
+image** and no fresh-volume seeding step — the seed *is* the live config.
+Iterate on seed files and they take effect on the *next* container start —
+no image rebuild required. Because the entire `seed/` dir maps onto `$HOME`,
+any future top-level subdir you add under `seed/` automatically appears at
+the matching path under `/pi-agent` — extensible by construction.
 
-Keep runtime state out of git: `seed/agent/auth.json` and
-`seed/agent/sessions/` are ignored (see `.gitignore`). `auth.json` is written
-the first time you authenticate, so don't worry if it doesn't exist yet.
+The entrypoint validates the mount **before** launching pi: if the seed is
+missing or incomplete, `mcp.json` references a missing executable, or the
+seed is read-only, it exits non-zero with a diagnostic instead of letting pi
+run half-configured. This also catches a wrong `$CAGED_HOME` — e.g. an old
+value that pointed at an agent subdir (a dangling `~/.pi/agent` fails the
+required-files check immediately).
+
+Keep runtime state out of git: `seed/.pi/agent/auth.json` and
+`seed/.pi/agent/sessions/` are ignored (see `.gitignore`). `auth.json` is
+written the first time you authenticate, so don't worry if it doesn't exist
+yet.
 
 **Session data lives per-project on the host** as a nested mount
 (`/pi-agent/.pi/agent/sessions` is masked by it): when you run `caged compose
 … up` from `~/folder`, pi's sessions are written to `~/folder/sessions/`
-(podman-compose creates the directory if missing). Deleting `seed/agent` or
-`auth.json` does **not** touch your sessions or your API keys' cached auth.
+(podman-compose creates the directory if missing). Deleting `seed/.pi/agent`
+or `auth.json` does **not** touch your sessions or your API keys' cached
+auth.
 
 ## Seed config (`seed/`)
 
-`seed/` mirrors pi's `~/.pi` home and ships in the image:
+`seed/` mirrors pi's `$HOME` on the host; `seed/.pi/` is pi's config home,
+mounted live (not baked into the image):
 
-* `agent/models.json` — providers: **DeepSeek**, **Volcengine Ark Coding**
+* `.pi/agent/models.json` — providers: **DeepSeek**, **Volcengine Ark Coding**
   (minimax-m3 / doubao-seed / glm-5.2), **OpenRouter**, **Local** (private,
   env-configured base URL + key)
-* `agent/settings.json` — trust + `pi-mcp-adapter` extension
-* `agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
-* `agent/skills/` — caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes
-* `agent/AGENTS.md` — environment primer pi loads for the container
-* `agent/scripts/` — `start-chrome-devtools-mcp.sh`, `devtools-forward.js` (CDP helpers, referenced by `mcp.json`)
+* `.pi/agent/settings.json` — trust + `pi-mcp-adapter` extension
+* `.pi/agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
+* `.pi/agent/skills/` — caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes
+* `.pi/agent/AGENTS.md` — environment primer pi loads for the container
+* `.pi/agent/scripts/` — `start-chrome-devtools-mcp.sh`, `devtools-forward.js` (CDP helpers, referenced by `mcp.json`)
 
-To change the config, just edit `seed/agent/` — it is the live config, bind-
+To change the config, just edit `seed/.pi/agent/` — it is the live config,
 mounted into the container (effective on next container start). No rebuild
 round-trip.
 
@@ -105,7 +120,7 @@ For interactive TUI auth flows that don't use `models.json`, pi stores
 credentials in `auth.json` inside the agent dir:
 
 pi stores credentials in `auth.json` inside the agent dir
-(`/pi-agent/agent/auth.json` on the volume). Two options:
+(`/pi-agent/.pi/agent/auth.json` on the volume). Two options:
 
 ```sh
 podman compose -f /path/to/caged/compose.yaml run --rm pi pi auth
@@ -115,8 +130,8 @@ Never put API keys in `/workspace` — anything there is readable by pi.
 
 ## chrome-devtools MCP
 
-`seed/agent/mcp.json` registers a chrome-devtools MCP server. It forwards the
-container-local port `19222` to the host's Chrome CDP and requires:
+`seed/.pi/agent/mcp.json` registers a chrome-devtools MCP server. It forwards
+the container-local port `19222` to the host's Chrome CDP and requires:
 
 1. Host Chrome running with `--remote-debugging-port=9222`
 2. `host.docker.internal` resolvable from the container (podman on macOS
@@ -133,7 +148,7 @@ that's expected, not a caged bug.
 |---|---|---|
 | `CAGED_IMAGE` | `caged:latest` | image tag to run |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
-| `CAGED_AGENT_SEED` | `./seed/agent` (relative to the compose file) | host dir bind-mounted at `/pi-agent/.pi/agent` — live seed, synced both ways |
+| `CAGED_HOME` | `./seed` (relative to the compose file) | host dir bind-mounted at `/pi-agent` (`$HOME`) — live seed: `seed/.pi` == `~/.pi`, synced both ways. Extensible: any new top-level dir under `seed/` appears at the matching path under `/pi-agent` |
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |

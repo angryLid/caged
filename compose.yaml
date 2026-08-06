@@ -17,7 +17,7 @@ services:
     environment:
       HOME: /pi-agent
       # Model provider keys. pi expands these $NAME references found in
-      # seed/agent/models.json from the container env at runtime. Pass your
+      # seed/.pi/agent/models.json from the container env at runtime. Pass your
       # real values when starting, e.g.:
       #   CAGED_IMAGE=... MY_DEEPSEEK_API_KEY=sk-... podman compose up
       # or keep them in an env file (compose supports `env_file:`).
@@ -29,7 +29,7 @@ services:
     working_dir: /workspace
     volumes:
       - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)
-      - ${CAGED_AGENT_SEED:-./seed/agent}:/pi-agent/.pi/agent:rw  # live seed (<caged>/seed/agent): pi's edits sync back to the host
+      - ${CAGED_HOME:-./seed}:/pi-agent:rw  # live $HOME: caged/seed maps 1:1 to pi's home, so ~/.pi == seed/.pi (synced both ways)
       - ${CAGED_WORKSPACE:-$PWD}/sessions:/pi-agent/.pi/agent/sessions  # pi sessions → per-project on host
     stdin_open: true              # -i
     tty: true                     # -t

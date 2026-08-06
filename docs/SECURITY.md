@@ -13,23 +13,23 @@ the host filesystem beyond the mount, or persist on the host.
 
 | Risk | Mitigation | Status |
 |------|-----------|--------|
-| Read host files | only `/workspace`, `$CAGED_WORKSPACE/sessions` and `caged/seed/agent` (mounted at `/pi-agent/.pi/agent`) are mounted; no `-v /`, rootfs is read-only | ✅ |
-| Write host files | read-only rootfs; `/workspace` rw and the live seed bind at `/pi-agent/.pi/agent` rw are the only writable host-backed mounts | ✅ |
+| Read host files | only `/workspace`, `$CAGED_WORKSPACE/sessions` and `caged/seed` (mounted at `/pi-agent`, pi's `$HOME`) are mounted; no `-v /`, rootfs is read-only | ✅ |
+| Write host files | read-only rootfs; `/workspace` rw and the live `$HOME` bind at `/pi-agent` (== `caged/seed`) rw are the only writable host-backed mounts | ✅ |
 | Escape via root | runs as UID 1000 non-root with `--userns=keep-id` | ✅ |
 | Gain capabilities | `--cap-drop ALL` + `--security-opt no-new-privileges` | ✅ |
 | Kernel exploit | container seccomp profile (podman default) | ✅ |
 | Exfiltrate secrets via network | **⚠️ intentionally NOT mitigated** — network is fully open by design (pi talks to model providers). See notes below. | ⚠️ |
-| Persistence on host | live seed bind `caged/seed/agent` → `/pi-agent/.pi/agent` (config/auth/skills) + `$CAGED_WORKSPACE/sessions` (session data) | ✅ |
+| Persistence on host | live `$HOME` bind `caged/seed` → `/pi-agent` (config/auth/skills at `seed/.pi`, sessions at `$CAGED_WORKSPACE/sessions`) | ✅ |
 | Zombie processes | tini as PID 1 | ✅ |
 
 ## Deliberate trade-offs (accepted risks)
 
 1. **Open network.** Required to reach model providers and to let pi install
    packages / `npm install` / clone repos. This means a compromised agent could
-   exfiltrate whatever it can read inside `/workspace` and the live seed bind.
-   → Keep your real secrets **out of `/workspace`**, or run `caged` on a throwaway
-   checkout of the repo. Provision keys via `auth.json` in `/pi-agent` (lands in
-   `seed/agent/` on the host, gitignored) and never commit them.
+   exfiltrate whatever it can read inside `/workspace` and the live `$HOME`
+   bind. → Keep your real secrets **out of `/workspace`**, or run `caged` on a
+   throwaway checkout of the repo. Provision keys via `auth.json` in
+   `seed/.pi/agent/` (gitignored) and never commit them.
 
 2. **Read-write `/workspace`.** pi needs it to edit code. If a repo should be
    treated as read-only, mount it `:ro` and let pi only read, or fork it into
@@ -47,15 +47,15 @@ the host filesystem beyond the mount, or persist on the host.
   runtime and live only in the process/volume `auth.json`.
 * Runtime (compose.yaml): read-only rootfs + tmpfs + cap_drop ALL +
   no_new_privileges + keep-id userns.
-* Volume hygiene: pi's config lives in the live seed bind (`caged/seed/agent`,
+* Volume hygiene: pi's home lives in the live `$HOME` bind (`caged/seed`,
   synced to the host repo); sessions live per-project at
-  `$CAGED_WORKSPACE/sessions`; auth.json is gitignored.
+  `$CAGED_WORKSPACE/sessions`; `seed/.pi/agent/auth.json` is gitignored.
 
 ## Verifying the container is actually restricted
 
 ```sh
 podman run --rm -it --read-only --cap-drop ALL --security-opt no-new-privileges \
-  --userns=keep-id -v "$PWD/seed/agent:/pi-agent/.pi/agent" caged:latest sh -c '
+  --userns=keep-id -v "$PWD/seed:/pi-agent" caged:latest sh -c '
     id
     touch /etc/test 2>&1 | head -1
     touch /tmp/test && echo "tmp writable"

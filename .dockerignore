@@ -4,6 +4,6 @@
 docs/
 compose.yaml
 
-# runtime state that may appear in the live seed bind mount
-seed/agent/auth.json
-seed/agent/sessions/
+# seed/ is not needed in the build context: pi's home ($HOME=/pi-agent) is
+# bind-mounted live at runtime, never COPY'd into the image.
+seed/
