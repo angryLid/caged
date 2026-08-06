@@ -5,14 +5,24 @@
       "type": "git",
       "url": "https://gitlab.com/gitlab-org/ai/skills.git",
       "skillsDir": "skills",
-      "enabled": []
+      "enabled": [
+        "commit-messages"
+      ]
     },
     {
       "name": "mattpocock-skills",
       "type": "git",
       "url": "https://github.com/mattpocock/skills.git",
       "skillsDir": "skills",
-      "enabled": []
+      "enabled": [
+        "productivity/grill-me",
+        "productivity/grilling",
+        "productivity/handoff",
+        "productivity/teach",
+        "productivity/to-questionnaire",
+        "productivity/wait-what",
+        "productivity/writing-for-agents"
+      ]
     },
     {
       "name": "local",

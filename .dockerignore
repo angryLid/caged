@@ -4,7 +4,12 @@
 docs/
 compose.yaml
 
-# seed/ is not needed in the build context: pi's config home (~/.pi) is
-# bind-mounted live at runtime (seed/.pi -> /agent-home/.pi), never COPY'd
-# into the image.
+# seed/ is generally NOT needed in the build context: pi's config home
+# (~/.pi) is bind-mounted live at runtime (seed/.pi -> /agent-home/.pi),
+# never COPY'd into the image. EXCEPTION: the Containerfile COPYs
+# seed/.pi/agent/skills.json at BUILD time to drive the build-time skill
+# clone, so that one file must be let back through the ignore.
 seed/
+!seed/.pi/
+!seed/.pi/agent/
+!seed/.pi/agent/skills.json
