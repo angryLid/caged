@@ -23,7 +23,6 @@ caged/
 │   └── agent/           # models.json (providers), settings.json, mcp.json,
 │                        # AGENTS.md, skills/; + devtools-forward.js, start-chrome-devtools-mcp.sh
 ├── scripts/
-│   ├── build.sh         # podman build -t caged:latest
 │   └── entrypoint.sh    # volume bootstrap + tini, runs as USER pi
 └── docs/SECURITY.md     # threat model & accepted trade-offs
 ```
@@ -34,8 +33,9 @@ Requirements: podman >= 4 on macOS (or docker with `userns_mode` support) plus
 `podman-compose` (`brew install podman-compose`).
 
 ```sh
-# 1. build
-cd caged && ./scripts/build.sh
+# 1. build (first run or after seed/ changes — compose auto-builds when the
+#    image is missing; force with `podman compose ... build --no-cache`)
+cd caged && podman compose build
 
 # 2. interactive TUI — run from the repo you want as the workspace:
 cd /path/to/your/repo

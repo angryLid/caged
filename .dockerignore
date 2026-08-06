@@ -2,5 +2,4 @@
 .gitignore
 /*.md
 docs/
-scripts/build.sh
 compose.yaml

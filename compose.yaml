@@ -1,6 +1,9 @@
 services:
   pi:
     image: ${CAGED_IMAGE:-caged:latest}
+    build:
+      context: .
+      dockerfile: Containerfile
     command: ["pi"]
     init: true                    # reap child processes (bash tool)
     read_only: true               # immutable root filesystem
