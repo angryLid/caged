@@ -1,16 +1,43 @@
 # caged
 
-Hardened podman/docker container to run
-[`@earendil-works/pi-coding-agent`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
-(`pi`) safely against your code.
+A hardened, disposable container to run AI coding agents in — **isolation
+for [`pi`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
+(`@earendil-works/pi-coding-agent`) by default**.
+
+Coding agents like pi execute arbitrary bash commands against your code, and
+out of the box pi ships **no permission management of its own** — anything it
+runs, it runs with whatever rights you have on the host. caged closes that
+gap: a minimal Linux container where the agent works as a **non-root user on
+a read-only filesystem**, with no capabilities and no extra privileges, so it
+can only ever touch the workspace you explicitly hand it.
 
 > **What caged is**: a minimal, locked-down runtime for an AI coding agent that
 > can execute arbitrary bash commands. Non-root user, read-only rootfs,
 > no capabilities, no extra privileges, one disposable volume for all state.
 >
-> **What caged explicitly is NOT**: a network sandbox. pi needs open networking
+> **What caged is explicitly NOT**: a network sandbox. pi needs open networking
 > to reach model providers — that part is on purpose. See
 > [SECURITY.md](docs/SECURITY.md) for the full threat model.
+
+## What's inside
+
+* **GitLab CLI (`glab` v1.112.0)** — official GitLab CLI baked into the
+  image: MRs, issues, pipelines, releases. Authenticate once with
+  `GITLAB_TOKEN` (env var), nothing stored in the repo.
+* **Atlassian CLI (`acli` v1.3.22)** — official Atlassian CLI baked in:
+  **Jira Cloud** work items, projects, admin APIs (also Confluence &
+  Bitbucket). API-token login; state survives restarts.
+* **Chrome DevTools MCP extension** — pi can drive your host Chrome through
+  the chrome-devtools MCP server (browse, search, screenshots, JS
+  evaluation). Optional: needs host Chrome listening on `:9222`.
+* **Multiple LLM providers** — DeepSeek, Volcengine Ark, OpenRouter, plus a
+  private local gateway; keys are passed via environment variables, never
+  baked into the image or committed to the repo.
+* **Live seed config** — pi's entire `~/.pi` is a two-way bind mount of
+  `seed/`: edit configs in this repo and they take effect on the next
+  container start — no image rebuild.
+* **Open networking** — deliberate, so pi can reach model providers and the
+  internet (see [docs/SECURITY.md](docs/SECURITY.md) for the trade-offs).
 
 ## Layout
 
