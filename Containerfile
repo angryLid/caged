@@ -31,8 +31,8 @@ RUN apt-get update \
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
 # Non-root runtime user + persistent dirs.
-# Ownership is preserved when podman/docker initializes a fresh named volume
-# from the /pi-agent path, so entrypoint chown is best-effort only.
+# The live seed bind (`seed/agent` -> `/pi-agent/.pi/agent`) is mounted at
+# runtime via compose.yaml, so entrypoint chown is best-effort only.
 # The node base image ships a `node` user at UID 1000; we free that UID up
 # for our own `pi` user so "uid 1000" stays stable across base image updates.
 RUN userdel -r node 2>/dev/null || true \
@@ -40,10 +40,10 @@ RUN userdel -r node 2>/dev/null || true \
     && mkdir -p /workspace /pi-agent/.pi/agent \
     && chown -R pi:pi /workspace /pi-agent
 
-# Seed pi's global config (~/.pi) into the volume path. podman/docker copies
-# this into a fresh empty named volume on first mount, so the container is
-# usable (providers, settings, skills, chrome-devtools MCP) with zero setup.
-# Keys stay out of here: models.json references $ENV names only.
+# Seed pi's global config (~/.pi) into the image. At runtime compose.yaml bind-
+# mounts <caged>/seed/agent over /pi-agent/.pi/agent, so the image copy is only
+# a default baseline; the live config is the host repo's seed/agent (edits sync
+# both ways). Keys stay out of here: models.json references $ENV names only.
 COPY seed /pi-agent/.pi/
 RUN chown -R pi:pi /pi-agent/.pi
 

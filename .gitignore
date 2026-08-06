@@ -9,3 +9,7 @@ node_modules/
 *.swp
 .idea/
 .vscode/
+
+# Runtime state pi writes back into the live seed bind mount
+seed/agent/auth.json
+seed/agent/sessions/

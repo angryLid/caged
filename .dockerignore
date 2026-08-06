@@ -3,3 +3,7 @@
 /*.md
 docs/
 compose.yaml
+
+# runtime state that may appear in the live seed bind mount
+seed/agent/auth.json
+seed/agent/sessions/

@@ -29,10 +29,7 @@ services:
     working_dir: /workspace
     volumes:
       - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)
-      - ${CAGED_VOLUME:-caged-pi-agent}:/pi-agent  # pi config / auth / downloaded tools (persists)
+      - ${CAGED_AGENT_SEED:-./seed/agent}:/pi-agent/.pi/agent:rw  # live seed (<caged>/seed/agent): pi's edits sync back to the host
       - ${CAGED_WORKSPACE:-$PWD}/sessions:/pi-agent/.pi/agent/sessions  # pi sessions → per-project on host
     stdin_open: true              # -i
     tty: true                     # -t
-
-volumes:
-  ${CAGED_VOLUME:-caged-pi-agent}:
