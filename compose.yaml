@@ -4,6 +4,11 @@ services:
     build:
       context: .
       dockerfile: Containerfile
+      args:
+        # Pass the pi version as a build-arg (default below) so a version
+        # bump rebuilds only the volatile pi layer, not the whole image.
+        # Override with: PI_VERSION=x.y.z podman compose build
+        PI_VERSION: ${PI_VERSION:-0.84.0}
     command: ["pi"]
     init: true                    # reap child processes (bash tool)
     read_only: true               # immutable root filesystem

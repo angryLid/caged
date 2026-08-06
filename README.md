@@ -344,9 +344,10 @@ These are known rough edges we've consciously chosen **not** to fix yet.
 * Running on macOS: podman runs inside a Linux VM, so `/workspace` bind-mount
   performance matters for large repos — see the earlier discussion about
   small-file I/O. `npm install` in the workspace will be slower than native.
-* The pi version is pinned via `ARG PI_VERSION` in the `Containerfile`; bump it
-  and rebuild to upgrade. (We deliberately don't quote a number here — the
-  project is still iterating.)
+* The pi version is pinned via `ARG PI_VERSION`, fed from compose's
+  `build.args.PI_VERSION` (default `0.84.0`). A single-layer rebuild:
+  `PI_VERSION=x.y.z podman compose build`. (We deliberately don't quote a
+  number here — the project is still iterating.)
 
 ## License / notes
 

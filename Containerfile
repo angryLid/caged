@@ -10,12 +10,17 @@
 #   * user code lives on a separate volume: /workspace
 #   * hardening (read-only rootfs, NO_NEW_PRIVILEGES, cap-drop) is applied
 #     at runtime via compose.yaml, not baked into the image
+#
+# Layer ordering for cache friendliness: the most volatile / frequently
+# changing layers (pi install, skills clone, entrypoint) sit at the BOTTOM,
+# so the slow, rarely-changing installs (apt, chrome-devtools-mcp, glab,
+# acli, user) are cached and reused across rebuilds. PI_VERSION is passed as
+# a build-arg from compose (default below) so a version bump is a single-layer
+# rebuild, not a Dockerfile edit that invalidates everything after it.
 
 ARG NODE_IMAGE=node:24-slim
 
 FROM ${NODE_IMAGE} AS base
-
-ARG PI_VERSION=0.84.0
 
 # Minimal runtime essentials:
 #   git          - pi's bash tool frequently manages repos / commits on user code
@@ -26,9 +31,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git ca-certificates curl tini \
     && rm -rf /var/lib/apt/lists/*
-
-# Install pi (pinned) globally. Open network at build time (npm registry).
-RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
 # chrome-devtools-mcp, pinned, installed INTO the image (not via npx): the
 # runtime /tmp is a noexec tmpfs, so npx'ing from $npm_config_cache=/tmp/.npm
@@ -89,11 +91,20 @@ RUN userdel -r node 2>/dev/null || true \
     && mkdir -p /workspace /agent-home/.pi/agent \
     && chown -R pi:pi /workspace /agent-home
 
+# Install pi (pinned) globally. Open network at build time (npm registry).
+# Volatile layer: sits after all the slow, rarely-changing installs above so
+# a PI_VERSION bump only rebuilds this layer (and the few below it), keeping
+# apt/chrome/glab/acli/user cached.
+ARG PI_VERSION=0.84.0
+RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
+
 # Declarative skills — clone the configured skill repos into the image at
 # BUILD time (network), so a container start only copies the enabled skills
 # into the seed — no network / git at start. skills.json lives in the seed
 # (seed/.pi/agent/skills.json) and is copied here to drive the build-time
 # clone; the resulting repos are baked under /opt/caged/skills/vendor.
+# Volatile layer: skills.json churns on seed edits, so it stays near the
+# bottom.
 COPY seed/.pi/agent/skills.json /opt/caged/skills.json
 COPY scripts/skills-sync.mjs /opt/caged/skills-sync.mjs
 RUN node /opt/caged/skills-sync.mjs \
