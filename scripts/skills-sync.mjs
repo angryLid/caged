@@ -9,23 +9,35 @@
  * `seed/.pi` dir (compose.yaml). So skills must be installed INTO the seed —
  * `seed/.pi/agent/skills/` — NOT into a user's project working tree.
  *
+ * Skills come from two kinds of source, resolved serially in declaration
+ * order (later sources override earlier ones on basename collision):
+ *   * type "git"   — clonable repos (e.g. gitlab-ai-skills, mattpocock-skills).
+ *     Cloned at **image build time** (network) into a vendor dir baked into
+ *     the image; the container start only copies the enabled skills from that
+ *     vendored set — no network, no git, at start.
+ *   * type "local" — skills maintained directly in the repo, in a directory
+ *     inside the seed (default `skills-src/`, resolved relative to the seed
+ *     dir). These are git-tracked sources of truth; the installed copy in
+ *     `skills/` is a generated artifact. Local sources are copied at container
+ *     start like any other.
+ *
  * Network vs. link is deliberately split:
- *   * The skill repos are cloned at **image build time** (network) into a
+ *   * Git skill repos are cloned at **image build time** (network) into a
  *     vendor dir baked into the image. The container start only copies the
  *     enabled skills from that vendored set into the seed's skills dir — no
  *     network, no git, at start.
  *   * Running the script by hand (local dev) clones + installs in one step.
  *
  * Modes:
- *   default / no mode flag   clone/pull repos, then install enabled skills
- *   --clone-only             only clone/pull repos into the vendor dir (build)
+ *   default / no mode flag   clone/pull git sources, then install enabled skills
+ *   --clone-only             only clone/pull git sources into the vendor dir (build)
  *   --link-only              only install enabled skills from an existing
- *                            vendor dir into the seed skills dir (container
- *                            start) — no network / git
+ *                            vendor dir + local seed sources into the seed
+ *                            skills dir (container start) — no network / git
  *
  * Installation copies each enabled skill dir into the seed skills dir and
  * marks it with a dotfile so stale managed copies can be detected and removed
- * without ever touching hand-written / committed skills.
+ * without ever touching unmanaged skills.
  *
  * Idempotent and self-healing: on a fresh clone it re-creates everything.
  *
@@ -37,7 +49,7 @@
  *   --config   path to skills.json. Default <project>/seed/.pi/agent/skills.json.
  *   --seed     the pi agent config dir that owns the skills; the install
  *              destination. Defaults to <project>/seed/.pi/agent.
- *   --vendor   where the skill source repos live. Defaults to
+ *   --vendor   where the git skill source repos live. Defaults to
  *              <seed>/skills-sync/vendor/skills (used by local-dev mode). At
  *              container start the entrypoint passes the image-baked dir,
  *              e.g. /opt/caged/skills/vendor.
@@ -109,41 +121,49 @@ function loadConfig() {
   return JSON.parse(readFileSync(configPath, "utf8"));
 }
 
-// --- 1. clone / pull repos (build time / local dev only) -------------------
+// --- 1. clone / pull git sources (build time / local dev only). ------------
+// Local sources are not cloned — they live directly in the seed (SEED_DIR).
 function syncRepos(cfg) {
   mkdirSync(VENDOR_DIR, { recursive: true });
-  for (const repo of cfg.repos) {
-    const dest = join(VENDOR_DIR, repo.name);
+  for (const src of cfg.sources) {
+    if (src.type === "local") continue;
+    const dest = join(VENDOR_DIR, src.name);
     if (existsSync(join(dest, ".git"))) {
-      console.log(`[pull] ${repo.name}`);
+      console.log(`[pull] ${src.name}`);
       run("git", ["-C", dest, "pull", "--ff-only", "--quiet"]);
     } else {
-      console.log(`[clone] ${repo.name} <- ${repo.url}`);
-      run("git", ["clone", "--quiet", repo.url, dest]);
+      console.log(`[clone] ${src.name} <- ${src.url}`);
+      run("git", ["clone", "--quiet", src.url, dest]);
     }
   }
 }
 
 // --- 2. resolve enabled skills into absolute source dirs -------------------
+// Sources are processed serially in declaration order; later sources override
+// earlier ones on basename collision (last wins).
 function resolveSkills(cfg) {
   const manifest = [];
   const seenBasename = new Map();
-  for (const repo of cfg.repos) {
-    const repoSrc = join(VENDOR_DIR, repo.name, repo.skillsDir);
-    for (const rel of repo.enabled) {
-      const src = join(repoSrc, rel);
+  for (const source of cfg.sources) {
+    // git sources live in the (build-time cloned) vendor dir; local sources
+    // live directly in the seed, resolved relative to SEED_DIR.
+    const sourceRoot = source.type === "local"
+      ? join(SEED_DIR, source.dir ?? "skills-src")
+      : join(VENDOR_DIR, source.name, source.skillsDir);
+    for (const rel of source.enabled) {
+      const src = join(sourceRoot, rel);
       const skillFile = join(src, "SKILL.md");
       if (!existsSync(skillFile)) {
-        warn(`skill not found: ${repo.name}/${rel} (expected ${skillFile})`);
+        warn(`skill not found: ${source.name}/${rel} (expected ${skillFile})`);
         continue;
       }
       const base = basename(src);
       if (seenBasename.has(base)) {
-        warn(`basename collision "${base}": enabled in both ${seenBasename.get(base)} and ${repo.name}/${rel} — pi will load only one`);
+        console.log(`[override] ${source.name}/${rel} overrides ${seenBasename.get(base)} (same basename "${base}")`);
       } else {
-        seenBasename.set(base, `${repo.name}/${rel}`);
+        seenBasename.set(base, `${source.name}/${rel}`);
       }
-      manifest.push({ base, src, repo: repo.name, rel });
+      manifest.push({ base, src, source: source.name, rel });
     }
   }
   return manifest;

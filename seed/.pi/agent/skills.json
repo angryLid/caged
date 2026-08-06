@@ -1,45 +1,30 @@
 {
-  "repos": [
+  "sources": [
     {
       "name": "gitlab-ai-skills",
+      "type": "git",
       "url": "https://gitlab.com/gitlab-org/ai/skills.git",
       "skillsDir": "skills",
-      "enabled": [
-        "glab",
-        "commit-messages",
-        "mr-review"
-      ]
+      "enabled": []
     },
     {
       "name": "mattpocock-skills",
+      "type": "git",
       "url": "https://github.com/mattpocock/skills.git",
       "skillsDir": "skills",
+      "enabled": []
+    },
+    {
+      "name": "local",
+      "type": "local",
+      "dir": "skills-src",
       "enabled": [
-        "engineering/ask-matt",
-        "engineering/code-review",
-        "engineering/codebase-design",
-        "engineering/diagnosing-bugs",
-        "engineering/domain-modeling",
-        "engineering/grill-with-docs",
-        "engineering/implement",
-        "engineering/improve-codebase-architecture",
-        "engineering/prototype",
-        "engineering/research",
-        "engineering/resolving-merge-conflicts",
-        "engineering/setup-matt-pocock-skills",
-        "engineering/tdd",
-        "engineering/to-spec",
-        "engineering/to-tickets",
-        "engineering/triage",
-        "engineering/wayfinder",
-        "engineering/wizard",
-        "productivity/grill-me",
-        "productivity/grilling",
-        "productivity/handoff",
-        "productivity/teach",
-        "productivity/to-questionnaire",
-        "productivity/wait-what",
-        "productivity/writing-for-agents"
+        "bgm-metadata",
+        "caged-persistence",
+        "create-post",
+        "markdown-link",
+        "mdx-notes",
+        "skills-sync"
       ]
     }
   ],

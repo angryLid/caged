@@ -64,42 +64,52 @@ agent skills and enabling a subset of them — see `seed/.pi/agent/skills.json`
 (managed in the seed, alongside the rest of the config). It is tool-agnostic
 (works with any agent that reads skills from a directory).
 
-The skill repos are cloned **at image build time** (network) into a vendor dir
-baked into the image (`/opt/caged/skills/vendor`). At **container start** the
-entrypoint only copies the enabled skills from that baked set into the seed's
-skills dir — **no network, no git at start**. This keeps the two network
-concerns apart: pulling latest skill versions happens once, when you rebuild
-the image; a container start is fast and offline-safe.
+Skills come from two kinds of source, resolved serially in declaration order
+(later sources override earlier ones on basename collision):
+
+* **`type: "git"`** — clonable repos. These are cloned **at image build time**
+  (network) into a vendor dir baked into the image (`/opt/caged/skills/vendor`).
+  At **container start** the entrypoint only copies the enabled skills from
+  that baked set into the seed's skills dir — **no network, no git at start**.
+* **`type: "local"`** — skills you maintain directly in this repo, in
+  `seed/.pi/agent/skills-src/` (git-tracked, the source of truth). They live in
+  the seed already, so they need **no image build step** — the entrypoint
+  copies enabled local skills straight from `skills-src/` into `skills/` at
+  container start, alongside the git ones.
 
 Skills are installed into the seed (`seed/.pi/agent/skills/`), pi's live
 config home bind-mounted at `/agent-home/.pi/agent` at runtime. Each enabled
 skill is copied in as a real directory (not a symlink) and marked with a
 hidden `.caged-skill-managed` file, so the tool can later tell its own copies
-apart from hand-written skills.
+apart from unmanaged skills.
 
 You can also run the sync by hand, e.g. after editing `skills.json` (local dev
 mode clones + installs in one step):
 
 ```bash
-node scripts/skills-sync.mjs            # clone/pull repos, then install into seed/.pi/agent/skills
+node scripts/skills-sync.mjs            # clone/pull git sources, then install into seed/.pi/agent/skills
 node scripts/skills-sync.mjs --dry-run  # preview without changing anything
-node scripts/skills-sync.mjs --link-only     # install only, from an existing vendor (no git/network)
-node scripts/skills-sync.mjs --clone-only    # clone/pull repos only (image build step)
+node scripts/skills-sync.mjs --link-only     # install only, from an existing vendor + local sources (no git/network)
+node scripts/skills-sync.mjs --clone-only    # clone/pull git sources only (image build step)
 ```
 
-- **`seed/.pi/agent/skills.json`** — the source of truth: a `repos[]` list
-  (each with a URL, `skillsDir`, and an `enabled` list of skill relative paths)
-  plus a `linkTargets[]` list of dirs, relative to the seed, to install skills
-  into (default `skills` → `seed/.pi/agent/skills`).
-- The script **clones** each repo into the vendor dir (or `git pull`s it), then
-  **copies** each enabled skill into the target. Stale managed copies are
-  removed, so dropping a skill from `enabled` uninstalls it. Hand-written
-  skills committed in `seed/.pi/agent/skills/` (bgm-metadata,
-  caged-persistence, create-post, markdown-link, mdx-notes, skills-sync) are
-  never touched — they carry no marker and are never clobbered.
-- The generated skill copies and the local-dev vendor are **gitignored** and
-  regenerated — edit `skills.json`, then re-run the script (or rebuild + restart
-  the container to pick up newly-added repos).
+- **`seed/.pi/agent/skills.json`** — the source of truth: a `sources[]` list.
+  Each git source has `type`, `url`, `skillsDir`, and an `enabled` list of
+  skill relative paths; each local source has `type`, `dir` (relative to the
+  seed), and an `enabled` list. Plus a `linkTargets[]` list of dirs, relative
+  to the seed, to install skills into (default `skills` →
+  `seed/.pi/agent/skills`).
+- The script **clones** each git source into the vendor dir (or `git pull`s
+  it), resolves local sources from `skills-src/`, then **copies** each enabled
+  skill into the target. Stale managed copies are removed, so dropping a skill
+  from `enabled` uninstalls it. Unmanaged skills (anything not carrying a
+  marker) are never clobbered.
+- The generated copies in `skills/` and the local-dev vendor are **gitignored**
+  and regenerated — edit **`skills-src/`** (your own skills) or `skills.json`
+  (declarations), then re-run the script (or rebuild + restart the container to
+  pick up newly-added git repos).
+
+> pi can also run this for you: ask it to “sync skills” (uses the `skills-sync` skill).
 
 > pi can also run this for you: ask it to “sync skills” (uses the `skills-sync` skill).
 

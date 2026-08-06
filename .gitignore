@@ -28,11 +28,6 @@ seed/.pi/agent/acli/
 # baked /opt/caged/skills/vendor, not from here)
 seed/.pi/agent/skills-sync/vendor/
 # skills-sync: generated skill copies in the seed's skills dir (installed at
-# container start). Hand-written/committed skills below are un-ignored.
-seed/.pi/agent/skills/*
-!seed/.pi/agent/skills/bgm-metadata/
-!seed/.pi/agent/skills/caged-persistence/
-!seed/.pi/agent/skills/create-post/
-!seed/.pi/agent/skills/markdown-link/
-!seed/.pi/agent/skills/mdx-notes/
-!seed/.pi/agent/skills/skills-sync/
+# container start). Sources of truth live in seed/.pi/agent/skills-src/ (git-
+# tracked); the skills/ dir is a regenerated artifact and ignored wholesale.
+seed/.pi/agent/skills/
