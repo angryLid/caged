@@ -1,0 +1,11 @@
+# Node / npm runtime state that pi may drop into the working tree
+node_modules/
+.pnpm-store/
+
+# OS cruft
+.DS_Store
+
+# Shell / editor leftovers
+*.swp
+.idea/
+.vscode/

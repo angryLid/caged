@@ -1,0 +1,26 @@
+services:
+  pi:
+    image: caged:latest
+    command: ["pi"]
+    init: true                    # reap child processes (bash tool)
+    read_only: true               # immutable root filesystem
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
+    userns_mode: keep-id
+    environment:
+      HOME: /pi-agent
+      PI_CODING_AGENT_DIR: /pi-agent/agent
+      PI_CODING_AGENT_SESSION_DIR: /pi-agent/sessions
+    working_dir: /workspace
+    volumes:
+      - .:/workspace:rw           # your code
+      - caged-pi-agent:/pi-agent  # pi config / sessions / downloaded tools
+    stdin_open: true              # -i
+    tty: true                     # -t
+
+volumes:
+  caged-pi-agent:

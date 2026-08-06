@@ -1,0 +1,7 @@
+.git/
+.gitignore
+*.md
+docs/
+scripts/build.sh
+scripts/run.sh
+compose.yaml
