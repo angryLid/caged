@@ -1,6 +1,6 @@
 services:
   pi:
-    image: caged:latest
+    image: ${CAGED_IMAGE:-caged:latest}
     command: ["pi"]
     init: true                    # reap child processes (bash tool)
     read_only: true               # immutable root filesystem
@@ -17,10 +17,10 @@ services:
       PI_CODING_AGENT_SESSION_DIR: /pi-agent/sessions
     working_dir: /workspace
     volumes:
-      - $PWD:/workspace:rw          # your code (caller's current dir)
-      - caged-pi-agent:/pi-agent    # pi config / sessions / downloaded tools
+      - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)
+      - ${CAGED_VOLUME:-caged-pi-agent}:/pi-agent  # pi config / sessions / downloaded tools
     stdin_open: true              # -i
     tty: true                     # -t
 
 volumes:
-  caged-pi-agent:
+  ${CAGED_VOLUME:-caged-pi-agent}:

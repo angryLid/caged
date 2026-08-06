@@ -9,7 +9,7 @@
 #     single volume: /pi-agent
 #   * user code lives on a separate volume: /workspace
 #   * hardening (read-only rootfs, NO_NEW_PRIVILEGES, cap-drop) is applied
-#     at runtime via scripts/run.sh / compose.yaml, not baked into the image
+#     at runtime via compose.yaml, not baked into the image
 
 ARG NODE_IMAGE=node:24-slim
 

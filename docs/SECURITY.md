@@ -42,7 +42,7 @@ the host filesystem beyond the mount, or persist on the host.
 ## Layered defense quick reference
 
 * Image: non-root USER pi, pinned agent version, minimal base layer.
-* Runtime (run.sh / compose.yaml): read-only rootfs + tmpfs + cap_drop ALL +
+* Runtime (compose.yaml): read-only rootfs + tmpfs + cap_drop ALL +
   no_new_privileges + keep-id userns.
 * Volume hygiene: everything pi persists lives under one named volume.
 

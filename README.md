@@ -17,36 +17,38 @@ Hardened podman/docker container to run
 ```
 caged/
 ├── Containerfile        # image definition (non-root, pinned pi version)
-├── compose.yaml         # podman compose / docker compose alternative
+├── compose.yaml         # the single runtime entry (podman compose / podman-compose)
 ├── scripts/
 │   ├── build.sh         # podman build -t caged:latest
-│   ├── run.sh           # hardened podman run wrapper
 │   └── entrypoint.sh    # volume bootstrap + tini, runs as USER pi
 └── docs/SECURITY.md     # threat model & accepted trade-offs
 ```
 
 ## Quickstart
 
+Requirements: podman >= 4 on macOS (or docker with `userns_mode` support) plus
+`podman-compose` (`brew install podman-compose`).
+
 ```sh
 # 1. build
-./scripts/build.sh
+cd caged && ./scripts/build.sh
 
-# 2. run against the current directory (mounts your code as the workspace)
+# 2. interactive TUI — run from the repo you want as the workspace:
 cd /path/to/your/repo
-/path/to/caged/scripts/run.sh                # interactive TUI
-/path/to/caged/scripts/run.sh "refactor this module"   # one-shot
-
-# or via compose (requires podman-compose: `brew install podman-compose`),
-# run from the repo you want as the workspace:
 podman compose -f /path/to/caged/compose.yaml up
+
+# 3. one-shot (non-interactive) run:
+podman compose -f /path/to/caged/compose.yaml run --rm pi pi --print "refactor this module"
 ```
+
+Both commands mount the **directory you run them from** as `/workspace`.
 
 ## What gets mounted
 
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
-| `/workspace`   | current dir (default) or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
-| `/pi-agent`    | named volume `caged-pi-agent` | rw | pi config, sessions, auth, downloaded tooling (rg/fd) |
+| `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
+| `/pi-agent`    | named volume `$CAGED_VOLUME` (default `caged-pi-agent`) | rw | pi config, sessions, auth, downloaded tooling (rg/fd) |
 
 Named volume `caged-pi-agent` persists between runs. `podman volume rm caged-pi-agent`
 gives you a completely clean slate.
@@ -58,7 +60,7 @@ pi stores credentials in `auth.json` inside the agent dir
 
 ```sh
 # a) interactive auth inside the container
-./scripts/run.sh pi auth
+podman compose -f /path/to/caged/compose.yaml run --rm pi pi auth
 
 # b) pre-provision the volume from the host
 podman run --rm -v caged-pi-agent:/pi-agent caged:latest pi auth
@@ -68,13 +70,15 @@ Never put API keys in `/workspace` — anything there is readable by pi.
 
 ## Environment knobs
 
+`compose.yaml` interpolates these from the calling shell; defaults listed.
+
 | Env var | Default | Meaning |
 |---|---|---|
-| `CAGED_IMAGE` | `caged:latest` | image tag for build/run |
+| `CAGED_IMAGE` | `caged:latest` | image tag to run |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
 | `CAGED_VOLUME` | `caged-pi-agent` | named volume mounted at `/pi-agent` |
 
-## Runtime hardening (applied by run.sh / compose.yaml)
+## Runtime hardening (applied by compose.yaml)
 
 * `--read-only` — root filesystem immutable (only `/workspace`, `/pi-agent`, `/tmp` writable)
 * `--tmpfs /tmp` — scratch, `noexec,nosuid`
