@@ -1,7 +1,8 @@
 {
   "defaultProjectTrust": "always",
   "packages": [
-    "npm:pi-mcp-adapter"
+    "npm:pi-mcp-adapter",
+    "npm:pi-web-access"
   ],
   "lastChangelogVersion": "0.84.0",
   "theme": "dark",
