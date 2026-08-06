@@ -52,12 +52,20 @@ Both commands mount the **directory you run them from** as `/workspace`.
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
 | `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
-| `/pi-agent`    | named volume `$CAGED_VOLUME` (default `caged-pi-agent`) | rw | pi home (`~/.pi`: config, sessions, auth, downloaded tooling) |
+| `/pi-agent`    | named volume `$CAGED_VOLUME` (default `caged-pi-agent`) | rw | pi home (`~/.pi`: config, auth, downloaded tooling) |
+| `/pi-agent/.pi/agent/sessions` | `$CAGED_WORKSPACE/sessions` on the host | rw | **pi session data — per-project, on the host** |
 
 Named volume `caged-pi-agent` persists between runs. On first use of a *fresh*
 empty volume, podman copies the contents of `/pi-agent` from the image — the
-seed — into it. `podman volume rm caged-pi-agent` wipes everything, and the
-next run re-seeds from the image.
+seed — into it. `podman volume rm caged-pi-agent` wipes it, and the next run
+re-seeds from the image.
+
+**Session data lives per-project on the host**, not in the volume: when you run
+`caged compose … up` from `~/folder`, pi's sessions are written to
+`~/folder/sessions/` (podman-compose creates the directory if missing). So each
+project keeps its own session history next to the code — `~/folder/sessions`.
+`podman volume rm caged-pi-agent` therefore **does not** delete your sessions;
+only the config/auth/tools volume is affected.
 
 ## Seed config (`seed/`)
 

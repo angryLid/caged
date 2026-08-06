@@ -12,8 +12,11 @@ image managed by podman). Behave accordingly.
 - The root filesystem is **read-only**. Writable areas:
   - `/workspace` — the user's code, mounted from the host working tree.
     Edits you make appear on the host as you write them.
-  - `/pi-agent` — pi state volume (config, sessions, auth, npm cache).
-    Persists across container restarts.
+  - `/pi-agent` — pi state volume (config, auth, npm cache). Persists across
+    container restarts.
+  - `/pi-agent/.pi/agent/sessions` — pi session data, mounted from
+    `$CAGED_WORKSPACE/sessions` on the host → each project keeps its own
+    sessions next to the code.
   - `/tmp` — scratch space, cleared on restart.
 - **Network is open**: no egress sandbox beyond the container boundary. You
   may reach model providers, registries, and the general internet directly.

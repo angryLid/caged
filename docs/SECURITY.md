@@ -13,13 +13,13 @@ the host filesystem beyond the mount, or persist on the host.
 
 | Risk | Mitigation | Status |
 |------|-----------|--------|
-| Read host files | only `/workspace` and `/pi-agent` are mounted; no `-v /`, rootfs is read-only | ✅ |
-| Write host files | read-only rootfs; `/workspace` rw is the only writable host-backed mount | ✅ |
+| Read host files | only `/workspace`, `/workspace/sessions` and `/pi-agent` are mounted; no `-v /`, rootfs is read-only | ✅ |
+| Write host files | read-only rootfs; `/workspace` rw (`/sessions` included) is the only writable host-backed mount | ✅ |
 | Escape via root | runs as UID 1000 non-root with `--userns=keep-id` | ✅ |
 | Gain capabilities | `--cap-drop ALL` + `--security-opt no-new-privileges` | ✅ |
 | Kernel exploit | container seccomp profile (podman default) | ✅ |
 | Exfiltrate secrets via network | **⚠️ intentionally NOT mitigated** — network is fully open by design (pi talks to model providers). See notes below. | ⚠️ |
-| Persistence on host | named volume `caged-pi-agent` is the only persisted state; wipe it to reset | ✅ |
+| Persistence on host | named volume `caged-pi-agent` (config/auth/tools) + `$CAGED_WORKSPACE/sessions` (session data) | ✅ |
 | Zombie processes | tini as PID 1 | ✅ |
 
 ## Deliberate trade-offs (accepted risks)
