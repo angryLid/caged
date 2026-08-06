@@ -49,9 +49,33 @@ caged/
 │   └── .pi/agent/       # models.json (providers), settings.json, mcp.json,
 │                        # AGENTS.md, skills/, scripts/ (CDP helpers)
 ├── scripts/
-│   └── entrypoint.sh    # seed validation (fail-fast) + tini, runs as USER pi
+│   ├── entrypoint.sh    # seed validation (fail-fast) + tini, runs as USER pi
+│   └── skills-sync.mjs  # declarative skills sync (see `## Skills (“skills-sync”)`)
 └── docs/SECURITY.md     # threat model & accepted trade-offs
 ```
+
+## Skills (“skills-sync”)
+
+This project ships a small **declarative** mechanism for pulling in external
+agent skills and enabling a subset of them — see `skills.json` at the repo
+root. It is tool-agnostic (works with any agent that reads skills from a
+directory; pi reads the project-local `.pi/skills/`).
+
+```bash
+node scripts/skills-sync.mjs          # clone/pull repos + (re)link enabled skills
+node scripts/skills-sync.mjs --dry-run   # preview without changing anything
+```
+
+- **`skills.json`** — the source of truth: a `repos[]` list (each with a URL,
+  `skillsDir`, and an `enabled` list of skill relative paths) plus a
+  `linkTargets[]` list of dirs to place symlinks (default `.pi/skills`).
+- The script **clones** each repo into `vendor/skills/<name>` (or `git pull`s it),
+  then creates **relative symlinks** into each link target. Stale links are
+  removed, so dropping a skill from `enabled` unlinks it.
+- `vendor/skills/` and `.pi/skills/` are **gitignored** and regenerated — edit
+  `skills.json`, then re-run the script.
+
+> pi can also run this for you: ask it to “sync skills” (uses the `skills-sync` skill).
 
 ## Quickstart
 

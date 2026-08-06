@@ -1,0 +1,30 @@
+{
+  "repos": [
+    {
+      "name": "gitlab-ai-skills",
+      "url": "https://gitlab.com/gitlab-org/ai/skills.git",
+      "skillsDir": "skills",
+      "enabled": [
+        "glab",
+        "commit-messages",
+        "mr-review"
+      ]
+    },
+    {
+      "name": "mattpocock-skills",
+      "url": "https://github.com/mattpocock/skills.git",
+      "skillsDir": "skills",
+      "enabled": [
+        "productivity/grill-me",
+        "engineering/code-review",
+        "engineering/tdd"
+      ]
+    }
+  ],
+  "linkTargets": [
+    {
+      "name": "pi",
+      "dir": ".pi/skills"
+    }
+  ]
+}
