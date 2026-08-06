@@ -32,9 +32,9 @@
           "maxTokens": 16384
         },
         {
-          "id": "glm-5.2",
-          "name": "GLM-5.2 (Volcengine Ark Coding)",
-          "contextWindow": 128000,
+          "id": "ark-code-latest",
+          "name": "ds4f via Ark",
+          "contextWindow": 270000,
           "maxTokens": 16384
         }
       ]

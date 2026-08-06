@@ -17,6 +17,8 @@ sessions/
 seed/.pi/agent/auth.json
 seed/.pi/agent/sessions/
 seed/.pi/agent/mcp-cache.json
+# pi's regenerable model catalog cache (from `pi update --models`)
+seed/.pi/agent/models-store.json
 # acli (Atlassian CLI) credentials: `acli jira auth login` stores its token
 # here via ACLI_CONFIG_DIR — persisted across restarts but never committed
 seed/.pi/agent/acli/

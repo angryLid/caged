@@ -15,7 +15,7 @@ ARG NODE_IMAGE=node:24-slim
 
 FROM ${NODE_IMAGE} AS base
 
-ARG PI_VERSION=0.83.0
+ARG PI_VERSION=0.84.0
 
 # Minimal runtime essentials:
 #   git          - pi's bash tool frequently manages repos / commits on user code
