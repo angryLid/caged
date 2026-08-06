@@ -29,9 +29,7 @@
       "type": "local",
       "dir": "skills-src",
       "enabled": [
-        "bgm-metadata",
         "caged-persistence",
-        "create-post",
         "markdown-link",
         "mdx-notes",
         "skills-sync"
