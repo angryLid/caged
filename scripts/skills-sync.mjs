@@ -2,45 +2,56 @@
 /**
  * skills-sync.mjs
  *
- * Declarative SKILLS sync for ./skills.json
+ * Declarative SKILLS sync for ./seed/.pi/agent/skills.json
  *
- * This project is a container image ("caged") that runs @earendil-works/pi-
- * coding-agent. pi scans ~/.pi/agent/skills/ for skills, and ~/.pi is a live
- * bind mount of the host `seed/.pi` dir (compose.yaml). So the skills must be
- * installed INTO the seed — `seed/.pi/agent/skills/` — NOT into the project's
- * working tree. The sync is therefore wired into the container entrypoint and
- * runs at every container start (see entrypoint.sh).
+ * The caged container runs @earendil-works/pi-coding-agent. pi scans
+ * ~/.pi/agent/skills/ for skills, and ~/.pi is a live bind mount of the host
+ * `seed/.pi` dir (compose.yaml). So skills must be installed INTO the seed —
+ * `seed/.pi/agent/skills/` — NOT into a user's project working tree.
  *
- * What it does:
- *   1. For each repo in skills.json, clone it into
- *      <seed>/skills-sync/vendor/skills/<name> if missing, otherwise `git pull`
- *      it (fast-forward to latest). The repos live inside the seed so the
- *      relative symlinks below stay valid inside the container's mount layout
- *      (everything under /agent-home/.pi/agent).
- *   2. For each enabled skill, create a RELATIVE symlink inside
- *      <seed>/skills (the dir pi scans) pointing back into that vendor dir.
- *   3. Remove stale symlinks this tool previously created (targets resolving
- *      into skills-sync/vendor/skills/), so skills removed from config stop
- *      loading. Hand-written / committed skills in <seed>/skills are left
- *      untouched.
+ * Network vs. link is deliberately split:
+ *   * The skill repos are cloned at **image build time** (network) into a
+ *     vendor dir baked into the image. The container start only copies the
+ *     enabled skills from that vendored set into the seed's skills dir — no
+ *     network, no git, at start.
+ *   * Running the script by hand (local dev) clones + installs in one step.
+ *
+ * Modes:
+ *   default / no mode flag   clone/pull repos, then install enabled skills
+ *   --clone-only             only clone/pull repos into the vendor dir (build)
+ *   --link-only              only install enabled skills from an existing
+ *                            vendor dir into the seed skills dir (container
+ *                            start) — no network / git
+ *
+ * Installation copies each enabled skill dir into the seed skills dir and
+ * marks it with a dotfile so stale managed copies can be detected and removed
+ * without ever touching hand-written / committed skills.
  *
  * Idempotent and self-healing: on a fresh clone it re-creates everything.
- * Relative symlinks mean nothing is hardcoded to an absolute path.
  *
  * Usage:
- *   node scripts/skills-sync.mjs [--dry-run] [--config skills.json] [--seed <pi-agent-dir>]
+ *   node scripts/skills-sync.mjs [--dry-run] [--config seed/.pi/agent/skills.json]
+ *                                [--seed <pi-agent-dir>] [--vendor <dir>]
+ *                                [--clone-only] [--link-only]
  *
- *   --seed   the pi agent config dir that owns the skills. Defaults to
- *            <project>/seed/.pi/agent. At container start the entrypoint
- *            passes the live mount: --seed /agent-home/.pi/agent
+ *   --config   path to skills.json. Default <project>/seed/.pi/agent/skills.json.
+ *   --seed     the pi agent config dir that owns the skills; the install
+ *              destination. Defaults to <project>/seed/.pi/agent.
+ *   --vendor   where the skill source repos live. Defaults to
+ *              <seed>/skills-sync/vendor/skills (used by local-dev mode). At
+ *              container start the entrypoint passes the image-baked dir,
+ *              e.g. /opt/caged/skills/vendor.
  *
  * Exit codes:
  *   0  ok
- *   1  fatal (bad config / clone / link failure)
+ *   1  fatal (bad config / clone / install failure)
  *   2  warnings only (e.g. skill missing, collision) — links still applied
  */
-import { readFileSync, mkdirSync, readdirSync, rmSync, symlinkSync, lstatSync, existsSync, realpathSync, readlinkSync } from "node:fs";
-import { dirname, resolve, join, relative, basename, sep } from "node:path";
+import {
+  readFileSync, mkdirSync, readdirSync, rmSync, cpSync, writeFileSync,
+  lstatSync, existsSync, readlinkSync,
+} from "node:fs";
+import { dirname, resolve, join, basename, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -49,16 +60,24 @@ const PROJECT_ROOT = resolve(__dirname, "..");
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
+const cloneOnly = args.includes("--clone-only");
+const linkOnly = args.includes("--link-only");
 const configIdx = args.indexOf("--config");
-const configPath = configIdx >= 0 ? resolve(PROJECT_ROOT, args[configIdx + 1]) : join(PROJECT_ROOT, "skills.json");
+const configPath = configIdx >= 0
+  ? resolve(PROJECT_ROOT, args[configIdx + 1])
+  : join(PROJECT_ROOT, "seed", ".pi", "agent", "skills.json");
 const seedIdx = args.indexOf("--seed");
 const SEED_DIR = seedIdx >= 0
   ? resolve(args[seedIdx + 1])
   : join(PROJECT_ROOT, "seed", ".pi", "agent");
-// Repos live inside the seed so symlinks in <seed>/skills stay valid under the
-// container's mount layout (/agent-home/.pi/agent). Config keys below are
-// resolved relative to SEED_DIR.
-const VENDOR_DIR = join(SEED_DIR, "skills-sync", "vendor", "skills");
+const vendorIdx = args.indexOf("--vendor");
+const VENDOR_DIR = vendorIdx >= 0
+  ? resolve(args[vendorIdx + 1])
+  : join(SEED_DIR, "skills-sync", "vendor", "skills");
+
+// Marker dropped into each installed skill dir so we can tell managed copies
+// apart from hand-written / committed skills when cleaning up.
+const MARKER = ".caged-skill-managed";
 
 let exitCode = 0;
 const warn = (msg) => { console.warn(`[warn] ${msg}`); exitCode = Math.max(exitCode, 2); };
@@ -69,12 +88,28 @@ function run(cmd, argsArr, opts = {}) {
   execFileSync(cmd, argsArr, { stdio: "inherit", ...opts });
 }
 
+// Install a skill by copying its source dir into the target location.
+//
+// Uses the shell `cp -r` (not node's fs.cpSync) because node's cpSync relies
+// on copy_file_range(2), which fails with EACCES on the virtiofs bind mount
+// that the live seed sits on (observed on podman/macOS). The external `cp`
+// walks the tree with plain reads/writes and works fine.
+function installSkill(src, dest, st) {
+  // Unlink a pre-existing symlink (legacy managed link / broken link) so the
+  // recursive `cp -r` never follows it into the vendor dir; real managed dirs
+  // are removed recursively.
+  if (st && st.isSymbolicLink()) rmSync(dest);
+  else rmSync(dest, { recursive: true, force: true });
+  run("cp", ["-r", "--", src + "/", dest]);
+  writeFileSync(join(dest, MARKER), "managed by caged skills-sync\n");
+}
+
 function loadConfig() {
   if (!existsSync(configPath)) throw new Error(`config not found: ${configPath}`);
   return JSON.parse(readFileSync(configPath, "utf8"));
 }
 
-// --- 1. clone / pull repos -------------------------------------------------
+// --- 1. clone / pull repos (build time / local dev only) -------------------
 function syncRepos(cfg) {
   mkdirSync(VENDOR_DIR, { recursive: true });
   for (const repo of cfg.repos) {
@@ -114,76 +149,72 @@ function resolveSkills(cfg) {
   return manifest;
 }
 
-// --- 3. (re)link into each target dir --------------------------------------
+// Is a path a managed entry? Either a marker-backed copy (current design) or a
+// legacy symlink pointing back into a skills-sync/vendor dir (old design).
+function isManagedAt(p, st) {
+  if (st.isDirectory()) return existsSync(join(p, MARKER));
+  if (st.isSymbolicLink()) {
+    try { return readlinkSync(p).includes(sep + "skills-sync" + sep + "vendor"); } catch { return false; }
+  }
+  return false;
+}
+
+// --- 3. install enabled skills into each target dir ------------------------
 function linkTargets(cfg, manifest) {
   for (const t of cfg.linkTargets) {
     // linkTargets.dir is relative to SEED_DIR (e.g. "skills" -> <seed>/skills)
     const linkDir = join(SEED_DIR, t.dir);
     mkdirSync(linkDir, { recursive: true });
 
-    // Managed links point into skills-sync/vendor/skills/. Remove any that are
-    // NOT in the current manifest (skill removed from config) — whether healthy
-    // or broken. readlink works on broken links; realpathSync would not.
     const wanted = new Set(manifest.map((m) => m.base));
-    const managedTarget = (rawTarget) => rawTarget.includes("skills-sync" + sep + "vendor" + sep + "skills");
+
+    // Remove entries that are NOT in the manifest but ARE managed (stale copy,
+    // or a legacy vendor symlink after a skill was removed from config). Hand-
+    // written / committed skills (no marker, not a vendor symlink) are left
+    // alone — but if a wanted skill collides with such a hand-written one, we
+    // warn below rather than clobber it.
     for (const entry of readdirSync(linkDir)) {
+      if (wanted.has(entry)) continue;
       const p = join(linkDir, entry);
       let st;
       try { st = lstatSync(p); } catch { continue; }
-      if (!st.isSymbolicLink()) continue;
-      let rawTarget;
-      try { rawTarget = readlinkSync(p); } catch { continue; }
-      if (managedTarget(rawTarget) && !wanted.has(entry) && !dryRun) {
-        console.log(`[unlink] ${t.name}: ${entry} (removed from config)`);
-        rmSync(p);
+      if (isManagedAt(p, st)) {
+        console.log(`[remove] ${t.name}: ${entry} (removed from config)`);
+        if (!dryRun) rmSync(p, { recursive: true, force: true });
       }
     }
 
     for (const m of manifest) {
-      const linkPath = join(linkDir, m.base);
-      // relative from linkDir to source, so it's portable across mounts/hosts
-      const rel = relative(linkDir, m.src);
-      const expected = realpathSync(m.src);
-      // If the entry exists and is a symlink that already resolves to the
-      // expected source, keep it. Otherwise (broken / wrong target / real dir)
-      // replace it so the link stays correct.
-      const existing = (() => {
-        try {
-          const st = lstatSync(linkPath);
-          if (!st.isSymbolicLink()) return "realdir";
-          const t = realpathSync(linkPath);
-          return t === expected ? "ok" : "stale";
-        } catch { return "stale"; }
-      })();
-      if (existing === "ok") {
-        console.log(`[exists] ${t.name}: ${m.base} (skip)`);
+      const dest = join(linkDir, m.base);
+      // A present but non-managed entry is a hand-written skill — never clobber
+      // it; warn instead.
+      let st;
+      let isManaged = false;
+      try { st = lstatSync(dest); isManaged = isManagedAt(dest, st); } catch { /* absent */ }
+      if (st && !isManaged) {
+        warn(`refusing to overwrite non-managed ${dest} — remove or rename it, or pick a different skill name`);
         continue;
       }
-      if (existing === "realdir") {
-        warn(`refusing to replace real directory ${linkPath} — remove it manually`);
-        continue;
+      console.log(`[install] ${t.name}: ${m.base} <- ${m.src}`);
+      if (!dryRun) {
+        installSkill(m.src, dest, st);
       }
-      if (existsSync(linkPath) || lstatExists(linkPath)) {
-        console.log(`[relink] ${t.name}: ${m.base} (stale target)`);
-        if (!dryRun) rmSync(linkPath);
-      }
-      console.log(`[link]  ${t.name}: ${m.base} -> ${rel}`);
-      if (!dryRun) symlinkSync(rel, linkPath, "dir");
     }
 
-    console.log(`[ok] linked ${manifest.length} skills into ${t.dir} (${linkDir})`);
+    console.log(`[ok] installed ${manifest.length} skills into ${t.dir} (${linkDir})`);
   }
 }
-
-function lstatExists(p) { try { lstatSync(p); return true; } catch { return false; } }
 
 // --- main ------------------------------------------------------------------
 try {
   const cfg = loadConfig();
   console.log(`[seed] ${SEED_DIR}`);
-  syncRepos(cfg);
-  const manifest = resolveSkills(cfg);
-  linkTargets(cfg, manifest);
+  console.log(`[vendor] ${VENDOR_DIR}`);
+  if (!linkOnly) syncRepos(cfg);
+  if (!cloneOnly) {
+    const manifest = resolveSkills(cfg);
+    linkTargets(cfg, manifest);
+  }
   console.log(dryRun ? "[dry-run] done" : "[done] skills synced");
 } catch (e) {
   err(e.message);

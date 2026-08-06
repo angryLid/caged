@@ -23,10 +23,11 @@ seed/.pi/agent/models-store.json
 # here via ACLI_CONFIG_DIR — persisted across restarts but never committed
 seed/.pi/agent/acli/
 
-# skills-sync: clones of external skill repos live INSIDE the seed (regenerated
-# by scripts/skills-sync.mjs at container start into -/.pi/agent/skills-sync/vendor)
+# skills-sync: local-dev clones of external skill repos (only used when running
+# skills-sync.mjs by hand; at container start the repos come from the image-
+# baked /opt/caged/skills/vendor, not from here)
 seed/.pi/agent/skills-sync/vendor/
-# skills-sync: generated skill symlinks in the seed's skills dir (regenerated at
+# skills-sync: generated skill copies in the seed's skills dir (installed at
 # container start). Hand-written/committed skills below are un-ignored.
 seed/.pi/agent/skills/*
 !seed/.pi/agent/skills/bgm-metadata/

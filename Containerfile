@@ -89,6 +89,19 @@ RUN userdel -r node 2>/dev/null || true \
     && mkdir -p /workspace /agent-home/.pi/agent \
     && chown -R pi:pi /workspace /agent-home
 
+# Declarative skills — clone the configured skill repos into the image at
+# BUILD time (network), so a container start only copies the enabled skills
+# into the seed — no network / git at start. skills.json lives in the seed
+# (seed/.pi/agent/skills.json) and is copied here to drive the build-time
+# clone; the resulting repos are baked under /opt/caged/skills/vendor.
+COPY seed/.pi/agent/skills.json /opt/caged/skills.json
+COPY scripts/skills-sync.mjs /opt/caged/skills-sync.mjs
+RUN node /opt/caged/skills-sync.mjs \
+        --config /opt/caged/skills.json \
+        --vendor /opt/caged/skills/vendor \
+        --clone-only \
+    && rm -f /opt/caged/skills.json
+
 # pi's config (~/.pi) is intentionally NOT copied into the image: at runtime
 # compose.yaml bind-mounts <caged>/seed/.pi over /agent-home/.pi (rw), so
 # ~/.pi is exactly the host's seed/.pi directory — a single source of truth

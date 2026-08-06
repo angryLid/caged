@@ -47,52 +47,59 @@ caged/
 ├── compose.yaml         # the single runtime entry (podman compose / podman-compose)
 ├── seed/                # pi's home (~/.pi) — LIVE bind-mount source for $HOME
 │   └── .pi/agent/       # models.json (providers), settings.json, mcp.json,
-│                        # AGENTS.md, skills/, scripts/ (CDP helpers)
+│                        # AGENTS.md, skills.json, skills/, scripts/ (CDP helpers)
 ├── scripts/
 │   ├── entrypoint.sh    # seed validation (fail-fast) + tini, runs as USER pi
 │   └── skills-sync.mjs  # declarative skills sync (see `## Skills (“skills-sync”)`)
 └── docs/SECURITY.md     # threat model & accepted trade-offs
+
+> `scripts/skills-sync.mjs` is also baked into the image (see `Containerfile`)
+> so the container start can install skills **without** the workspace mounted.
 ```
 
 ## Skills (“skills-sync”)
 
 This project ships a small **declarative** mechanism for pulling in external
-agent skills and enabling a subset of them — see `skills.json` at the repo
-root. It is tool-agnostic (works with any agent that reads skills from a
-directory).
+agent skills and enabling a subset of them — see `seed/.pi/agent/skills.json`
+(managed in the seed, alongside the rest of the config). It is tool-agnostic
+(works with any agent that reads skills from a directory).
 
-Skills are installed **into the seed** (`seed/.pi/agent/skills/`), pi's live
-config home that is bind-mounted at `/agent-home/.pi/agent` at runtime. The
-repos are cloned into `seed/.pi/agent/skills-sync/vendor/` and each enabled
-skill is exposed as a relative symlink in `seed/.pi/agent/skills/` pointing
-back into that vendor dir. Keeping the repos inside the seed means the
-relative links stay valid inside the container's mount layout (everything
-under `/agent-home/.pi/agent`).
+The skill repos are cloned **at image build time** (network) into a vendor dir
+baked into the image (`/opt/caged/skills/vendor`). At **container start** the
+entrypoint only copies the enabled skills from that baked set into the seed's
+skills dir — **no network, no git at start**. This keeps the two network
+concerns apart: pulling latest skill versions happens once, when you rebuild
+the image; a container start is fast and offline-safe.
 
-Because the seed is bind-mounted (not baked into the image) the sync runs at
-**container start** — the entrypoint calls the script with `--seed
-/agent-home/.pi/agent` before launching pi (best-effort; a network hiccup or
-missing config just logs a warning and pi still starts). You can also run it
-by hand, e.g. after editing `skills.json`:
+Skills are installed into the seed (`seed/.pi/agent/skills/`), pi's live
+config home bind-mounted at `/agent-home/.pi/agent` at runtime. Each enabled
+skill is copied in as a real directory (not a symlink) and marked with a
+hidden `.caged-skill-managed` file, so the tool can later tell its own copies
+apart from hand-written skills.
+
+You can also run the sync by hand, e.g. after editing `skills.json` (local dev
+mode clones + installs in one step):
 
 ```bash
-node scripts/skills-sync.mjs            # clone/pull repos + (re)link into seed/.pi/agent/skills
+node scripts/skills-sync.mjs            # clone/pull repos, then install into seed/.pi/agent/skills
 node scripts/skills-sync.mjs --dry-run  # preview without changing anything
+node scripts/skills-sync.mjs --link-only     # install only, from an existing vendor (no git/network)
+node scripts/skills-sync.mjs --clone-only    # clone/pull repos only (image build step)
 ```
 
-- **`skills.json`** — the source of truth: a `repos[]` list (each with a URL,
-  `skillsDir`, and an `enabled` list of skill relative paths) plus a
-  `linkTargets[]` list of dirs, relative to the seed, to place symlinks
-  (default `skills` → `seed/.pi/agent/skills`).
-- The script **clones** each repo into `seed/.pi/agent/skills-sync/vendor/<name>`
-  (or `git pull`s it), then creates **relative symlinks** into each link
-  target. Stale links are removed, so dropping a skill from `enabled` unlinks it.
-  Hand-written skills committed in `seed/.pi/agent/skills/` (bgm-metadata,
+- **`seed/.pi/agent/skills.json`** — the source of truth: a `repos[]` list
+  (each with a URL, `skillsDir`, and an `enabled` list of skill relative paths)
+  plus a `linkTargets[]` list of dirs, relative to the seed, to install skills
+  into (default `skills` → `seed/.pi/agent/skills`).
+- The script **clones** each repo into the vendor dir (or `git pull`s it), then
+  **copies** each enabled skill into the target. Stale managed copies are
+  removed, so dropping a skill from `enabled` uninstalls it. Hand-written
+  skills committed in `seed/.pi/agent/skills/` (bgm-metadata,
   caged-persistence, create-post, markdown-link, mdx-notes, skills-sync) are
-  never touched.
-- `seed/.pi/agent/skills-sync/vendor/` and the generated skill symlinks are
-  **gitignored** and regenerated at every container start — edit `skills.json`,
-  then re-run the script (or restart the container).
+  never touched — they carry no marker and are never clobbered.
+- The generated skill copies and the local-dev vendor are **gitignored** and
+  regenerated — edit `skills.json`, then re-run the script (or rebuild + restart
+  the container to pick up newly-added repos).
 
 > pi can also run this for you: ask it to “sync skills” (uses the `skills-sync` skill).
 
@@ -178,7 +185,8 @@ auth.
   env-configured base URL + key)
 * `.pi/agent/settings.json` — trust + `pi-mcp-adapter` extension
 * `.pi/agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
-* `.pi/agent/skills/` — caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes
+* `.pi/agent/skills.json` — declarative skills config (see [`Skills`](#skills-skills-sync))
+* `.pi/agent/skills/` — hand-written skills (caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes); downloaded skills are copied in here at container start
 * `.pi/agent/AGENTS.md` — environment primer pi loads for the container
 * `.pi/agent/scripts/` — `start-chrome-devtools-mcp.sh`, `devtools-forward.js` (CDP helpers, referenced by `mcp.json`)
 
@@ -299,13 +307,36 @@ once per setup is the supported path.
 See [docs/SECURITY.md](docs/SECURITY.md) for the detailed threat model and the
 explicitly accepted risks (open network, rw workspace).
 
+## Known issues (accepted / deferred)
+
+These are known rough edges we've consciously chosen **not** to fix yet.
+
+* **`glab` auth does not survive restarts.** `XDG_CONFIG_HOME` points at the
+  `/tmp` tmpfs, so `glab auth login` state is lost on every restart — the
+  supported path is the `GITLAB_TOKEN` env var. This is inconsistent with
+  `acli`, whose `ACLI_CONFIG_DIR` lives on the live `~/.pi` mount and does
+  persist.
+* **Container start requires all provider keys up front, but failures are
+  deferred.** Every provider key env var defaults to empty; if one is missing,
+  pi only errors when that model is actually used — a delayed, hard-to-trace
+  failure rather than a fail-fast startup check.
+* **Skill basename collisions are warned about, not resolved.** If two vendor
+  repos ship a skill with the same name (e.g. `handoff`), the tool warns but
+  still installs both; pi loads only the first, so which one wins depends on
+  repo order.
+* **The open-network model means a compromised agent could exfiltrate keys.**
+  Keys live in the container env and `auth.json`; a breached agent can read
+  them and send them out. This is an accepted trade-off (see
+  [docs/SECURITY.md](docs/SECURITY.md)); keep real secrets out of `/workspace`.
+
 ## Known limitations
 
 * Running on macOS: podman runs inside a Linux VM, so `/workspace` bind-mount
   performance matters for large repos — see the earlier discussion about
   small-file I/O. `npm install` in the workspace will be slower than native.
-* The image is pinned to `@earendil-works/pi-coding-agent@0.83.0`; bump
-  `ARG PI_VERSION` in the `Containerfile` and rebuild to upgrade.
+* The pi version is pinned via `ARG PI_VERSION` in the `Containerfile`; bump it
+  and rebuild to upgrade. (We deliberately don't quote a number here — the
+  project is still iterating.)
 
 ## License / notes
 

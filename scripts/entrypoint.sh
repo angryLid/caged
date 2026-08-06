@@ -59,22 +59,26 @@ for dir in "$PI_HOME" "$PI_HOME/agent" /tmp/.npm /tmp/.cache; do
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done
 
-# --- 3. declarative skills sync (best-effort) ----------------------------
+# --- 3. declarative skills install (best-effort) -------------------------
 #
-# pi scans ~/.pi/agent/skills/ for skills. The skill repos + their symlinks
-# are runtime artifacts (gitignored) that live inside the seed, so we
-# (re)generate them at every container start from the project's skills.json.
-# This is the container "start" half of skills-sync: it clones/pulls each
-# repo into $AGENT_DIR/skills-sync/vendor and (re)links the enabled skills
-# into $AGENT_DIR/skills. Non-fatal — if the network is down or the config
-# is missing, we log a warning and still launch pi.
-if [ -f "$WORKSPACE/skills.json" ] && [ -f "$WORKSPACE/scripts/skills-sync.mjs" ]; then
-    echo "caged: syncing skills (best-effort)..."
-    if ! node "$WORKSPACE/scripts/skills-sync.mjs" --seed "$AGENT_DIR"; then
-        echo "caged: warning: skills sync did not complete (exit $?) — continuing" >&2
+# pi scans ~/.pi/agent/skills/ for skills. The skill repos are cloned into the
+# IMAGE at build time (see Containerfile) under /opt/caged/skills/vendor; at
+# container start we only copy the enabled skills from there into the seed's
+# skills dir — no network, no git. The config (skills.json) lives in the seed
+# (seed/.pi/agent/skills.json), so it is managed with the rest of the config
+# and never depends on the mounted workspace. Non-fatal — if the config or
+# baked vendor is missing, we log a warning and still launch pi.
+if [ -f "$AGENT_DIR/skills.json" ] && [ -f /opt/caged/skills-sync.mjs ]; then
+    echo "caged: installing skills (best-effort)..."
+    if ! node /opt/caged/skills-sync.mjs \
+            --config "$AGENT_DIR/skills.json" \
+            --seed "$AGENT_DIR" \
+            --vendor /opt/caged/skills/vendor \
+            --link-only; then
+        echo "caged: warning: skills install did not complete (exit $?) — continuing" >&2
     fi
 else
-    echo "caged: warning: skills.json or skills-sync.mjs not found in \$WORKSPACE — skipping skills sync" >&2
+    echo "caged: warning: skills.json or skills-sync.mjs missing — skipping skills install" >&2
 fi
 
 exec tini -s -- "$@"
