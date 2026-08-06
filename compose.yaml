@@ -21,6 +21,8 @@ services:
       MY_DEEPSEEK_API_KEY: ${MY_DEEPSEEK_API_KEY:-}
       VOLCENGINE_API_KEY: ${VOLCENGINE_API_KEY:-}
       MY_OPENROUTER_API_KEY: ${MY_OPENROUTER_API_KEY:-}
+      LOCAL_API_KEY: ${LOCAL_API_KEY:-}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-}
     working_dir: /workspace
     volumes:
       - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)

@@ -22,13 +22,16 @@ image managed by podman). Behave accordingly.
 ## Provider configuration
 
 `~/.pi/agent/models.json` (`/pi-agent/.pi/agent/models.json`) defines the
-model providers — currently DeepSeek, Volcengine Ark Coding, and OpenRouter.
+model providers — currently DeepSeek, Volcengine Ark Coding, OpenRouter,
+and a local provider whose base URL + key come entirely from the container
+env (`$LOCAL_LLM_BASE_URL`, `$LOCAL_API_KEY`).
 The `apiKey` fields reference environment variables
-(`$MY_DEEPSEEK_API_KEY`, `$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`)
-that pi expands from the container environment at runtime. The real keys are
-provided by the operator via container env vars — **they never belong in
-`/workspace`**. If a provider is missing its key, tell the user which env var
-needs to be set rather than fabricating one.
+(`$MY_DEEPSEEK_API_KEY`, `$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`,
+`$LOCAL_API_KEY`) that pi expands from the container environment at
+runtime. The real keys and the local endpoint are provided by the operator
+via container env vars — **they never belong in `/workspace`**. If a
+provider is missing its key, tell the user which env var needs to be set
+rather than fabricating one.
 
 To add or change providers/models, edit `models.json` in the volume (or the
 `seed/` directory of the caged source repo and rebuild the image).

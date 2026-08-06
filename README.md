@@ -64,7 +64,8 @@ next run re-seeds from the image.
 `seed/` mirrors pi's `~/.pi` home and ships in the image:
 
 * `agent/models.json` — providers: **DeepSeek**, **Volcengine Ark Coding**
-  (minimax-m3 / doubao-seed / glm-5.2), **OpenRouter**
+  (minimax-m3 / doubao-seed / glm-5.2), **OpenRouter**, **Local** (private,
+  env-configured base URL + key)
 * `agent/settings.json` — trust + `pi-mcp-adapter` extension
 * `agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
 * `agent/skills/` — caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes
@@ -77,11 +78,13 @@ To change the shipped config, edit `seed/` and rebuild; the live volume
 ## Provider keys
 
 `models.json` references keys by env var name (`$MY_DEEPSEEK_API_KEY`,
-`$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`); pi expands these from the
-container environment at runtime. Pass them when starting:
+`$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`, and for the local
+provider `$LOCAL_API_KEY` + `$LOCAL_LLM_BASE_URL`); pi expands these from
+the container environment at runtime. Pass them when starting:
 
 ```sh
 MY_DEEPSEEK_API_KEY=sk-... VOLCENGINE_API_KEY=ark-... \
+  LOCAL_API_KEY=... LOCAL_LLM_BASE_URL=http://... \
   podman compose -f /path/to/caged/compose.yaml up
 ```
 
@@ -121,6 +124,8 @@ that's expected, not a caged bug.
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
+| `LOCAL_API_KEY` | *(unset)* | Local LLM provider key (passed into container) |
+| `LOCAL_LLM_BASE_URL` | *(unset)* | Local LLM base URL, e.g. `http://llm.local/v1` (passed into container) |
 
 ## Runtime hardening (applied by compose.yaml)
 
