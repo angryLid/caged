@@ -14,10 +14,10 @@ set -u
 
 # 1) Start the forwarder if nothing is listening on 127.0.0.1:19222 yet.
 #    Idempotent: repeated launches are cheap TCP probes, one spawn max.
-if [ -f "$HOME/.pi/devtools-forward.js" ] && ! (exec 3<>/dev/tcp/127.0.0.1/19222) 2>/dev/null; then
+if [ -f "$HOME/.pi/agent/scripts/devtools-forward.js" ] && ! (exec 3<>/dev/tcp/127.0.0.1/19222) 2>/dev/null; then
   # setsid: detach from this process group so the forwarder outlives the
   # MCP server process (and any pkill targeting chrome-devtools-mcp).
-  setsid nohup node "$HOME/.pi/devtools-forward.js" >/dev/null 2>&1 &
+  setsid nohup node "$HOME/.pi/agent/scripts/devtools-forward.js" >/dev/null 2>&1 &
   # give it a moment to bind before the MCP server connects
   sleep 0.3
 fi
