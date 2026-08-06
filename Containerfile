@@ -30,6 +30,11 @@ RUN apt-get update \
 # Install pi (pinned) globally. Open network at build time (npm registry).
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
+# chrome-devtools-mcp, pinned, installed INTO the image (not via npx): the
+# runtime /tmp is a noexec tmpfs, so npx'ing from $npm_config_cache=/tmp/.npm
+# fails with "Permission denied".
+RUN npm install -g chrome-devtools-mcp@1.6.0
+
 # Non-root runtime user + persistent dirs.
 # The node base image ships a `node` user at UID 1000; we free that UID up
 # for our own `pi` user so "uid 1000" stays stable across base image updates.
