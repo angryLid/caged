@@ -17,8 +17,8 @@ services:
       PI_CODING_AGENT_SESSION_DIR: /pi-agent/sessions
     working_dir: /workspace
     volumes:
-      - .:/workspace:rw           # your code
-      - caged-pi-agent:/pi-agent  # pi config / sessions / downloaded tools
+      - $PWD:/workspace:rw          # your code (caller's current dir)
+      - caged-pi-agent:/pi-agent    # pi config / sessions / downloaded tools
     stdin_open: true              # -i
     tty: true                     # -t
 

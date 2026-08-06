@@ -36,7 +36,8 @@ cd /path/to/your/repo
 /path/to/caged/scripts/run.sh                # interactive TUI
 /path/to/caged/scripts/run.sh "refactor this module"   # one-shot
 
-# or via compose
+# or via compose (requires podman-compose: `brew install podman-compose`),
+# run from the repo you want as the workspace:
 podman compose -f /path/to/caged/compose.yaml up
 ```
 
