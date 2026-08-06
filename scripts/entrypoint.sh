@@ -11,8 +11,9 @@
 
 set -e
 
-for dir in "${PI_CODING_AGENT_DIR:-/pi-agent/agent}" \
-           "${PI_CODING_AGENT_SESSION_DIR:-/pi-agent/sessions}"; do
+PI_HOME="${HOME:-/pi-agent}/.pi"
+
+for dir in "$PI_HOME" "$PI_HOME/agent"; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done

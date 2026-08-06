@@ -1,0 +1,52 @@
+{
+  "providers": {
+    "DeepSeek-API": {
+      "baseUrl": "https://api.deepseek.com",
+      "api": "openai-completions",
+      "authHeader": true,
+      "apiKey": "$MY_DEEPSEEK_API_KEY",
+      "models": [
+        { "id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "reasoning": true },
+        { "id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro Preview", "reasoning": true }
+      ]
+    },
+    "volcengine": {
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/coding",
+      "api": "anthropic-messages",
+      "apiKey": "$VOLCENGINE_API_KEY",
+      "compat": {
+        "supportsEagerToolInputStreaming": false,
+        "supportsStrictTools": true
+      },
+      "models": [
+        {
+          "id": "minimax-m3",
+          "name": "minimax-m3 (Volcengine Ark Coding)",
+          "contextWindow": 128000,
+          "maxTokens": 16384
+        },
+        {
+          "id": "doubao-seed-2.1-turbo",
+          "name": "Doubao-Seed-2.1-Turbo (Volcengine Ark Coding)",
+          "contextWindow": 128000,
+          "maxTokens": 16384
+        },
+        {
+          "id": "glm-5.2",
+          "name": "GLM-5.2 (Volcengine Ark Coding)",
+          "contextWindow": 128000,
+          "maxTokens": 16384
+        }
+      ]
+    },
+    "my-openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "api": "openai-completions",
+      "authHeader": true,
+      "apiKey": "$MY_OPENROUTER_API_KEY",
+      "models": [
+        { "id": "openai/gpt-5.6-luna", "name": "GPT-5.6 Luna (OpenRouter)", "reasoning": true }
+      ]
+    }
+  }
+}

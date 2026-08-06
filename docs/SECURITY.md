@@ -42,6 +42,9 @@ the host filesystem beyond the mount, or persist on the host.
 ## Layered defense quick reference
 
 * Image: non-root USER pi, pinned agent version, minimal base layer.
+* Seed: `seed/` ships only **configuration, never secrets** — `models.json`
+  references key env-var names, real values arrive via container env at
+  runtime and live only in the process/volume `auth.json`.
 * Runtime (compose.yaml): read-only rootfs + tmpfs + cap_drop ALL +
   no_new_privileges + keep-id userns.
 * Volume hygiene: everything pi persists lives under one named volume.

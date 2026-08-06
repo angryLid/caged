@@ -18,6 +18,10 @@ Hardened podman/docker container to run
 caged/
 ├── Containerfile        # image definition (non-root, pinned pi version)
 ├── compose.yaml         # the single runtime entry (podman compose / podman-compose)
+├── seed/                # pi "global config" (~/.pi) — baked into the image,
+│   │                    # copied into a fresh /pi-agent volume on first run
+│   └── agent/           # models.json (providers), settings.json, mcp.json,
+│                        # AGENTS.md, skills/; + devtools-forward.js, start-chrome-devtools-mcp.sh
 ├── scripts/
 │   ├── build.sh         # podman build -t caged:latest
 │   └── entrypoint.sh    # volume bootstrap + tini, runs as USER pi
@@ -48,25 +52,62 @@ Both commands mount the **directory you run them from** as `/workspace`.
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
 | `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
-| `/pi-agent`    | named volume `$CAGED_VOLUME` (default `caged-pi-agent`) | rw | pi config, sessions, auth, downloaded tooling (rg/fd) |
+| `/pi-agent`    | named volume `$CAGED_VOLUME` (default `caged-pi-agent`) | rw | pi home (`~/.pi`: config, sessions, auth, downloaded tooling) |
 
-Named volume `caged-pi-agent` persists between runs. `podman volume rm caged-pi-agent`
-gives you a completely clean slate.
+Named volume `caged-pi-agent` persists between runs. On first use of a *fresh*
+empty volume, podman copies the contents of `/pi-agent` from the image — the
+seed — into it. `podman volume rm caged-pi-agent` wipes everything, and the
+next run re-seeds from the image.
 
-## Authentication
+## Seed config (`seed/`)
+
+`seed/` mirrors pi's `~/.pi` home and ships in the image:
+
+* `agent/models.json` — providers: **DeepSeek**, **Volcengine Ark Coding**
+  (minimax-m3 / doubao-seed / glm-5.2), **OpenRouter**
+* `agent/settings.json` — trust + `pi-mcp-adapter` extension
+* `agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
+* `agent/skills/` — caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes
+* `agent/AGENTS.md` — environment primer pi loads for the container
+* `devtools-forward.js`, `start-chrome-devtools-mcp.sh` — CDP helpers
+
+To change the shipped config, edit `seed/` and rebuild; the live volume
+(.e.g. `/pi-agent/.pi`) is what pi actually reads.
+
+## Provider keys
+
+`models.json` references keys by env var name (`$MY_DEEPSEEK_API_KEY`,
+`$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`); pi expands these from the
+container environment at runtime. Pass them when starting:
+
+```sh
+MY_DEEPSEEK_API_KEY=sk-... VOLCENGINE_API_KEY=ark-... \
+  podman compose -f /path/to/caged/compose.yaml up
+```
+
+For interactive TUI auth flows that don't use `models.json`, pi stores
+credentials in `auth.json` inside the agent dir:
 
 pi stores credentials in `auth.json` inside the agent dir
 (`/pi-agent/agent/auth.json` on the volume). Two options:
 
 ```sh
-# a) interactive auth inside the container
 podman compose -f /path/to/caged/compose.yaml run --rm pi pi auth
-
-# b) pre-provision the volume from the host
-podman run --rm -v caged-pi-agent:/pi-agent caged:latest pi auth
 ```
 
 Never put API keys in `/workspace` — anything there is readable by pi.
+
+## chrome-devtools MCP
+
+`seed/agent/mcp.json` registers a chrome-devtools MCP server. It forwards the
+container-local port `19222` to the host's Chrome CDP and requires:
+
+1. Host Chrome running with `--remote-debugging-port=9222`
+2. `host.docker.internal` resolvable from the container (podman on macOS
+   provides it)
+
+Without host Chrome listening, pi will report the MCP server as unavailable —
+that's expected, not a caged bug.
 
 ## Environment knobs
 
@@ -77,6 +118,9 @@ Never put API keys in `/workspace` — anything there is readable by pi.
 | `CAGED_IMAGE` | `caged:latest` | image tag to run |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
 | `CAGED_VOLUME` | `caged-pi-agent` | named volume mounted at `/pi-agent` |
+| `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
+| `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
+| `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
 
 ## Runtime hardening (applied by compose.yaml)
 

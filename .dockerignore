@@ -1,6 +1,6 @@
 .git/
 .gitignore
-*.md
+/*.md
 docs/
 scripts/build.sh
 compose.yaml

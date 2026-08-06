@@ -1,0 +1,4 @@
+{
+  "defaultProjectTrust": "always",
+  "packages": ["npm:pi-mcp-adapter"]
+}

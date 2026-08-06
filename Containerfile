@@ -37,12 +37,19 @@ RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 # for our own `pi` user so "uid 1000" stays stable across base image updates.
 RUN userdel -r node 2>/dev/null || true \
     && useradd --create-home --uid 1000 --shell /bin/bash pi \
-    && mkdir -p /workspace /pi-agent/agent /pi-agent/sessions \
+    && mkdir -p /workspace /pi-agent/.pi/agent \
     && chown -R pi:pi /workspace /pi-agent
 
+# Seed pi's global config (~/.pi) into the volume path. podman/docker copies
+# this into a fresh empty named volume on first mount, so the container is
+# usable (providers, settings, skills, chrome-devtools MCP) with zero setup.
+# Keys stay out of here: models.json references $ENV names only.
+COPY seed /pi-agent/.pi/
+RUN chown -R pi:pi /pi-agent/.pi
+
+# HOME=/pi-agent so $HOME/.pi (pi's default config location) lands on the
+# persistent volume.
 ENV HOME=/pi-agent \
-    PI_CODING_AGENT_DIR=/pi-agent/agent \
-    PI_CODING_AGENT_SESSION_DIR=/pi-agent/sessions \
     WORKSPACE=/workspace
 
 COPY scripts/entrypoint.sh /usr/local/bin/caged-entrypoint

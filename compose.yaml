@@ -13,8 +13,14 @@ services:
     userns_mode: keep-id
     environment:
       HOME: /pi-agent
-      PI_CODING_AGENT_DIR: /pi-agent/agent
-      PI_CODING_AGENT_SESSION_DIR: /pi-agent/sessions
+      # Model provider keys. pi expands these $NAME references found in
+      # seed/agent/models.json from the container env at runtime. Pass your
+      # real values when starting, e.g.:
+      #   CAGED_IMAGE=... MY_DEEPSEEK_API_KEY=sk-... podman compose up
+      # or keep them in an env file (compose supports `env_file:`).
+      MY_DEEPSEEK_API_KEY: ${MY_DEEPSEEK_API_KEY:-}
+      VOLCENGINE_API_KEY: ${VOLCENGINE_API_KEY:-}
+      MY_OPENROUTER_API_KEY: ${MY_OPENROUTER_API_KEY:-}
     working_dir: /workspace
     volumes:
       - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)
