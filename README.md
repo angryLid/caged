@@ -37,15 +37,25 @@ Requirements: podman >= 4 on macOS (or docker with `userns_mode` support) plus
 #    `podman compose ... build --no-cache`)
 cd caged && podman compose build
 
-# 2. interactive TUI — run from the repo you want as the workspace:
+# 2. interactive TUI — run from the repo you want as the workspace.
+#    Prefer `run` over `up`: podman-compose's `up` doesn't forward terminal
+#    size/SIGWINCH or TERM on macOS, which garbles pi's full-screen TUI.
+#    `run` shells out to `podman run -it` and forwards the terminal properly.
 cd /path/to/your/repo
-podman compose -f /path/to/caged/compose.yaml up
+podman compose -f /path/to/caged/compose.yaml run --rm pi
 
 # 3. one-shot (non-interactive) run:
 podman compose -f /path/to/caged/compose.yaml run --rm pi pi --print "refactor this module"
 ```
 
 Both commands mount the **directory you run them from** as `/workspace`.
+
+> **TUI looks jagged/aliased?** (podman-compose 1.x `up` only) — that's a known
+> podman-compose TTY limitation: it creates a pty but never forwards the
+> terminal size or TERM. Fix: use `run` (above), or run the equivalent
+> `podman run -it` one-liner from [docs/SECURITY.md](docs/SECURITY.md)
+> (verify block) with your mounts. Resizing the terminal window once also
+> often snaps the renderer back into place.
 
 ## What gets mounted
 

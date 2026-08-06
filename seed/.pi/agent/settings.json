@@ -1,4 +1,8 @@
 {
   "defaultProjectTrust": "always",
-  "packages": ["npm:pi-mcp-adapter"]
+  "packages": [
+    "npm:pi-mcp-adapter"
+  ],
+  "lastChangelogVersion": "0.83.0",
+  "theme": "dark"
 }

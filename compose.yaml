@@ -16,6 +16,12 @@ services:
     userns_mode: keep-id
     environment:
       HOME: /agent-home
+      # pi's TUI needs a real terminal identity: podman-compose forces
+      # TERM=xterm and drops the host size/SIGWINCH on `up` (jagged TUI).
+      # Forward the host TERM (and truecolor), so colors render correctly.
+      TERM: ${TERM:-xterm-256color}
+      COLORTERM: "truecolor"
+      LANG: C.UTF-8
       # Model provider keys. pi expands these $NAME references found in
       # seed/.pi/agent/models.json from the container env at runtime. Pass your
       # real values when starting, e.g.:
