@@ -31,6 +31,14 @@ services:
       VOLCENGINE_API_KEY: ${VOLCENGINE_API_KEY:-}
       MY_OPENROUTER_API_KEY: ${MY_OPENROUTER_API_KEY:-}
       LOCAL_API_KEY: ${LOCAL_API_KEY:-}
+      # glab (GitLab CLI) auth — same pattern as provider keys: secrets via
+      # env only, never in the repo. ~/.config sits on the read-only rootfs,
+      # so point XDG_CONFIG_HOME at /tmp (scratch); with GITLAB_TOKEN set no
+      # config file is needed at all.
+      GITLAB_TOKEN: ${GITLAB_TOKEN:-}
+      GITLAB_HOST: ${GITLAB_HOST:-}
+      GLAB_SEND_TELEMETRY: "false"
+      XDG_CONFIG_HOME: /tmp/.config
       # Keep home-derived caches OUT of the live .pi mount and off the rootfs:
       # only ~/.pi is a writable host mount; scratch caches go to /tmp (tmpfs).
       npm_config_cache: /tmp/.npm

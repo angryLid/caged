@@ -25,6 +25,8 @@ image managed by podman). Behave accordingly.
 - **Network is open**: no egress sandbox beyond the container boundary. You
   may reach model providers, registries, and the general internet directly.
 - `git`, `node`/`npm`, `curl` are available. `bash` is the shell.
+- `glab` (official GitLab CLI, v1.112.0) is baked into the image — prefer it
+  over raw curl for GitLab API work (MRs, issues, pipelines, releases).
 
 ## Provider configuration
 
@@ -47,6 +49,14 @@ rather than fabricating one.
 To add or change providers/models, edit `models.json` in the volume (or the
 `seed/` directory of the caged source repo — the seed is live-mounted, no
 rebuild needed; changes take effect on next container start).
+
+## glab (GitLab CLI)
+
+Authenticate via the `GITLAB_TOKEN` environment variable (plus `GITLAB_HOST`
+for a self-hosted instance), passed by the operator at container start — like
+the provider keys, never stored in the repo. `XDG_CONFIG_HOME` points at
+`/tmp`, so `glab auth login` state does not survive a restart; use the env
+token instead.
 
 ## chrome-devtools MCP (optional)
 

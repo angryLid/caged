@@ -157,6 +157,27 @@ the container-local port `19222` to the host's Chrome CDP and requires:
 Without host Chrome listening, pi will report the MCP server as unavailable —
 that's expected, not a caged bug.
 
+## glab (GitLab CLI)
+
+[`glab`](https://gitlab.com/gitlab-org/cli) — the official GitLab CLI — is
+baked into the image (v1.112.0, pinned `ARG GLAB_VERSION` in the
+Containerfile, sha256-verified against the official checksums). Use it for
+MRs, issues, pipelines, releases, etc. instead of hand-rolled curl against
+the GitLab API.
+
+Auth follows the same env-only pattern as the model provider keys — pass a
+token when starting, it never lives in the repo:
+
+```sh
+GITLAB_TOKEN=glpat-... \
+  podman compose -f /path/to/caged/compose.yaml run --rm pi glab issue list
+```
+
+For a self-hosted instance also set `GITLAB_HOST=https://gitlab.example.com`.
+`XDG_CONFIG_HOME` is pointed at `/tmp` because `~/.config` is on the
+read-only rootfs; `glab auth login` output therefore does **not** survive a
+container restart — the env token is the supported path.
+
 ## Environment knobs
 
 `compose.yaml` interpolates these from the calling shell; defaults listed.
@@ -170,6 +191,8 @@ that's expected, not a caged bug.
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
 | `LOCAL_API_KEY` | *(unset)* | Local LLM provider key (passed into container) |
+| `GITLAB_TOKEN` | *(unset)* | `glab` (GitLab CLI) API token (passed into container) |
+| `GITLAB_HOST` | *(unset)* | `glab` GitLab instance host (default `https://gitlab.com`) |
 
 ## Runtime hardening (applied by compose.yaml)
 

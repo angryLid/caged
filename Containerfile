@@ -35,6 +35,27 @@ RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 # fails with "Permission denied".
 RUN npm install -g chrome-devtools-mcp@1.6.0
 
+# glab — official GitLab CLI (https://gitlab.com/gitlab-org/cli).
+# Single static Go binary: pinned version + sha256 verified against the
+# official per-release checksums.txt. TARGETARCH comes from BuildKit and both
+# amd64/arm64 linux assets exist, so the same Dockerfile builds for either.
+ARG GLAB_VERSION=1.112.0
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) sha=f1c52907558b665f2032b615787d353cd06e54240b501a81f9489bfc8f6a8ebf;; \
+      arm64) sha=54a5fe7de0db23e34151c55e561c28e59e6ef6a7731f7d0ce8a00fa58cd8d8f8;; \
+      *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    curl -fsSL -o /tmp/glab.tar.gz \
+      "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/packages/generic/glab/${GLAB_VERSION}/glab_${GLAB_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    echo "${sha}  /tmp/glab.tar.gz" | sha256sum -c -; \
+    mkdir -p /tmp/glab \
+    && tar -xzf /tmp/glab.tar.gz -C /tmp/glab \
+    && install -m 0755 /tmp/glab/bin/glab /usr/local/bin/glab \
+    && rm -rf /tmp/glab /tmp/glab.tar.gz \
+    && glab version
+
 # Non-root runtime user + persistent dirs.
 # The node base image ships a `node` user at UID 1000; we free that UID up
 # for our own `pi` user so "uid 1000" stays stable across base image updates.
