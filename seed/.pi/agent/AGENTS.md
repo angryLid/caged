@@ -12,12 +12,16 @@ image managed by podman). Behave accordingly.
 - The root filesystem is **read-only**. Writable areas:
   - `/workspace` — the user's code, mounted from the host working tree.
     Edits you make appear on the host as you write them.
-  - `/pi-agent` — pi state volume (config, auth, npm cache). Persists across
-    container restarts.
+  - `/pi-agent/.pi` — pi's config home, a LIVE bind mount of the host dir
+    `<caged>/seed/.pi` (config, auth, skills). Anything pi writes here (even
+    `auth.json` and new skills) lands in the caged repo tree immediately.
   - `/pi-agent/.pi/agent/sessions` — pi session data, mounted from
     `$CAGED_WORKSPACE/sessions` on the host → each project keeps its own
     sessions next to the code.
-  - `/tmp` — scratch space, cleared on restart.
+  - `/tmp` — scratch space, cleared on restart. npm/node caches are pointed
+    here (`$npm_config_cache=/tmp/.npm`, `$XDG_CACHE_HOME=/tmp/.cache`).
+  - Everything else under `/pi-agent` (the rest of `$HOME`) is **read-only** —
+    don't expect to stash state there; use `/tmp` instead.
 - **Network is open**: no egress sandbox beyond the container boundary. You
   may reach model providers, registries, and the general internet directly.
 - `git`, `node`/`npm`, `curl` are available. `bash` is the shell.
@@ -37,8 +41,8 @@ provider is missing its key, tell the user which env var needs to be set
 rather than fabricating one.
 
 To add or change providers/models, edit `models.json` in the volume (or the
-`seed/` directory of the caged source repo (live-mount the seed — no rebuild
-needed; changes take effect on next container start).
+`seed/` directory of the caged source repo — the seed is live-mounted, no
+rebuild needed; changes take effect on next container start).
 
 ## chrome-devtools MCP (optional)
 

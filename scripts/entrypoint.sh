@@ -3,12 +3,13 @@
 #
 # Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
 #   1. Fail-fast validation BEFORE launching pi. There is deliberately no
-#      config baked into the image: $HOME (=/pi-agent) must be the live bind
-#      mount of the host `seed/` directory (compose.yaml does this), making
-#      ~/.pi == seed/.pi. If the seed is missing, incomplete, or internally
-#      inconsistent, we exit non-zero with a clear message — never let pi
-#      start half-configured.
-#   2. Best-effort ownership bootstrap (matters for fresh named volumes).
+#      config baked into the image: ~/.pi (=/pi-agent/.pi) must be the live
+#      bind mount of the host `seed/.pi` directory (compose.yaml does this).
+#      If the seed is missing, incomplete, or internally inconsistent, we
+#      exit non-zero with a clear message — never let pi start
+#      half-configured.
+#   2. Best-effort ownership bootstrap (matters for fresh named volumes) and
+#      cache dirs on the /tmp tmpfs (npm/node never touch the RO home).
 #   3. Launch the requested command under tini so spawned bash subprocesses
 #      (pi's bash tool) get reaped properly.
 
@@ -25,13 +26,13 @@ fail() {
 # --- 1. fail-fast validation of the live seed bind -----------------------
 
 [ -d "$AGENT_DIR" ] || fail \
-    "config dir '$AGENT_DIR' not found — \$HOME must be the live seed bind." \
-    "Run caged via 'podman compose up' (mounts <caged>/seed at /pi-agent), or mount it manually."
+    "config dir '$AGENT_DIR' not found — ~/.pi must be the live seed bind." \
+    "Run caged via 'podman compose up' (mounts <caged>/seed/.pi at /pi-agent/.pi), or mount it manually."
 
 for f in models.json settings.json AGENTS.md; do
     [ -f "$AGENT_DIR/$f" ] || fail \
         "required config file missing: '$AGENT_DIR/$f' — the live seed mount is incomplete" \
-        "(check CAGED_HOME: it must point at the caged/ repo's seed dir, and seed/.pi/agent must exist)."
+        "(check CAGED_PI_HOME: it must point at <caged>/seed/.pi so ~/.pi/agent has the seed files)."
 done
 
 # mcp.json is optional, but every command it references must exist — a
@@ -52,7 +53,7 @@ fi
 
 # --- 2. bootstrap (best-effort) ------------------------------------------
 
-for dir in "$PI_HOME" "$PI_HOME/agent"; do
+for dir in "$PI_HOME" "$PI_HOME/agent" /tmp/.npm /tmp/.cache; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done

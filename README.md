@@ -52,26 +52,29 @@ Both commands mount the **directory you run them from** as `/workspace`.
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
 | `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
-| `/pi-agent` (`$HOME`) | `<caged>/seed` (`$CAGED_HOME`) | rw | **pi's live home** — `seed/` maps 1:1 to `$HOME`, so `~/.pi` *is* `seed/.pi`; everything pi configures lands back on the host |
+| `/pi-agent/.pi` (`~/.pi`) | `<caged>/seed/.pi` (`$CAGED_PI_HOME`) | rw | **pi's live config home** — maps 1:1 to `seed/.pi`; everything pi configures lands back on the host |
 | `/pi-agent/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
 | `/pi-agent/.pi/agent/sessions` | `$CAGED_WORKSPACE/sessions` on the host | rw | **pi session data — per-project, on the host** |
 
-`$HOME` is `/pi-agent`, so the whole `seed/` tree is the live home mount:
-`~/.pi` *is* `seed/.pi` and `~/.pi/agent` is `seed/.pi/agent`. Whatever pi
+`$HOME` is `/pi-agent` and only `~/.pi` (`/pi-agent/.pi`) is a live bind mount
+of `caged/seed/.pi` — one level of indirection below `$HOME`, so the repo tree
+only ever reflects pi's config home, never stray `$HOME` state. Whatever pi
 writes under `~/.pi` (settings, models, mcp.json, skills, even `auth.json`)
 lands directly in the repo tree. There is **no baked-in config inside the
 image** and no fresh-volume seeding step — the seed *is* the live config.
 Iterate on seed files and they take effect on the *next* container start —
-no image rebuild required. Because the entire `seed/` dir maps onto `$HOME`,
-any future top-level subdir you add under `seed/` automatically appears at
-the matching path under `/pi-agent` — extensible by construction.
+no image rebuild required.
+
+The rest of `$HOME` stays read-only (rootfs): home-derived caches are pointed
+at the `/tmp` tmpfs (`npm_config_cache`, `XDG_CACHE_HOME`), keeping the
+container stateful-free apart from the two mounts and scratch.
 
 The entrypoint validates the mount **before** launching pi: if the seed is
 missing or incomplete, `mcp.json` references a missing executable, or the
 seed is read-only, it exits non-zero with a diagnostic instead of letting pi
-run half-configured. This also catches a wrong `$CAGED_HOME` — e.g. an old
-value that pointed at an agent subdir (a dangling `~/.pi/agent` fails the
-required-files check immediately).
+run half-configured. This also catches a wrong `$CAGED_PI_HOME` — e.g. an
+old value that pointed at a higher-level dir (a dangling `~/.pi/agent` fails
+the required-files check immediately).
 
 Keep runtime state out of git: `seed/.pi/agent/auth.json` and
 `seed/.pi/agent/sessions/` are ignored (see `.gitignore`). `auth.json` is
@@ -87,8 +90,8 @@ auth.
 
 ## Seed config (`seed/`)
 
-`seed/` mirrors pi's `$HOME` on the host; `seed/.pi/` is pi's config home,
-mounted live (not baked into the image):
+`seed/.pi/` mirrors pi's config home `~/.pi` on the host and is mounted live
+(not baked into the image):
 
 * `.pi/agent/models.json` — providers: **DeepSeek**, **Volcengine Ark Coding**
   (minimax-m3 / doubao-seed / glm-5.2), **OpenRouter**, **Local** (private,
@@ -148,7 +151,7 @@ that's expected, not a caged bug.
 |---|---|---|
 | `CAGED_IMAGE` | `caged:latest` | image tag to run |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
-| `CAGED_HOME` | `./seed` (relative to the compose file) | host dir bind-mounted at `/pi-agent` (`$HOME`) — live seed: `seed/.pi` == `~/.pi`, synced both ways. Extensible: any new top-level dir under `seed/` appears at the matching path under `/pi-agent` |
+| `CAGED_PI_HOME` | `./seed/.pi` (relative to the compose file) | host dir bind-mounted at `/pi-agent/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
@@ -157,7 +160,7 @@ that's expected, not a caged bug.
 
 ## Runtime hardening (applied by compose.yaml)
 
-* `--read-only` — root filesystem immutable (only `/workspace`, `/pi-agent`, `/tmp` writable)
+* `--read-only` — root filesystem immutable (only `/workspace`, `~/.pi` (`/pi-agent/.pi`), and `/tmp` writable)
 * `--tmpfs /tmp` — scratch, `noexec,nosuid`
 * `--cap-drop ALL` — container process gets zero kernel capabilities
 * `--security-opt no-new-privileges` — no setuid-style privilege escalation

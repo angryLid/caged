@@ -5,9 +5,9 @@ description: Persist pi skills and packages (extensions) by writing them into th
 
 # caged persistence
 
-In caged, `$HOME` (`/pi-agent`) is a **live bind mount** of the host directory
-`caged/seed`, so `~/.pi/agent` (`/pi-agent/.pi/agent`) is the host dir
-`caged/seed/.pi/agent`. Everything pi writes there is synced back to the host
+In caged, `~/.pi` (`/pi-agent/.pi`) is a **live bind mount** of the host
+directory `caged/seed/.pi`, so `~/.pi/agent` (`/pi-agent/.pi/agent`) is the
+host dir `caged/seed/.pi/agent`. Everything pi writes there is synced back to the host
 repo at the same moment — config edits, new skills, extension packages, even
 `auth.json` (which is gitignored). There is no named volume to wipe and
 nothing to re-seed: the seed *is* the source of truth on the host.

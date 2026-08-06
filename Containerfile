@@ -39,11 +39,12 @@ RUN userdel -r node 2>/dev/null || true \
     && chown -R pi:pi /workspace /pi-agent
 
 # pi's config (~/.pi) is intentionally NOT copied into the image: at runtime
-# compose.yaml bind-mounts <caged>/seed over /pi-agent ($HOME), so $HOME/.pi
-# is exactly the host's seed/.pi directory — a single source of truth with no
-# image copy to drift or go stale. The entrypoint validates that the bind is
-# in place and fails fast otherwise. Keys stay out of seed/: models.json
-# references $ENV names only.
+# compose.yaml bind-mounts <caged>/seed/.pi over /pi-agent/.pi (rw), so
+# ~/.pi is exactly the host's seed/.pi directory — a single source of truth
+# with no image copy to drift or go stale. Only ~/.pi is a writable host
+# mount; the rest of $HOME stays read-only (rootfs) with caches redirected
+# to /tmp. The entrypoint validates that the bind is in place and fails fast
+# otherwise. Keys stay out of seed/: models.json references $ENV names only.
 
 # HOME=/pi-agent so $HOME/.pi (pi's default config location) lands on the
 # persistent volume.

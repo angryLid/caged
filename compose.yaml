@@ -26,10 +26,14 @@ services:
       MY_OPENROUTER_API_KEY: ${MY_OPENROUTER_API_KEY:-}
       LOCAL_API_KEY: ${LOCAL_API_KEY:-}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-}
+      # Keep home-derived caches OUT of the live .pi mount and off the rootfs:
+      # only ~/.pi is a writable host mount; scratch caches go to /tmp (tmpfs).
+      npm_config_cache: /tmp/.npm
+      XDG_CACHE_HOME: /tmp/.cache
     working_dir: /workspace
     volumes:
       - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)
-      - ${CAGED_HOME:-./seed}:/pi-agent:rw  # live $HOME: caged/seed maps 1:1 to pi's home, so ~/.pi == seed/.pi (synced both ways)
+      - ${CAGED_PI_HOME:-./seed/.pi}:/pi-agent/.pi:rw  # live ~/.pi: seed/.pi maps 1:1 to pi's config home (synced both ways)
       - ${CAGED_WORKSPACE:-$PWD}/sessions:/pi-agent/.pi/agent/sessions  # pi sessions → per-project on host
     stdin_open: true              # -i
     tty: true                     # -t
