@@ -1,6 +1,6 @@
 ---
 name: caged-persistence
-description: Persist pi skills and packages (extensions) by writing them into the caged seed. `$HOME` is a LIVE bind mount of `caged/seed`, so `~/.pi/agent` is exactly `seed/.pi/agent` — anything pi writes there (new skills, package entries in seed/.pi/agent/settings.json packages[], even auth.json) lands in the host repo immediately — no rebuild or volume-copy step needed. CAVEAT: for skills declared in `skills.json` (managed), the durable location is the SOURCE (`skills-src/<name>/` for local, the git repo for git) — edit there and re-run skills-sync, because `skills/` is a generated, overwritten install dir. Use when creating or editing a pi skill or installing a pi extension and wanting it in every future caged run.
+description: 'Persist pi skills and packages (extensions) by writing them into the caged seed. `$HOME` is a LIVE bind mount of `caged/seed`, so `~/.pi/agent` is exactly `seed/.pi/agent` — anything pi writes there (new skills, package entries in seed/.pi/agent/settings.json packages[], even auth.json) lands in the host repo immediately — no rebuild or volume-copy step needed. CAVEAT: for skills declared in `skills.json` (managed), the durable location is the SOURCE (`skills-src/<name>/` for local, the git repo for git) — edit there and re-run skills-sync, because `skills/` is a generated, overwritten install dir. Use when creating or editing a pi skill or installing a pi extension and wanting it in every future caged run.'
 ---
 
 # caged persistence
