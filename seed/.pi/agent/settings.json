@@ -1,8 +1,8 @@
 {
   "defaultProjectTrust": "always",
   "packages": [
-    "/opt/caged/extensions/node_modules/pi-mcp-adapter",
-    "/opt/caged/extensions/node_modules/pi-web-access"
+    "npm:pi-mcp-adapter",
+    "npm:pi-web-access"
   ],
   "lastChangelogVersion": "0.84.0",
   "theme": "dark",
