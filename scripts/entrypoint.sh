@@ -58,15 +58,6 @@ if grep -q '/opt/caged/extensions' "$AGENT_DIR/settings.json" 2>/dev/null; then
     done
 fi
 
-# jiti (pi's TS extension loader) caches transpiled modules at os.tmpdir()/jiti
-# — a RAM tmpfs wiped on every container start, which would make pi re-transpile
-# the whole extension tree (~1.4s) each time. Restore the cache that was primed
-# and baked into the image at build time (see Containerfile). Best-effort: if it
-# is missing, pi still starts, just slower.
-if [ -d /opt/caged/jiti-cache ] && [ ! -d /tmp/jiti ]; then
-    cp -a /opt/caged/jiti-cache /tmp/jiti
-fi
-
 # The sessions mount must exist and the seed must be writable (both ways).
 [ -d "$AGENT_DIR/sessions" ] || fail \
     "sessions dir '$AGENT_DIR/sessions' not found — \$CAGED_WORKSPACE/sessions should be" \

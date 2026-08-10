@@ -196,11 +196,10 @@ auth.
 * `.pi/agent/settings.json` — trust + pi extensions. The two extensions
   (`pi-mcp-adapter`, `pi-web-access`) are **baked into the image** at
   `/opt/caged/extensions/...` (see Containerfile) and referenced here by
-  absolute image path, so versions are pinned per build (like
-  chrome-devtools-mcp). Faster startup comes from the **jiti transpile cache**
-  that is primed at build time and restored by the entrypoint (see below) —
-  measured 1.4s → 0.2s. The old `npm:` entries were removed;
-  `seed/.pi/agent/npm/` (gitignored) is now legacy and can be deleted.
+  absolute image path — pi imports them at every startup, and loading them
+  from the image rootfs avoids the slow virtiofs bind mount (measured
+  ~1.5s → ~0.2s). The old `npm:` entries were removed; `seed/.pi/agent/npm/`
+  (gitignored) is now legacy and can be deleted.
 * `.pi/agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
 * `.pi/agent/skills.json` — declarative skills config (see [`Skills`](#skills-skills-sync))
 * `.pi/agent/skills/` — hand-written skills (caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes); downloaded skills are copied in here at container start
@@ -351,11 +350,10 @@ These are known rough edges we've consciously chosen **not** to fix yet.
 * Running on macOS: podman runs inside a Linux VM, so `/workspace` bind-mount
   performance matters for large repos — see the earlier discussion about
   small-file I/O. `npm install` in the workspace will be slower than native.
-  Note that pi's slow startup is NOT the mount: extensions are loaded through
-  jiti, whose transpile cache lives in the `/tmp` tmpfs and would be wiped on
-  every container start. caged primes that cache at build time and restores it
-  in the entrypoint (see Containerfile), so startup stays fast on every start.
-  Verify with `PI_TIMING=1 podman compose up`.
+  The same mount cost applies to pi's own startup, which is why the pi
+  extensions are baked into the image instead of the seed (see
+  [`Seed config`](#seed-config-seed)) — you can verify startup timings with
+  `PI_TIMING=1 podman compose up`.
 * The pi version is pinned via `ARG PI_VERSION`, fed from compose's
   `build.args.PI_VERSION` (default `0.84.0`). A single-layer rebuild:
   `PI_VERSION=x.y.z podman compose build`. (We deliberately don't quote a

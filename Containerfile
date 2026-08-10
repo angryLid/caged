@@ -99,35 +99,18 @@ ARG PI_VERSION=0.84.0
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
 # The pi extensions used by seed/.pi/agent/settings.json, baked INTO the image
-# rather than installed into the seed, so their versions are pinned at build
-# time (like chrome-devtools-mcp above: bump these ARGs and rebuild to update)
-# and a fresh clone never needs a startup npm install. settings.json points
-# packages[] at /opt/caged/extensions/... absolute image paths.
+# rather than installed into the seed. pi imports these at EVERY startup, and
+# reading them through the virtiofs bind mount (~/.pi/agent/npm — ~100MB /
+# 9k files) costs ~1.5s on a cold cache (measured: pi-mcp-adapter import 964ms
+# + pi-web-access 474ms vs ~200ms from the rootfs). settings.json points
+# packages[] at /opt/caged/extensions/... absolute image paths, so startup
+# loads them from local disk and never touches the mount. Pinned, like
+# chrome-devtools-mcp above: bump these ARGs and rebuild to update.
 ARG PI_MCP_ADAPTER_VERSION=2.20.1
 ARG PI_WEB_ACCESS_VERSION=0.18.0
 RUN npm install --prefix /opt/caged/extensions \
         pi-mcp-adapter@${PI_MCP_ADAPTER_VERSION} \
         pi-web-access@${PI_WEB_ACCESS_VERSION}
-
-# Prime jiti's transpile cache. pi loads the .ts extensions through jiti
-# (dist/core/extensions/loader.js), which caches each transformed module under
-# os.tmpdir()/jiti — a RAM tmpfs that every container start wipes, forcing a
-# full re-transpile (~1.4s measured: 964ms + 474ms) at every startup. Running
-# the real loader here fills the cache (same image paths, same jiti version),
-# and the entrypoint copies it back into /tmp/jiti before pi starts, cutting
-# extension imports to ~0.2s. The cache is keyed by filename hash + source
-# trailer, so it stays valid until extensions/pi/jiti change — i.e. a rebuild.
-RUN printf '%s\n' \
-        'import { loadExtensions } from "/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js";' \
-        'const res = await loadExtensions([' \
-        '  "/opt/caged/extensions/node_modules/pi-mcp-adapter/index.ts",' \
-        '  "/opt/caged/extensions/node_modules/pi-web-access/index.ts",' \
-        '], "/");' \
-        'console.log("primed " + res.extensions.length + " extensions; " + res.errors.length + " errors");' \
-        'for (const e of res.errors) console.error("prime error: " + e.error);' \
-    > /tmp/prime-extensions.mjs \
-    && node /tmp/prime-extensions.mjs \
-    && cp -a /tmp/jiti /opt/caged/jiti-cache
 
 # Declarative skills — clone the configured skill repos into the image at
 # BUILD time (network), so a container start only copies the enabled skills
