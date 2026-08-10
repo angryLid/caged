@@ -344,6 +344,15 @@ These are known rough edges we've consciously chosen **not** to fix yet.
 * Running on macOS: podman runs inside a Linux VM, so `/workspace` bind-mount
   performance matters for large repos — see the earlier discussion about
   small-file I/O. `npm install` in the workspace will be slower than native.
+* pi startup is slow while it loads its two extensions
+  (`pi-mcp-adapter`, `pi-web-access`): the module imports take ~1.3s
+  (measured ~820–960ms + ~470–520ms, `PI_TIMING=1`) before the TUI
+  appears. This looks like container-level I/O cost for loading the
+  extension tree — neither baking the extensions into the image layer nor
+  pre-priming caches changed the timing on our setup. Workarounds if it
+  bothers you: drop `pi-mcp-adapter`/`pi-web-access` from `packages` in
+  `seed/.pi/agent/settings.json` (`"packages": []`), or accept the delay
+  per container start.
 * The pi version is pinned via `ARG PI_VERSION`, fed from compose's
   `build.args.PI_VERSION` (default `0.84.0`). A single-layer rebuild:
   `PI_VERSION=x.y.z podman compose build`. (We deliberately don't quote a
