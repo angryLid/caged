@@ -46,6 +46,18 @@ if [ -f "$AGENT_DIR/mcp.json" ]; then
     done
 fi
 
+# settings.json declares the pi extensions by absolute IMAGE path
+# (/opt/caged/extensions/..., see Containerfile). If the running image
+# predates that bake step, fail fast instead of silently launching pi with
+# no mcp/web-search extensions (and never let it fall back to a slow install
+# at startup — the whole point is to keep this off the bind mount).
+if grep -q '/opt/caged/extensions' "$AGENT_DIR/settings.json" 2>/dev/null; then
+    for ext in pi-mcp-adapter pi-web-access; do
+        [ -d "/opt/caged/extensions/node_modules/$ext" ] || fail \
+            "extension '$ext' not found at /opt/caged/extensions/node_modules/$ext — the image predates the extension bake step. Rebuild it: podman compose build"
+    done
+fi
+
 # The sessions mount must exist and the seed must be writable (both ways).
 [ -d "$AGENT_DIR/sessions" ] || fail \
     "sessions dir '$AGENT_DIR/sessions' not found — \$CAGED_WORKSPACE/sessions should be" \

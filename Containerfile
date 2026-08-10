@@ -98,6 +98,20 @@ RUN userdel -r node 2>/dev/null || true \
 ARG PI_VERSION=0.84.0
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
+# The pi extensions used by seed/.pi/agent/settings.json, baked INTO the image
+# rather than installed into the seed. pi imports these at EVERY startup, and
+# reading them through the virtiofs bind mount (~/.pi/agent/npm — ~100MB /
+# 9k files) costs ~1.5s on a cold cache (measured: pi-mcp-adapter import 964ms
+# + pi-web-access 474ms vs ~200ms from the rootfs). settings.json points
+# packages[] at /opt/caged/extensions/... absolute image paths, so startup
+# loads them from local disk and never touches the mount. Pinned, like
+# chrome-devtools-mcp above: bump these ARGs and rebuild to update.
+ARG PI_MCP_ADAPTER_VERSION=2.20.1
+ARG PI_WEB_ACCESS_VERSION=0.18.0
+RUN npm install --prefix /opt/caged/extensions \
+        pi-mcp-adapter@${PI_MCP_ADAPTER_VERSION} \
+        pi-web-access@${PI_WEB_ACCESS_VERSION}
+
 # Declarative skills — clone the configured skill repos into the image at
 # BUILD time (network), so a container start only copies the enabled skills
 # into the seed — no network / git at start. skills.json lives in the seed

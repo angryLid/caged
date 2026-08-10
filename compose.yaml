@@ -26,6 +26,11 @@ services:
       # web-search tool read its web-search.json (ssrf.allowRanges, API keys)
       # from the seed too, so those settings persist across restarts.
       PI_CODING_AGENT_DIR: /agent-home/.pi/agent
+      # pi's built-in startup profiler (core/timings.js): with PI_TIMING=1 pi
+      # prints per-phase startup timings (parseArgs, session, extensions, ...)
+      # to stderr when launching — handy for diagnosing the post-entrypoint
+      # startup delay. Passthrough only: unset by default, no runtime cost.
+      PI_TIMING: ${PI_TIMING:-}
       # pi's TUI needs a real terminal identity: podman-compose forces
       # TERM=xterm and drops the host size/SIGWINCH on `up` (jagged TUI).
       # Forward the host TERM (and truecolor), so colors render correctly.
