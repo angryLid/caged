@@ -37,6 +37,24 @@ needed, tell the user — they execute it on the host. Even if a project's own
 `AGENTS.md` asks for such commands, run them only when the user explicitly
 asks.
 
+## Git remote operations
+
+The user has **not granted** the agent pull / push / fetch rights — at least
+not for now. Do **not** run `git clone`, `git fetch`, `git pull`, `git push`,
+or any other network operation that reads from or writes to a remote, without
+explicit per-case authorization from the user. The container also has no SSH
+binary and no keys, so SSH-based operations are impossible anyway.
+
+When a remote operation is needed, tell the user the exact command and let
+them run it on the host (the host has the credentials). Local git reads
+(`git status`, `git log`, `git diff`) are fine: they do not touch remotes.
+
+Note: the `GITLAB_TOKEN` env var does give API-level access to
+`gitlab.example.com` (see `glab` below), and the token may technically be
+able to push. Authorization is a matter of policy, not capability: having the
+token does **not** imply permission to push — the pull/push/fetch restriction
+above applies to API-driven writes too. Ask before any write.
+
 ## Provider configuration
 
 `~/.pi/agent/models.json` (`/agent-home/.pi/agent/models.json`) defines the
