@@ -53,7 +53,7 @@ caged/
 │   └── skills-sync.mjs  # declarative skills sync (see `## Skills (“skills-sync”)`)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
-    └── CLI-AUTH.md    # glab token-at-rest trade-offs & risk analysis
+    └── CLI-AUTH.md           # glab/acli auth behavior, persistence & risks
 
 > `scripts/skills-sync.mjs` is also baked into the image (see `Containerfile`)
 > so the container start can install skills **without** the workspace mounted.
@@ -303,7 +303,8 @@ echo "$JIRA_API_TOKEN" | \
 `~/.pi` mount, so login state survives restarts while the token stays out of
 git (`seed/.pi/agent/acli/` is ignored, like `auth.json`). No secret env var
 is needed; unlike `glab` there is no env-token passthrough, so authenticating
-once per setup is the supported path.
+once per setup is the supported path. Auth behavior and pitfalls for both
+CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
 ## Environment knobs
 

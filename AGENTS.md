@@ -57,7 +57,8 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
 ## Working here
 
 - Tools: `glab` for GitLab CLI, `acli` for Atlassian/Jira, `podman compose`
-  for the stack. Prefer them over raw curl.
+  for the stack. Prefer them over raw curl. Their auth/persistence behavior
+  and trade-offs: `docs/CLI-AUTH.md`.
 - The single runtime entry is `compose.yaml`. Prefer `run` over `up` for
   interactive TUI (podman-compose `up` doesn't forward terminal size/TERM).
 - Skills can be synced by hand with `node scripts/skills-sync.mjs`

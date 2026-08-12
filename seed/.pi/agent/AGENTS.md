@@ -91,6 +91,9 @@ acli), so login state survives restarts. Use `--hostname` (not `--host`) and
 
     echo "$GITLAB_TOKEN" | glab auth login --hostname gitlab.example.com --stdin --git-protocol https
 
+Auth model & traps (env-token precedence, host binding, plaintext at rest):
+`/workspace/caged/docs/CLI-AUTH.md`.
+
 ## acli (Atlassian CLI)
 
 `acli` (official Atlassian CLI, v1.3.22) is baked into the image for Jira
@@ -101,7 +104,10 @@ with an API token read from stdin:
 
 or interactively with `acli jira auth login --web` (OAuth; needs a browser).
 `ACLI_CONFIG_DIR=/agent-home/.pi/agent/acli` (gitignored), so login state
-survives restarts but tokens never enter the repo. API tokens come from
+survives restarts but tokens never enter the repo. The token enters **only**
+via `auth login` — acli reads no auth env var (`JIRA_API_TOKEN` in the
+container env is ignored). Auth model & traps:
+`/workspace/caged/docs/CLI-AUTH.md`. API tokens come from
 https://id.atlassian.com/manage-profile/security/api-tokens — never ask for
 them in plain text in the workspace.
 
