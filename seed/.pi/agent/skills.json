@@ -6,7 +6,9 @@
       "url": "https://gitlab.com/gitlab-org/ai/skills.git",
       "skillsDir": "skills",
       "enabled": [
-        "commit-messages"
+        "commit-messages",
+        "glab",
+        "glab-glql"
       ]
     },
     {
@@ -22,6 +24,15 @@
         "productivity/to-questionnaire",
         "productivity/wait-what",
         "productivity/writing-for-agents"
+      ]
+    },
+    {
+      "name": "acli",
+      "type": "git",
+      "url": "https://github.com/peetzweg/acli-skill.git",
+      "skillsDir": ".",
+      "enabled": [
+        "."
       ]
     },
     {
