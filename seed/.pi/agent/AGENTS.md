@@ -24,7 +24,11 @@ image managed by podman). Behave accordingly.
     don't expect to stash state there; use `/tmp` instead.
 - **Network is open**: no egress sandbox beyond the container boundary. You
   may reach model providers, registries, and the general internet directly.
-- `git`, `node`/`npm`, `curl` are available. `bash` is the shell.
+- `git`, `node`/`npm`, `curl` are available. `bash` is the shell. The image
+  is **node:slim 24** — `node` exists, but most other script interpreters
+  (python, ruby, perl, …) likely do **not**. For simple data processing
+  (JSON transforms, text munging, quick scripts), always reach for `node`
+  first.
 - `glab` (official GitLab CLI, v1.112.0) is baked into the image — prefer it
   over raw curl for GitLab API work (MRs, issues, pipelines, releases).
 
@@ -55,6 +59,16 @@ able to push. Authorization is a matter of policy, not capability: having the
 token does **not** imply permission to push — the pull/push/fetch restriction
 above applies to API-driven writes too. Ask before any write.
 
+## Server-side changes need confirmation
+
+Any operation that **mutates server-side state — create, modify, or delete**
+anything on a remote service (GitLab MRs/issues/labels/comments via `glab`,
+Jira work items/transitions/comments via `acli`, git pushes, any API write)
+— requires a two-step confirmation: first state exactly what you intend to
+change, then wait for explicit user confirmation **before executing**. This
+is a hard rule, not a default. Read-only calls (list, view, search, diff)
+need no confirmation.
+
 ## Provider configuration
 
 `~/.pi/agent/models.json` (`/agent-home/.pi/agent/models.json`) defines the
@@ -79,35 +93,26 @@ rebuild needed; changes take effect on next container start).
 
 ## glab (GitLab CLI)
 
-Authenticate via the `GITLAB_TOKEN` environment variable (plus `GITLAB_HOST`
-for a self-hosted instance), passed by the operator at container start — like
-the provider keys. `GITLAB_TOKEN` takes precedence over stored credentials
-and is never written to disk; prefer it for automated runs.
+`glab` is available for GitLab API work (MRs, issues, pipelines, labels,
+releases, …) — prefer it over raw curl. **Concrete command how-tos live in
+the glab skill** — `~/.pi/agent/skills/glab/SKILL.md` — read it before any
+glab write operation (several field flags fail silently there).
 
-For interactive persistence, `glab auth login` writes to
-`~/.pi/agent/glab-cli/` (`GLAB_CONFIG_DIR`, gitignored — same pattern as
-acli), so login state survives restarts. Use `--hostname` (not `--host`) and
-`--git-protocol https` (the container has no ssh binary):
-
-    echo "$GITLAB_TOKEN" | glab auth login --hostname gitlab.example.com --stdin --git-protocol https
-
-Auth model & traps (env-token precedence, host binding, plaintext at rest):
-`/workspace/caged/docs/CLI-AUTH.md`.
+Authentication is via the container-env `GITLAB_TOKEN` (plus `GITLAB_HOST`
+for a self-hosted instance); it takes precedence over stored credentials and
+is never written to disk. The env token must be bound to the right host — an
+env var authenticated against `gitlab.com` will not be used for a
+self-hosted instance.
 
 ## acli (Atlassian CLI)
 
-`acli` (official Atlassian CLI, v1.3.22) is baked into the image for Jira
-Cloud work (`acli jira workitem ...`, project/admin commands). Authenticate
-with an API token read from stdin:
+`acli` is available for Jira Cloud work (work items, projects, boards,
+admin, …). **Concrete command how-tos live in the acli skill** —
+`~/.pi/agent/skills/acli/SKILL.md` — read it before using acli.
 
-    echo "<API_TOKEN>" | acli jira auth login --site "<site>.atlassian.net" --email "you@example.com" --token
-
-or interactively with `acli jira auth login --web` (OAuth; needs a browser).
-`ACLI_CONFIG_DIR=/agent-home/.pi/agent/acli` (gitignored), so login state
-survives restarts but tokens never enter the repo. The token enters **only**
-via `auth login` — acli reads no auth env var (`JIRA_API_TOKEN` in the
-container env is ignored). Auth model & traps:
-`/workspace/caged/docs/CLI-AUTH.md`. API tokens come from
+The token enters **only** via `auth login` (stdin or `--web`); login state
+lives in `~/.pi/agent/acli` (gitignored) and survives restarts. API tokens
+come from
 https://id.atlassian.com/manage-profile/security/api-tokens — never ask for
 them in plain text in the workspace.
 
