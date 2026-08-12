@@ -81,9 +81,15 @@ rebuild needed; changes take effect on next container start).
 
 Authenticate via the `GITLAB_TOKEN` environment variable (plus `GITLAB_HOST`
 for a self-hosted instance), passed by the operator at container start — like
-the provider keys, never stored in the repo. `XDG_CONFIG_HOME` points at
-`/tmp`, so `glab auth login` state does not survive a restart; use the env
-token instead.
+the provider keys. `GITLAB_TOKEN` takes precedence over stored credentials
+and is never written to disk; prefer it for automated runs.
+
+For interactive persistence, `glab auth login` writes to
+`~/.pi/agent/glab-cli/` (`GLAB_CONFIG_DIR`, gitignored — same pattern as
+acli), so login state survives restarts. Use `--hostname` (not `--host`) and
+`--git-protocol https` (the container has no ssh binary):
+
+    echo "$GITLAB_TOKEN" | glab auth login --hostname gitlab.example.com --stdin --git-protocol https
 
 ## acli (Atlassian CLI)
 

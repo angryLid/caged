@@ -51,7 +51,9 @@ caged/
 ├── scripts/
 │   ├── entrypoint.sh    # seed validation (fail-fast) + tini, runs as USER pi
 │   └── skills-sync.mjs  # declarative skills sync (see `## Skills (“skills-sync”)`)
-└── docs/SECURITY.md     # threat model & accepted trade-offs
+└── docs/
+    ├── SECURITY.md           # threat model & accepted trade-offs
+    └── CLI-AUTH.md    # glab token-at-rest trade-offs & risk analysis
 
 > `scripts/skills-sync.mjs` is also baked into the image (see `Containerfile`)
 > so the container start can install skills **without** the workspace mounted.
@@ -253,18 +255,31 @@ Containerfile, sha256-verified against the official checksums). Use it for
 MRs, issues, pipelines, releases, etc. instead of hand-rolled curl against
 the GitLab API.
 
-Auth follows the same env-only pattern as the model provider keys — pass a
-token when starting, it never lives in the repo:
+Two ways to authenticate:
 
-```sh
-GITLAB_TOKEN=glpat-... \
-  podman compose -f /path/to/caged/compose.yaml run --rm pi glab issue list
-```
+* **Env token (primary, for automated runs).** Pass `GITLAB_TOKEN` (plus
+  `GITLAB_HOST=https://gitlab.example.com` for a self-hosted instance) when
+  starting; it takes precedence over stored credentials and never touches
+  disk:
 
-For a self-hosted instance also set `GITLAB_HOST=https://gitlab.example.com`.
-`XDG_CONFIG_HOME` is pointed at `/tmp` because `~/.config` is on the
-read-only rootfs; `glab auth login` output therefore does **not** survive a
-container restart — the env token is the supported path.
+  ```sh
+  GITLAB_TOKEN=glpat-... \
+    podman compose -f /path/to/caged/compose.yaml run --rm pi glab issue list
+  ```
+
+* **Persisted login (interactive).** `GLAB_CONFIG_DIR` points at
+  `/agent-home/.pi/agent/glab-cli` on the live `~/.pi` mount, so
+  `glab auth login` state survives container restarts (gitignored, like
+  `acli` and `auth.json`):
+
+  ```sh
+  echo "$GITLAB_TOKEN" | podman compose -f /path/to/caged/compose.yaml run --rm \
+    pi glab auth login --hostname gitlab.example.com --stdin --git-protocol https
+  ```
+
+  Run from any directory (the workspace can be a throwaway dir). The token is
+  stored as plaintext (`0600`, gitignored) — the trade-offs are analysed in
+  [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
 ## acli (Atlassian CLI)
 
@@ -321,11 +336,6 @@ explicitly accepted risks (open network, rw workspace).
 
 These are known rough edges we've consciously chosen **not** to fix yet.
 
-* **`glab` auth does not survive restarts.** `XDG_CONFIG_HOME` points at the
-  `/tmp` tmpfs, so `glab auth login` state is lost on every restart — the
-  supported path is the `GITLAB_TOKEN` env var. This is inconsistent with
-  `acli`, whose `ACLI_CONFIG_DIR` lives on the live `~/.pi` mount and does
-  persist.
 * **Container start requires all provider keys up front, but failures are
   deferred.** Every provider key env var defaults to empty; if one is missing,
   pi only errors when that model is actually used — a delayed, hard-to-trace

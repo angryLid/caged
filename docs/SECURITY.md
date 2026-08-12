@@ -39,6 +39,12 @@ the host filesystem beyond the mount, or persist on the host.
    need them, you are expanding the blast radius — add them explicitly and
    document why.
 
+4. **GitLab CLI token at rest in the live seed.** `glab auth login` persists
+   a plaintext token to `seed/.pi/agent/glab-cli/config.yml` (gitignored,
+   `0600`) so interactive auth survives container restarts — see
+   [CLI-AUTH.md](CLI-AUTH.md) for the full risk analysis. `glab`
+   still prefers `GITLAB_TOKEN` from the env when it is set.
+
 ## Layered defense quick reference
 
 * Image: non-root USER pi, pinned agent version, minimal base layer.
