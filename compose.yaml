@@ -20,45 +20,37 @@ services:
       - no-new-privileges
     userns_mode: keep-id
     environment:
+      # Base identity.
       HOME: /agent-home
-      # Point pi and the web-search/fetch tool at the live seed mount. The
-      # default is ~/.pi/agent anyway, but setting it explicitly makes the
-      # web-search tool read its web-search.json (ssrf.allowRanges, API keys)
-      # from the seed too, so those settings persist across restarts.
-      PI_CODING_AGENT_DIR: /agent-home/.pi/agent
-      # pi's TUI needs a real terminal identity: podman-compose forces
-      # TERM=xterm and drops the host size/SIGWINCH on `up` (jagged TUI).
-      # Forward the host TERM (and truecolor), so colors render correctly.
+      # TUI identity — podman-compose `up` forces TERM=xterm and drops
+      # size/SIGWINCH (jagged TUI); forward the host TERM + truecolor.
       TERM: ${TERM:-xterm-256color}
       COLORTERM: "truecolor"
       LANG: C.UTF-8
-      # Model provider keys. pi expands these $NAME references found in
-      # seed/.pi/agent/models.json from the container env at runtime. Pass your
-      # real values when starting, e.g.:
-      #   CAGED_IMAGE=... MY_DEEPSEEK_API_KEY=sk-... podman compose up
-      # or keep them in an env file (compose supports `env_file:`).
+      # pi config home — pinned to the live seed mount so pi (and the
+      # web-search tool) read their settings from the seed and persist.
+      PI_CODING_AGENT_DIR: /agent-home/.pi/agent
+      # --- External API credentials: secrets via env only, referenced by
+      #     name from seed config (models.json) — pass at start or in an
+      #     env_file; never baked into the image.
+      # LLM providers.
       MY_DEEPSEEK_API_KEY: ${MY_DEEPSEEK_API_KEY:-}
       VOLCENGINE_API_KEY: ${VOLCENGINE_API_KEY:-}
       MY_OPENROUTER_API_KEY: ${MY_OPENROUTER_API_KEY:-}
       LOCAL_API_KEY: ${LOCAL_API_KEY:-}
-      # glab (GitLab CLI) auth — GITLAB_TOKEN via env is the primary path for
-      # automated runs: it takes precedence over stored credentials and is
-      # never written to disk. For interactive use, GLAB_CONFIG_DIR points at
-      # the live ~/.pi mount so `glab auth login` state survives restarts
-      # (gitignored, like auth.json — see docs/CLI-AUTH.md).
+      # GitLab (glab) — env token is primary (takes precedence, never on
+      # disk); GLAB_CONFIG_DIR persists `glab auth login` on the live ~/.pi.
       GITLAB_TOKEN: ${GITLAB_TOKEN:-}
       GITLAB_HOST: ${GITLAB_HOST:-}
       GLAB_SEND_TELEMETRY: "false"
       GLAB_CONFIG_DIR: /agent-home/.pi/agent/glab-cli
-      # acli (official Atlassian CLI) — config dir on the live ~/.pi mount so
-      # `acli jira auth login` state survives restarts (gitignored, like
-      # auth.json). Pass the API token via JIRA_API_TOKEN (same pattern as
-      # GITLAB_TOKEN) or interactively via stdin at login; never in the repo.
+      # Jira (acli) — token via JIRA_API_TOKEN or interactive login;
+      # ACLI_CONFIG_DIR on the live ~/.pi persists login state.
       JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
       ACLI_CONFIG_DIR: /agent-home/.pi/agent/acli
-      XDG_CONFIG_HOME: /tmp/.config
-      # Keep home-derived caches OUT of the live .pi mount and off the rootfs:
-      # only ~/.pi is a writable host mount; scratch caches go to /tmp (tmpfs).
+      # --- Scratch & caches: rootfs is read-only and ~/.pi must stay
+      #     repo-clean, so throwaway state goes to the /tmp tmpfs.
+      XDG_CONFIG_HOME: /tmp/.config   # XDG fallback for other CLIs
       npm_config_cache: /tmp/.npm
       XDG_CACHE_HOME: /tmp/.cache
     working_dir: /workspace
