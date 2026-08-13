@@ -41,6 +41,7 @@
       "dir": "skills-src",
       "enabled": [
         "caged-persistence",
+        "jira-kanban-todo",
         "markdown-link",
         "mdx-notes",
         "skills-sync"
