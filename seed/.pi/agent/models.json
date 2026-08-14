@@ -62,15 +62,15 @@
           "maxTokens": 16384
         },
         {
-          "id": "gemma-4-31B",
-          "name": "Gemma 4 31B (Local)",
+          "id": "Coding2",
+          "name": "Coding2 (Local)",
+          "reasoning": true,
           "contextWindow": 270000,
           "maxTokens": 16384
         },
         {
-          "id": "kat-coder-v2.5-dev",
-          "name": "Kat Coder v2.5 Dev (Local)",
-          "reasoning": true,
+          "id": "gemma-4-31B",
+          "name": "Gemma 4 31B (Local)",
           "contextWindow": 270000,
           "maxTokens": 16384
         }
