@@ -69,37 +69,51 @@ path.
 ## Reaching host services
 
 `models.json` points the `local-llm` provider at
-`http://host.docker.internal:8765/v1`, and
-`start-chrome-devtools-mcp.sh` defaults its forwarder to
-`host.docker.internal:9222` — but `container` **does not resolve
-`host.docker.internal`** (and has no `--add-host` either; see
-[apple/container#673](https://github.com/apple/container/issues/673) and
-[#346](https://github.com/apple/container/issues/346)). The supported fix is
-host-side, one command: `container system dns create` with `--localhost`
-binds a domain to a fake IP whose packets the macOS packet filter redirects
-to the host's own loopback — any port:
+`http://192.168.64.1:8765/v1`, and `start-chrome-devtools-mcp.sh` defaults
+its forwarder to `192.168.64.1:9222`. **`192.168.64.1` is the vmnet gateway
+of the `container` default network — the host's bridge interface as seen
+from inside every container** (it's the containers' default route, so it's
+reachable with no DNS, pf, or sudo setup, and it survives reboots). Verify
+it once on your machine:
 
 ```bash
-# Needs sudo; the packet-filter rule is dropped on reboot, re-run then.
-sudo container system dns create host.docker.internal --localhost 203.0.113.113
+container run -it --rm alpine ip route   # default gateway = 192.168.64.1
 ```
 
-The domain name is arbitrary — using `host.docker.internal` (rather than the
-docs' `host.container.internal`) keeps `models.json` and the CDP forwarder
-**portable**: the same value resolves on the podman path (natively) and on
-the Apple path (via the redirect). Pick a fake IP that can't collide with
-your networks — the tool documents `203.0.113.0/24` and `172.16.0.0/12` as
-safe ranges.
+The one requirement is that the **host services listen on that address**,
+not just loopback:
 
-`start-container.sh` warns (doesn't fail) at startup when
-`host.docker.internal` doesn't resolve and `LOCAL_API_KEY` is set.
+- `caddy-dev-server` (the local LLM proxy) must listen on
+  `192.168.64.1:8765` (e.g. Caddyfile `192.168.64.1:8765`). The gateway IP
+  is only visible to container VMs — binding it does **not** expose the
+  service to your LAN; avoid `0.0.0.0` for that reason.
+- Chrome's CDP port binds `127.0.0.1` only on macOS, so bridge it to the
+  gateway IP: `socat TCP-LISTEN:192.168.64.1:9222,fork TCP:127.0.0.1:9222 &`
+  (Chrome still runs with `--remote-debugging-port=9222` as usual).
+- macOS's Application Firewall may block incoming connections on
+  non-loopback addresses — allow `caddy`/`socat` if the probe below
+  connects but containers get refused.
 
-Caveats:
-- needs a `container` build with the `--localhost` flag (merged upstream
-  2026-01-24 — check `container system dns create --help`)
-- creating a localhost domain disables Private Relay
-- an early build had a `pfctl reload` bug (`reloadProcess doesn't exist`);
-  it's fixed upstream — update `container` if you hit it
+`start-container.sh` probes `192.168.64.1:8765` at startup (warns, doesn't
+fail) when `LOCAL_API_KEY` is set.
+
+Why not a hostname? apple/container has no `--add-host` and won't resolve
+`host.docker.internal` or `host.container.internal` without the documented
+`container system dns create --localhost` + `[dns] domain` machinery (sudo,
+pf rules that die on reboot, Private Relay caveats — see
+[apple/container#673](https://github.com/apple/container/issues/673) and
+[#346](https://github.com/apple/container/issues/346)). A static IP avoids
+all of it.
+
+### podman/docker (compose) compatibility — deferred
+
+`models.json` is shared between the Apple and compose runtimes, and pi does
+not interpolate env vars in `baseUrl`, so the single static value above
+targets the Apple vmnet gateway; the compose/podman path currently can't
+reach it. To implement later: map a stable host address in `compose.yaml`
+(Docker Desktop's `host.docker.internal` or podman's `host.containers.internal`
+with `extra_hosts: host-gateway`) and bind caddy per runtime. Not done yet,
+by design.
 
 ## Deliberate divergences from compose.yaml
 

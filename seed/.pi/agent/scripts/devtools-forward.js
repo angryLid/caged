@@ -7,21 +7,22 @@
  *   Chrome's DevTools HTTP server (--remote-debugging-port) rejects any
  *   request whose Host header is not `localhost` / `127.0.0.1` / an IP
  *   literal: "Host header is specified and is not an IP address or localhost."
- *   Connecting via host.docker.internal:9222 therefore fails with a 500 even
- *   though --remote-allow-origins=* is set (that flag only relaxes the
- *   WebSocket Origin/CORS check, NOT the Host header check).
+ *   Connecting via a hostname (e.g. host.docker.internal) therefore fails
+ *   with a 500 even though --remote-allow-origins=* is set (that flag only
+ *   relaxes the WebSocket Origin/CORS check, NOT the Host header check).
  *
  * HOW it works:
  *   Clients in the sandbox connect to 127.0.0.1:19222 with Host:
  *   localhost:19222 (which Chrome accepts); this server pipes the raw TCP
- *   bytes to host.docker.internal:9222, so Chrome only ever sees a
- *   localhost Host header.
+ *   bytes to 192.168.64.1:9222 (the host CDP via the vmnet gateway;
+ *   override with $CDP_HOST), so Chrome only ever sees a localhost Host
+ *   header.
  *
  * Requires only Node's built-in `net` — no socat, no dependencies.
  */
 const net = require("net");
 
-const HOST = process.env.CDP_HOST || "host.docker.internal";
+const HOST = process.env.CDP_HOST || "192.168.64.1";
 const REMOTE_PORT = parseInt(process.env.CDP_REMOTE_PORT || "9222", 10);
 const LOCAL_PORT = parseInt(process.env.CDP_LOCAL_PORT || "19222", 10);
 

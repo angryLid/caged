@@ -74,9 +74,10 @@ need no confirmation.
 `~/.pi/agent/models.json` (`/agent-home/.pi/agent/models.json`) defines the
 model providers — currently DeepSeek, Volcengine Ark Coding, OpenRouter,
 and a local provider. The local provider's `baseUrl` is the host
-`caddy-dev-server` proxy `http://host.docker.internal:8765/v1` (forwards
-to the internal LLM gateway with the Host header rewritten to the
-upstream hostname — the upstream hostname lives only in the host's
+`caddy-dev-server` proxy `http://192.168.64.1:8765/v1` — the Apple
+`container` vmnet gateway, the host as seen from inside a container
+(forwards to the internal LLM gateway with the Host header rewritten to
+the upstream hostname — the upstream hostname lives only in the host's
 Caddyfile, never in this repo); its API key comes from the container env
 (`$LOCAL_API_KEY`).
 The `apiKey` fields reference environment variables
@@ -120,7 +121,7 @@ them in plain text in the workspace.
 
 An MCP server for host Chrome's DevTools protocol is configured. It requires
 the host to run Chrome with `--remote-debugging-port=9222`; the container
-reaches it via `host.docker.internal:9222`. If the MCP is not responding,
+reaches it via `192.168.64.1:9222`. If the MCP is not responding,
 the host Chrome is likely not listening — tell the user, don't guess.
 
 ## One-shot use

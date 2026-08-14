@@ -218,8 +218,10 @@ round-trip.
 `$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`, and for the local
 provider `$LOCAL_API_KEY`); pi expands these from the container
 environment at runtime. The local provider's `baseUrl` is the host
-`caddy-dev-server` proxy `http://host.docker.internal:8765/v1`, which
-forwards to the internal LLM gateway with the Host header rewritten to
+`caddy-dev-server` proxy `http://192.168.64.1:8765/v1` — the Apple
+`container` vmnet gateway, i.e. the host as seen from inside a container
+(podman/docker mapping not implemented yet; see `docs/APPLE-CONTAINER.md`),
+which forwards to the internal LLM gateway with the Host header rewritten to
 the upstream hostname (that hostname lives only in the host's Caddyfile,
 never in this repo). Pass the keys when starting:
 
@@ -247,8 +249,10 @@ Never put API keys in `/workspace` — anything there is readable by pi.
 the container-local port `19222` to the host's Chrome CDP and requires:
 
 1. Host Chrome running with `--remote-debugging-port=9222`
-2. `host.docker.internal` resolvable from the container (podman on macOS
-   provides it)
+2. Host Chrome's CDP reachable at `192.168.64.1:9222` (the Apple
+   `container` vmnet gateway; on macOS Chrome binds loopback only, so bridge
+   it with socat — see `docs/APPLE-CONTAINER.md`. The podman/docker mapping
+   is not implemented yet.)
 
 Without host Chrome listening, pi will report the MCP server as unavailable —
 that's expected, not a caged bug.

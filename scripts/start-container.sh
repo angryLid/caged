@@ -29,23 +29,21 @@ if [ ! -f "${PI_HOME_HOST}/agent/models.json" ]; then
     exit 1
 fi
 
-# --- host.docker.internal reachability hint (Apple path only) ---
-# models.json's local-llm provider and the chrome-devtools forwarder default to
-# host.docker.internal. apple/container can't resolve that name natively; the
-# fix is a host-side DNS redirect (see docs/APPLE-CONTAINER.md, "Reaching host
-# services"). The tool writes its resolver file with a "containerization."
-# prefix, so probe for that file rather than resolving the name on the host
-# (macOS dispatches /etc/resolver by filename and never matches it). Warn,
-# don't fail — pi runs fine without it if the local provider is unused.
-if [ -n "${LOCAL_API_KEY:-}" ] && [ ! -f "/etc/resolver/containerization.host.docker.internal" ]; then
-    echo "Warning: the host.docker.internal DNS redirect doesn't look set up." >&2
-    echo "  The local-llm provider (baseUrl in seed/.pi/agent/models.json) and Chrome" >&2
-    echo "  CDP forwarding reach the host through it. Set it up on the Mac:" >&2
-    echo "    sudo container system dns create host.docker.internal --localhost 203.0.113.113" >&2
-    echo "  If containers still can't resolve it, also enable container DNS forwarding:" >&2
-    echo "    add to ~/.config/container/config.toml: [dns] domain = \"docker.internal\"" >&2
-    echo "    then: container system stop && container system start" >&2
-    echo "  See docs/APPLE-CONTAINER.md -> 'Reaching host services'." >&2
+# --- local-llm reachability hint (Apple path only) ---
+# models.json's local-llm provider and the chrome-devtools forwarder reach the
+# host at 192.168.64.1 — the vmnet gateway of `container`'s default network,
+# i.e. the Mac's bridge interface as seen from inside every container (no DNS,
+# pf, or sudo setup needed). The host services just have to listen on that
+# address, not only loopback: the caddy-dev-server proxy on 192.168.64.1:8765,
+# and Chrome CDP reachable on 192.168.64.1:9222 (socat bridge if Chrome binds
+# loopback only). Warn, don't fail — pi runs fine without it if the local
+# provider is unused. See docs/APPLE-CONTAINER.md, "Reaching host services".
+if [ -n "${LOCAL_API_KEY:-}" ] && ! curl -sS --noproxy '*' -m 1 -o /dev/null "http://192.168.64.1:8765/v1/models" 2>/dev/null; then
+    echo "Warning: the local-llm provider doesn't look reachable at 192.168.64.1:8765." >&2
+    echo "  The local-llm provider (baseUrl in seed/.pi/agent/models.json) reaches the host" >&2
+    echo "  through the vmnet gateway. Make sure the host caddy-dev-server proxy listens" >&2
+    echo "  on 192.168.64.1:8765 (not just 127.0.0.1), and macOS allows incoming" >&2
+    echo "  connections. See docs/APPLE-CONTAINER.md -> 'Reaching host services'." >&2
 fi
 
 # Pre-create the host sessions directory (under the workspace directory).
@@ -79,6 +77,7 @@ exec container run \
   -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}" \
   -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" \
   -e LOCAL_API_KEY="${LOCAL_API_KEY:-}" \
+  -e CDP_HOST="192.168.64.1" \
   -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" \
   -e GITLAB_HOST="${GITLAB_HOST:-}" \
   -e GLAB_SEND_TELEMETRY="false" \
