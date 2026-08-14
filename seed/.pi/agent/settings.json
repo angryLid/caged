@@ -6,7 +6,7 @@
   ],
   "lastChangelogVersion": "0.84.0",
   "theme": "dark",
-  "defaultProvider": "volcengine",
-  "defaultModel": "ark-code-latest",
+  "defaultProvider": "DeepSeek-API",
+  "defaultModel": "deepseek-v4-flash",
   "defaultThinkingLevel": "medium"
 }
