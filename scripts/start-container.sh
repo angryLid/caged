@@ -43,8 +43,8 @@ if [ -n "${LOCAL_API_KEY:-}" ] && [ ! -f "/etc/resolver/containerization.host.do
     echo "  CDP forwarding reach the host through it. Set it up on the Mac:" >&2
     echo "    sudo container system dns create host.docker.internal --localhost 203.0.113.113" >&2
     echo "  If containers still can't resolve it, also enable container DNS forwarding:" >&2
-    echo "    container system property set dns.domain docker.internal" >&2
-    echo "    container system stop && container system start" >&2
+    echo "    add to ~/.config/container/config.toml: [dns] domain = \"docker.internal\"" >&2
+    echo "    then: container system stop && container system start" >&2
     echo "  See docs/APPLE-CONTAINER.md -> 'Reaching host services'." >&2
 fi
 
