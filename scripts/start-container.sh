@@ -29,6 +29,24 @@ if [ ! -f "${PI_HOME_HOST}/agent/models.json" ]; then
     exit 1
 fi
 
+# --- host.docker.internal reachability hint (Apple path only) ---
+# models.json's local-llm provider and the chrome-devtools forwarder default to
+# host.docker.internal. apple/container can't resolve that name natively — the
+# fix is a host-side DNS redirect (see docs/APPLE-CONTAINER.md, "Reaching host
+# services"). Only relevant when the local provider is configured; warn, don't
+# fail — pi runs fine without it if the local provider is unused.
+if [ -n "${LOCAL_API_KEY:-}" ]; then
+    HOST_DNS="$(dscacheutil -q host -a name host.docker.internal 2>/dev/null || true)"
+    if ! printf '%s' "$HOST_DNS" | grep -q 'ip_address'; then
+        echo "Warning: 'host.docker.internal' does not resolve on this Mac." >&2
+        echo "  The local-llm provider (baseUrl in seed/.pi/agent/models.json) and Chrome" >&2
+        echo "  CDP forwarding reach the host through it; without a DNS redirect they fail" >&2
+        echo "  inside the container. One-time fix (re-run after every reboot):" >&2
+        echo "    sudo container system dns create host.docker.internal --localhost 203.0.113.113" >&2
+        echo "  See docs/APPLE-CONTAINER.md -> 'Reaching host services'." >&2
+    fi
+fi
+
 # Pre-create the host sessions directory (under the workspace directory).
 mkdir -p "${WORKSPACE_HOST}/sessions"
 

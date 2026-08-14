@@ -66,6 +66,41 @@ path.
   3. **stops a leftover same-name container** (`container stop` — SIGTERM, 5s
      timeout) before running.
 
+## Reaching host services
+
+`models.json` points the `local-llm` provider at
+`http://host.docker.internal:8765/v1`, and
+`start-chrome-devtools-mcp.sh` defaults its forwarder to
+`host.docker.internal:9222` — but `container` **does not resolve
+`host.docker.internal`** (and has no `--add-host` either; see
+[apple/container#673](https://github.com/apple/container/issues/673) and
+[#346](https://github.com/apple/container/issues/346)). The supported fix is
+host-side, one command: `container system dns create` with `--localhost`
+binds a domain to a fake IP whose packets the macOS packet filter redirects
+to the host's own loopback — any port:
+
+```bash
+# Needs sudo; the packet-filter rule is dropped on reboot, re-run then.
+sudo container system dns create host.docker.internal --localhost 203.0.113.113
+```
+
+The domain name is arbitrary — using `host.docker.internal` (rather than the
+docs' `host.container.internal`) keeps `models.json` and the CDP forwarder
+**portable**: the same value resolves on the podman path (natively) and on
+the Apple path (via the redirect). Pick a fake IP that can't collide with
+your networks — the tool documents `203.0.113.0/24` and `172.16.0.0/12` as
+safe ranges.
+
+`start-container.sh` warns (doesn't fail) at startup when
+`host.docker.internal` doesn't resolve and `LOCAL_API_KEY` is set.
+
+Caveats:
+- needs a `container` build with the `--localhost` flag (merged upstream
+  2026-01-24 — check `container system dns create --help`)
+- creating a localhost domain disables Private Relay
+- an early build had a `pfctl reload` bug (`reloadProcess doesn't exist`);
+  it's fixed upstream — update `container` if you hit it
+
 ## Deliberate divergences from compose.yaml
 
 Compatibility-driven, not oversights. Keep them in mind when diffing the
