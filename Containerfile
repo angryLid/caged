@@ -105,8 +105,8 @@ RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 # clone; the resulting repos are baked under /opt/caged/skills/vendor.
 # Volatile layer: skills.json churns on seed edits, so it stays near the
 # bottom.
-COPY seed/.pi/agent/skills.json /opt/caged/skills.json
-COPY scripts/skills-sync.mjs /opt/caged/skills-sync.mjs
+COPY seed/.pi/agent/skills.json scripts/skills-sync.mjs  /opt/caged/
+
 RUN node /opt/caged/skills-sync.mjs \
         --config /opt/caged/skills.json \
         --vendor /opt/caged/skills/vendor \

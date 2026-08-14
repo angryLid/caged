@@ -53,7 +53,8 @@ caged/
 │   └── skills-sync.mjs  # declarative skills sync (see `## Skills (“skills-sync”)`)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
-    └── CLI-AUTH.md           # glab/acli auth behavior, persistence & risks
+    ├── CLI-AUTH.md           # glab/acli auth behavior, persistence & risks
+    └── APPLE-CONTAINER.md    # running via Apple's container tool (no compose)
 
 > `scripts/skills-sync.mjs` is also baked into the image (see `Containerfile`)
 > so the container start can install skills **without** the workspace mounted.
@@ -138,6 +139,11 @@ podman compose -f /path/to/caged/compose.yaml run --rm pi pi --print "refactor t
 ```
 
 Both commands mount the **directory you run them from** as `/workspace`.
+
+> **On Apple silicon?** You can run the same stack with Apple's native
+> `container` tool instead of podman — it has no compose support and a
+> couple of hardening layers differ. See
+> [docs/APPLE-CONTAINER.md](docs/APPLE-CONTAINER.md).
 
 > **TUI looks jagged/aliased?** (podman-compose 1.x `up` only) — that's a known
 > podman-compose TTY limitation: it creates a pty but never forwards the

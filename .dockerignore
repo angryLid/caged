@@ -9,7 +9,12 @@ compose.yaml
 # never COPY'd into the image. EXCEPTION: the Containerfile COPYs
 # seed/.pi/agent/skills.json at BUILD time to drive the build-time skill
 # clone, so that one file must be let back through the ignore.
-seed/
+
+seed/*
 !seed/.pi/
+
+seed/.pi/*
 !seed/.pi/agent/
+
+seed/.pi/agent/*
 !seed/.pi/agent/skills.json
