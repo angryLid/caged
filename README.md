@@ -51,6 +51,11 @@ caged/
 ├── scripts/
 │   ├── entrypoint.sh    # seed validation (fail-fast) + tini, runs as USER pi
 │   └── skills-sync.mjs  # declarative skills sync (see `## Skills (“skills-sync”)`)
+├── dsh/                 # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) container
+│   ├── Containerfile    #   its own image (node24, non-root, pinned dsh)
+│   ├── compose.yaml     #   the dsh runtime entry (Web UI on :3080, or headless)
+│   ├── scripts/         #   Apple `container` build/start (no compose there)
+│   └── seed/.dsh/       #   live $DSH_HOME bind (like seed/.pi for dsh)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
     ├── CLI-AUTH.md           # glab/acli auth behavior, persistence & risks

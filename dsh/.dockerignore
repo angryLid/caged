@@ -1,0 +1,5 @@
+# dsh build context: keep it lean — we COPY only scripts/entrypoint.sh into the
+# image at build time. Everything else (seed, docs, git) is runtime-only.
+.git
+*.md
+seed/

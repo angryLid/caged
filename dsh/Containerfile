@@ -1,0 +1,92 @@
+# syntax=docker/dockerfile:1
+#
+# dsh Containerfile — a hardened, disposable container for DeepSeek Harness
+# (`@deepseek-ai/dsh`, https://github.com/deepseek-ai/deepseek-harness).
+#
+# Sibling to the caged image (../Containerfile) with the same hardening
+# posture and the same "run the agent under the lowest privilege" goal — but
+# for dsh's browser Web UI instead of pi's TUI. Key differences:
+#
+#   * dsh is a server: `dsh web` defaults to binding 127.0.0.1:3080 and its
+#     CLI *rejects* `--host 0.0.0.0` ("would expose remote code execution to
+#     the network"). We keep that CLI guard but set the webserver CONFIG to bind
+#     0.0.0.0:3080 inside the container via the shipped home-level patch
+#     (seed/.dsh/cordis.patch.yml — the runtime schema allows it, only the flag
+#     parser rejects it), and every launch publishes the host side to loopback
+#     only. So no in-container port bridge is needed.
+#   * dsh's data root is $DSH_HOME (~/.dsh), the analogue of pi's ~/.pi. It is
+#     LIVE bind-mounted from seed/.dsh so config persists and syncs like the pi
+#     seed: profiles/ auto-initialize on first run, edits land on the next
+#     start, no image rebuild.
+#
+# Design goals (mirror caged): non-root uid 1000, read-only rootfs, no caps,
+# hardening applied at runtime via compose.yaml. Network stays OPEN by design
+# (dsh needs to reach model providers).
+
+ARG NODE_IMAGE=node:24-slim
+
+FROM ${NODE_IMAGE} AS base
+
+# Minimal runtime essentials:
+#   git          - dsh agents manage repos / commits on user code
+#   ca-certificates - TLS for npm/model provider calls
+#   curl         - net debugging
+#   tini         - proper PID 1 (zombie reaping of bash subprocesses)
+#   python3 + build-essential - node-gyp toolchain. dsh's terminal dep
+#   node-pty@1.1.0 ships NO Linux prebuilds (only darwin-*/win32-*); on Linux
+#   its install always does `node-gyp rebuild`, which needs Python + a C++
+#   compiler. This layer is cached, so the toolchain does not churn on dsh
+#   version bumps. (node-addon-require-builtin ships prebuilt linux-* binaries,
+#   so node-pty is the only package that must compile.)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git ca-certificates curl tini python3 build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root runtime user + persistent dirs.
+# Reuse the caged convention: UID 1000 (freed from the base image's `node`
+# user so "uid 1000" stays stable across base image updates), home is
+# /agent-home named generically, so the image stays reusable for other agents.
+RUN userdel -r node 2>/dev/null || true \
+    && useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash pi \
+    && mkdir -p /workspace /agent-home/.dsh \
+    && chown -R pi:pi /workspace /agent-home
+
+# Install dsh (pinned) globally. Open network at build time (npm registry).
+# This is the volatile layer: a DSH_VERSION bump rebuilds only this (and the
+# few below it), keeping the apt/user layers cached. The published npm set is
+# internally consistent at rc.6 (@deepseek-ai/dsh and all its @deepseek-ai/dsh-*
+# bundle deps are ^0.1.0-rc.6); its native deps (node-pty,
+# node-addon-require-builtin) ship prebuilt linux x64/arm64-gnu binaries, so
+# no build toolchain is required in the image.
+ARG DSH_VERSION=0.1.0-rc.6
+RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
+
+# $DSH_HOME is intentionally NOT copied into the image: at runtime compose.yaml
+# bind-mounts <caged>/dsh/seed/.dsh over /agent-home/.dsh (rw), so $DSH_HOME is
+# exactly the host's seed/.dsh — one source of truth with no image copy to
+# drift. Only $DSH_HOME is a writable host mount; the rest of $HOME stays on
+# the read-only rootfs with caches redirected to /tmp. The entrypoint validates
+# the bind is in place and fails fast otherwise. Keys stay out of seed/:
+# dsh's credential resolution gives the inherited process environment top
+# (read-only) precedence, so compose forwards DEEPSEEK_API_KEY & friends.
+
+ENV HOME=/agent-home \
+    DSH_HOME=/agent-home/.dsh \
+    WORKSPACE=/workspace
+
+COPY scripts/entrypoint.sh /usr/local/bin/dsh-entrypoint
+RUN chmod +x /usr/local/bin/dsh-entrypoint
+
+# best-effort default-workspace seeder (see scripts/ensure-workspace.mjs),
+# invoked from the entrypoint so a fresh seed opens the Web UI on /workspace.
+COPY scripts/ensure-workspace.mjs /usr/local/bin/dsh-ensure-workspace
+RUN chmod +x /usr/local/bin/dsh-ensure-workspace
+
+USER pi
+WORKDIR /workspace
+
+# Default: serve the Web UI. Override the args for other modes, e.g.
+#   ["dsh", "--profile", "headless", "explain this repo and exit"]
+ENTRYPOINT ["/usr/local/bin/dsh-entrypoint"]
+CMD ["dsh", "web"]

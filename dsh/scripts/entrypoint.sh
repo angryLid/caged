@@ -1,0 +1,57 @@
+#!/bin/sh
+# dsh entrypoint.
+#
+# Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
+#   1. Fail-fast validation of the LIVE $DSH_HOME bind (seed/.dsh) BEFORE
+#      launching dsh. No config is baked into the image: $DSH_HOME must be the
+#      live bind mount of the host `dsh/seed/.dsh` (compose.yaml / the Apple
+#      start script do this). If it is missing or not writable we exit non-zero
+#      with a clear message — never let dsh start half-configured.
+#   2. Best-effort bootstrap of cache dirs on the /tmp tmpfs (node never
+#      touches the RO home or the repo-clean $DSH_HOME).
+#   3. Launch the requested command under tini so spawned bash subprocesses
+#      (dsh's bash tool) get reaped properly.
+#
+# The Web UI binds 0.0.0.0:3080 (with the host side published to loopback only)
+# via seed/.dsh/cordis.patch.yml — no in-container bridge is needed. See that
+# file for the rationale.
+
+set -e
+
+# compose sets DSH_HOME=/agent-home/.dsh; honour an override.
+DSH_HOME_PATH="${DSH_HOME:-/agent-home/.dsh}"
+
+fail() {
+    echo "dsh: error: $*" >&2
+    exit 1
+}
+
+# --- 1. fail-fast validation of the live seed bind -----------------------
+
+[ -d "$DSH_HOME_PATH" ] || fail \
+    "config home '$DSH_HOME_PATH' not found — \$DSH_HOME must be the live seed bind." \
+    "Run via 'podman compose -f dsh/compose.yaml up' (mounts <caged>/dsh/seed/.dsh" \
+    "at /agent-home/.dsh), or mount it manually."
+[ -w "$DSH_HOME_PATH" ] || fail \
+    "'$DSH_HOME_PATH' is not writable — the live seed bind must be rw" \
+    "(dsh auto-initializes profiles/ and stores settings/sessions here on first use)."
+
+# --- 2. bootstrap (best-effort caches on the /tmp tmpfs) ------------------
+
+for dir in /tmp/.npm /tmp/.cache /tmp/.config; do
+    mkdir -p "$dir"
+    chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
+done
+
+# --- 3. best-effort: default Web workspace -------------------------------
+# dsh's Web UI has no env var for a default workspace; it derives the default
+# from the persisted workspace registry ($DSH_HOME/storages/workspace.json).
+# Seed a /workspace registration so the UI opens on the mounted code dir
+# instead of asking the user to "Choose workspace". Idempotent and best-effort
+# (never blocks boot, never clobbers user registrations) — see
+# scripts/ensure-workspace.mjs.
+if [ -x /usr/local/bin/dsh-ensure-workspace ]; then
+    dsh-ensure-workspace || echo "dsh: warn: default workspace seed skipped (non-fatal)" >&2 || true
+fi
+
+exec tini -s -- "$@"

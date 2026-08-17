@@ -1,0 +1,27 @@
+# caged dsh — bind the Web UI to the container network.
+#
+# This is the HOME-LEVEL patch ($DSH_HOME/cordis.patch.yml), applied after every
+# bundle and profile patch, so it overrides the webserver config that the
+# dsh-web-app bundle inserts.
+#
+# Why: dsh web defaults to binding 127.0.0.1 and its CLI *rejects* `--host
+# 0.0.0.0` ("would expose remote code execution to the network"). That guard
+# assumes a bare `dsh web` on a user's machine. In a container the port escapes
+# only through the operator's explicit publish (which we bind to the HOST
+# LOOPBACK, 127.0.0.1), so binding all interfaces *inside* the container is the
+# intended deployment and adds no exposure. The runtime schema accepts '0.0.0.0'
+# (see @deepseek-ai/dsh-host-webserver Config); only the CLI flag parser rejects
+# it, so we patch the config directly instead of passing `--host`.
+#
+# The port is pinned to 3080 (dsh's default) and is the CONTAINER-internal port.
+# The host-side port is chosen by the operator via DSH_HOST_PORT in
+# compose.yaml / start-container.sh; changing it does not require touching this
+# file. We deliberately do NOT use !!js to read DSH_PORT from the environment —
+# keep the container port a stable constant and vary only the host publish.
+#
+# Note: the `headless` profile has no webserver row, so headless runs print a
+# benign "patch named an id absent from the tree" warning to stderr. Non-fatal.
+- id: webserver
+  config:
+    host: '0.0.0.0'
+    port: 3080
