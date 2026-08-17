@@ -74,8 +74,9 @@ works too.
 ### Models: pi provider set migrated (+ BYOK)
 
 The image ships the same four provider routes as the pi agent's
-`seed/.pi/agent/models.json`, as the composition base in
-`seed/.dsh/cordis.patch.yml` (`llm-pi-ai` entry):
+`seed/.pi/agent/models.json`, tracked in the home settings document
+`seed/.dsh/settings.yaml` (the `llm-pi-ai` section; the file is un-ignored
+in `seed/.dsh/.gitignore`, and `$DSH_HOME` is the live bind of `seed/.dsh`):
 
 | route | key env / credential ref | protocol |
 |---|---|---|
@@ -91,18 +92,12 @@ the Web UI (Settings → Models → card → key field); dsh stores it in
 operator env needed. An operator-injected env var of the same name (e.g. via
 `scripts/dsh-start-container.sh`) shadows the stored value and renders the
 field read-only. The `llm-pi-ai` adapter is dormant-capable: removing the
-patch entry empties the route set while the full pi-ai catalog stays
-configurable from the Models page.
+section empties the route set while the full pi-ai catalog stays configurable
+from the Models page.
 
-Settings resolve as schema defaults < the patch base < the user settings
-section (`seed/.dsh/settings.yaml`, gitignored), so a Models-page edit layers
-on top of the shipped routes instead of replacing them. Editing the routes
-once saved: the patch entry is the composition base — change it to re-baseline.
-
-Mapping notes: pi's `"$VAR"` refs become bare names; pi-only compat flags
-(`supportsEagerToolInputStreaming`, `supportsStrictTools`) have no dsh
-surface and are dropped; `reasoning: true` maps to the nearest dsh knob
-(`reasoning: high` + `compat.thinkingFormat` where the dialect is known).
+`settings.yaml` is dsh-managed, so the Models page edits the same file the
+repo tracks — expect occasional noise diffs in git status after a UI change
+(models/keys themselves land in `.credentials.yaml`, which stays ignored).
 
 ### Permission model (danger-full-access by default)
 
