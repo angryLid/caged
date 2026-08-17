@@ -63,11 +63,18 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   so a compose/multi-container stack would add nothing worthwhile; run a
   single disposable container.
 - **Apple `container` is the runtime**, and it doesn't support orchestration
-  anyway, which fits. Build/run via `scripts/build-container.sh` +
+  anyway, which fits. Build/run via `scripts/build-container.sh pi` +
   `scripts/start-container.sh`; full detail in `docs/APPLE-CONTAINER.md`.
 - **dsh lives flat at the repo root** — `Containerfile.dsh`, `README.dsh.md`,
   `scripts/dsh-*`, `seed/.dsh/`. It's a second agent image (DeepSeek
   Harness), sibling to pi: keep it flat, don't re-nest it under a `dsh/` dir.
+- **Shared base image.** `Containerfile.base` (built by
+  `scripts/build-caged-base.sh`) holds what the pi and dsh images share —
+  apt essentials, the pinned `glab`/`acli` CLIs, the non-root user. Both
+  `Containerfile` and `Containerfile.dsh` are thin `FROM` layers on top of
+  it: CLI/pin/base updates belong in the base, agent-specific layers in the
+  derived files. `scripts/build-container.sh pi|dsh` rebuilds the base
+  automatically unless `CAGED_SKIP_BASE=1`.
 - Skills can be synced by hand with `node scripts/skills-sync.mjs`
   (`--dry-run` to preview, `--link-only` / `--clone-only` for the split paths).
 - After changing any seed config, the change is only visible on the next

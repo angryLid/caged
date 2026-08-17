@@ -8,8 +8,11 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 
 > dsh is a **developer preview** that is iterating rapidly, with
 > compatibility-breaking changes expected. The version is pinned in
-> `Containerfile` (build-arg `DSH_VERSION`, default `0.1.0-rc.6`) so a release
-> bump is explicit.
+> `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.0-rc.6`) so a
+> release bump is explicit. dsh builds on the repo's shared base image
+> `Containerfile.base` (built automatically by the build script), which
+> provides apt essentials, the glab/acli CLIs and the non-root user — the
+> same CLI tooling pi ships.
 
 ## What it is / isn't
 
@@ -28,12 +31,14 @@ sharing the same `scripts/` and `seed/` directories. The dsh files are:
 ```
 caged/
 ├── Containerfile        # pi image (caged) — the repo's default (see README.md)
-├── Containerfile.dsh    # dsh image (this one): node24, non-root, pinned dsh
+├── Containerfile.base   # shared base for both images: apt essentials, glab, acli, non-root user
+├── Containerfile.dsh    # dsh image (this one): FROM the base, pinned dsh
 ├── README.dsh.md        # this file
 ├── scripts/
 │   ├── dsh-entrypoint.sh      # fail-fast seed check + tini + workspace seed
 │   ├── dsh-ensure-workspace.mjs # best-effort: register /workspace as Web default
-│   ├── dsh-build-container.sh # Apple `container` build
+│   ├── build-caged-base.sh    # shared base image build (built first automatically)
+│   ├── build-container.sh     # Apple `container` build — run with argument `dsh`
 │   └── dsh-start-container.sh # Apple `container` run: web UI on host loopback
 └── seed/.dsh/           # LIVE $DSH_HOME bind source — ships our home-level
                          # cordis.patch.yml; dsh generates profiles/settings/
@@ -49,8 +54,9 @@ so there's no orchestration — and Apple's `container` tool (the runtime) has
 no compose support anyway. Build and run with the scripts:
 
 ```sh
-# build (context repo root, build-arg DSH_VERSION)
-scripts/dsh-build-container.sh
+# build (context repo root: builds the shared Containerfile.base first,
+# then the dsh image with build-arg DSH_VERSION)
+scripts/build-container.sh dsh
 # run the web UI; opens on the host loopback
 DSH_HOST_PORT=8080 scripts/dsh-start-container.sh
 open http://127.0.0.1:3080
@@ -147,7 +153,8 @@ inside the container via `cordis.patch.yml`). The container port is a stable
 3080; only `DSH_HOST_PORT` varies. Hardening is the tool's implementable
 subset (same as the pi image): `--read-only`, `--cap-drop ALL`, `--tmpfs
 /tmp`, pinned memory — no userns / no `--security-opt`. Env knobs: `DSH_IMAGE`,
-`DSH_VERSION`, `DSH_HOME_HOST`, `CAGED_WORKSPACE`, `DSH_MEMORY`.
+`DSH_VERSION`, `DSH_HOME_HOST`, `CAGED_WORKSPACE`, `DSH_MEMORY` (build:
+`CAGED_BASE_IMAGE`, `CAGED_SKIP_BASE`, `GLAB_VERSION`, `ACLI_VERSION`).
 
 ## Port mapping
 

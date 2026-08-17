@@ -43,15 +43,16 @@ can only ever touch the workspace you explicitly hand it.
 
 ```
 caged/
-├── Containerfile        # image definition (non-root, pinned pi version)
+├── Containerfile        # pi image (non-root, pinned pi version)
+├── Containerfile.base   # shared base for both images: apt essentials, glab, acli, non-root user
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── seed/                # agent homes — LIVE bind-mount sources
 │   ├── .pi/agent/       # pi's ~/.pi: models.json (providers), settings.json,
 │   │                    #   mcp.json, AGENTS.md, skills.json, skills/, scripts/
 │   └── .dsh/            # dsh's $DSH_HOME: cordis.patch.yml + generated config
 ├── scripts/
-│   ├── build-container.sh   # Apple `container` build (image from Containerfile)
-│   ├── dsh-build-container.sh # same, for the dsh image (Containerfile.dsh)
+│   ├── build-caged-base.sh  # shared base image build (Containerfile.base) — built automatically by the one below
+│   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh  (arg required, no default)
 │   ├── start-container.sh   # Apple `container` run (interactive pi TUI)
 │   ├── dsh-start-container.sh # same, for dsh (Web UI on host loopback)
 │   ├── entrypoint.sh        # pi seed validation (fail-fast) + tini, runs as USER pi
@@ -130,9 +131,11 @@ Requirements: Apple's native [`container`](https://github.com/apple/container)
 tool on Apple silicon (Linux containers as lightweight VMs).
 
 ```sh
-# 1. build (only needed the first time, or when the Containerfile changes).
-#    Optionally pick a pi version:   PI_VERSION=x.y.z scripts/build-container.sh
-scripts/build-container.sh
+# 1. build (only needed the first time, or when the images change). The
+#    shared base image (Containerfile.base: apt essentials, glab, acli,
+#    non-root user) is built automatically first. Optionally pick a pi
+#    version:   PI_VERSION=x.y.z scripts/build-container.sh pi
+scripts/build-container.sh pi
 
 # 2. interactive TUI — run from the repo you want as the workspace, then
 #    start the disposable container. It mounts the directory you run it from
@@ -146,7 +149,7 @@ cd /path/to/your/repo
 > **Why scripts, not compose?** caged runs a *single* disposable container — the
 > container's only job is isolation, so a compose/multi-container stack would add
 > nothing. And Apple's `container` tool doesn't support compose orchestration
-> anyway, which fits perfectly. Build/run via `scripts/build-container.sh` +
+> anyway, which fits perfectly. Build/run via `scripts/build-container.sh pi` +
 > `scripts/start-container.sh`; full detail in
 > [docs/APPLE-CONTAINER.md](docs/APPLE-CONTAINER.md).
 
@@ -262,8 +265,9 @@ that's expected, not a caged bug.
 ## glab (GitLab CLI)
 
 [`glab`](https://gitlab.com/gitlab-org/cli) — the official GitLab CLI — is
-baked into the image (v1.112.0, pinned `ARG GLAB_VERSION` in the
-Containerfile, sha256-verified against the official checksums). Use it for
+baked into the shared base image (v1.112.0, pinned `ARG GLAB_VERSION`
+in `Containerfile.base`, sha256-verified against the official checksums);
+both the pi and the dsh image inherit it. Use it for
 MRs, issues, pipelines, releases, etc. instead of hand-rolled curl against
 the GitLab API.
 
@@ -297,8 +301,9 @@ Two ways to authenticate:
 
 [`acli`](https://developer.atlassian.com/cloud/acli/) — Atlassian's official
 command line interface (Jira Cloud, Confluence, Bitbucket, admin APIs) — is
-baked into the image (v1.3.22, pinned `ARG ACLI_VERSION` in the
-Containerfile). Atlassian only publishes `latest`-style URLs, so the pin is
+baked into the shared base image (v1.3.22, pinned `ARG ACLI_VERSION`
+in `Containerfile.base`); both the pi and the dsh image inherit it.
+Atlassian only publishes `latest`-style URLs, so the pin is
 enforced via the versioned `.deb` filename + the sha256 taken from
 Atlassian's own apt repo `Packages` index, mirroring the `glab` pattern.
 
@@ -320,12 +325,17 @@ CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
 ## Environment knobs
 
-`scripts/start-container.sh` (and `scripts/build-container.sh`) read these from
-the calling shell; defaults listed.
+`scripts/start-container.sh` (and `scripts/build-container.sh pi|dsh` /
+`scripts/build-caged-base.sh`) read these from the calling shell; defaults
+listed.
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `CAGED_IMAGE` | `caged:latest` | image tag to run |
+| `CAGED_BASE_IMAGE` | `caged-base:latest` | shared base image tag — built first by `build-caged-base.sh`, imported via FROM in both Containerfiles |
+| `CAGED_SKIP_BASE` | `0` | set to `1` to skip the automatic base rebuild when building a derived image |
+| `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |
+| `ACLI_VERSION` | `1.3.22` | acli version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
 | `CAGED_PI_HOME` | `./seed/.pi` (relative to the repo root) | host dir bind-mounted at `/agent-home/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
@@ -379,7 +389,7 @@ These are known rough edges we've consciously chosen **not** to fix yet.
   `seed/.pi/agent/settings.json` (`"packages": []`), or accept the delay
   per container start.
 * The pi version is pinned via `ARG PI_VERSION` (default `0.84.2`). Rebuild a
-  specific version with `PI_VERSION=x.y.z scripts/build-container.sh`. (We
+  specific version with `PI_VERSION=x.y.z scripts/build-container.sh pi`. (We
   deliberately don't quote a number here — the project is still iterating.)
 
 ## License / notes

@@ -5,7 +5,12 @@
 #
 # Sibling to the caged image (./Containerfile) with the same hardening
 # posture and the same "run the agent under the lowest privilege" goal — but
-# for dsh's browser Web UI instead of pi's TUI. Key differences:
+# for dsh's browser Web UI instead of pi's TUI. Builds FROM the shared base
+# image ./Containerfile.base (built first by `scripts/build-container.sh dsh`
+# via scripts/build-caged-base.sh), which provides apt essentials, the
+# glab/acli CLIs and the non-root user — so dsh agents get the same CLI
+# tooling as pi for free. Only dsh-specific layers live here. Key
+# differences from pi:
 #
 #   * dsh is a server: `dsh web` defaults to binding 127.0.0.1:3080 and its
 #     CLI *rejects* `--host 0.0.0.0` ("would expose remote code execution to
@@ -23,40 +28,31 @@
 # hardening applied at runtime via scripts/dsh-start-container.sh. Network
 # stays OPEN by design (dsh needs to reach model providers).
 
-ARG NODE_IMAGE=node:24-slim
+ARG CAGED_BASE_IMAGE=caged-base:latest
 
-FROM ${NODE_IMAGE} AS base
+FROM ${CAGED_BASE_IMAGE}
 
-# Minimal runtime essentials:
-#   git          - dsh agents manage repos / commits on user code
-#   ca-certificates - TLS for npm/model provider calls
-#   curl         - net debugging
-#   tini         - proper PID 1 (zombie reaping of bash subprocesses)
-#   python3 + build-essential - node-gyp toolchain. dsh's terminal dep
-#   node-pty@1.1.0 ships NO Linux prebuilds (only darwin-*/win32-*); on Linux
-#   its install always does `node-gyp rebuild`, which needs Python + a C++
-#   compiler. This layer is cached, so the toolchain does not churn on dsh
-#   version bumps. (node-addon-require-builtin ships prebuilt linux-* binaries,
-#   so node-pty is the only package that must compile.)
+# node-gyp toolchain, dsh-specific: dsh's terminal dep node-pty@1.1.0 ships
+# NO Linux prebuilds (only darwin-*/win32-*); on Linux its install always
+# does `node-gyp rebuild`, which needs Python + a C++ compiler. This layer
+# is cached, so the toolchain does not churn on dsh version bumps.
+# (node-addon-require-builtin ships prebuilt linux-* binaries, so node-pty
+# is the only package that must compile.)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        git ca-certificates curl tini python3 build-essential \
+        python3 build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Non-root runtime user + persistent dirs.
-# Reuse the caged convention: UID 1000 (freed from the base image's `node`
-# user so "uid 1000" stays stable across base image updates), home is
-# /agent-home named generically, so the image stays reusable for other agents.
-RUN userdel -r node 2>/dev/null || true \
-    && useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash pi \
-    && mkdir -p /workspace /agent-home/.dsh \
-    && chown -R pi:pi /workspace /agent-home
+# dsh's `$DSH_HOME` dir on the persistent volume (the base only creates
+# /agent-home; the .dsh subdir is dsh-specific).
+RUN mkdir -p /agent-home/.dsh \
+    && chown -R pi:pi /agent-home/.dsh
 
 # Install dsh (pinned) globally. Open network at build time (npm registry).
 # This is the volatile layer: a DSH_VERSION bump rebuilds only this (and the
-# few below it), keeping the apt/user layers cached. The published npm set is
-# internally consistent at rc.6 (@deepseek-ai/dsh and all its @deepseek-ai/dsh-*
-# bundle deps are ^0.1.0-rc.6); its native deps (node-pty,
+# few below it), keeping the base/toolchain layers cached. The published npm
+# set is internally consistent at rc.6 (@deepseek-ai/dsh and all its
+# @deepseek-ai/dsh-* bundle deps are ^0.1.0-rc.6); its native deps (node-pty,
 # node-addon-require-builtin) ship prebuilt linux x64/arm64-gnu binaries, so
 # no build toolchain is required in the image.
 ARG DSH_VERSION=0.1.0-rc.6
@@ -71,11 +67,9 @@ RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
 # the bind is in place and fails fast otherwise. Keys stay out of seed/:
 # dsh's credential resolution gives the inherited process environment top
 # (read-only) precedence, so start-container.sh forwards DEEPSEEK_API_KEY &
-# friends.
+# friends. (HOME and WORKSPACE come from the base image.)
 
-ENV HOME=/agent-home \
-    DSH_HOME=/agent-home/.dsh \
-    WORKSPACE=/workspace
+ENV DSH_HOME=/agent-home/.dsh
 
 COPY scripts/dsh-entrypoint.sh /usr/local/bin/dsh-entrypoint
 RUN chmod +x /usr/local/bin/dsh-entrypoint

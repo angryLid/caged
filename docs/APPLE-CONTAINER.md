@@ -10,7 +10,7 @@ deep-negation `.dockerignore` form):
 
 | What | Command |
 |---|---|
-| Build image | `scripts/build-container.sh` |
+| Build image | `scripts/build-container.sh pi` (`scripts/build-container.sh dsh` for dsh) |
 | Run (TUI) | `scripts/start-container.sh` |
 
 The scripts honor the env knobs `CAGED_IMAGE`, `CAGED_WORKSPACE` and
@@ -48,11 +48,18 @@ seed/.pi/agent/*
 Don't "simplify" it back to the collapsed form — it regresses the Apple
 path.
 
-## The two scripts
+## The scripts
 
-- **`scripts/build-container.sh`** — `container build` with the project root
-  as context and an absolute Containerfile path (works from any cwd);
-  `PI_VERSION` build-arg (default `0.84.2`).
+- **`scripts/build-container.sh pi|dsh`** — `container build` with the project
+  root as context and an absolute Containerfile path (works from any cwd). The
+  image is a required argument (`pi` → `./Containerfile`, `dsh` →
+  `./Containerfile.dsh`); a build without one fails. Per-image build args:
+  `PI_VERSION` (default `0.84.2`) for pi, `DSH_VERSION` (default
+  `0.1.0-rc.6`) for dsh. It builds the shared base image first —
+  `Containerfile.base` via `scripts/build-caged-base.sh` (apt essentials,
+  glab, acli, non-root user; tag `caged-base:latest`) — so the pi and dsh
+  image builds share one cached base. Skip that with `CAGED_SKIP_BASE=1`,
+  or point both at a custom `CAGED_BASE_IMAGE`.
 - **`scripts/start-container.sh`** — `container run` wiring the two mounts
   (`/workspace`, the live seed `~/.pi`), the
   environment, and the hardening flags the tool supports (`--read-only`,
@@ -154,7 +161,7 @@ BuildKit builder builds with **2 CPUs / 2 GB**.
   pi on larger tasks. Override with `CAGED_MEMORY` (e.g.
   `CAGED_MEMORY=8g scripts/start-container.sh`). CPUs stay at the 4-CPU
   default; if heavy workspace builds feel slow, add `--cpus` alongside.
-- `build-container.sh` keeps the builder defaults (2 CPU / 2 GB); if an image
+- the build script (`scripts/build-container.sh pi|dsh`) keeps the builder defaults (2 CPU / 2 GB); if an image
   build OOMs, add `--memory` there too.
 
 A machine-wide default is possible via the tool's own config file
