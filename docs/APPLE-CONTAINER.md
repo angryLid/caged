@@ -148,5 +148,5 @@ A machine-wide default is possible via the tool's own config file
 — the script pins the value instead so behavior is reproducible on any host.
 
 > `scripts/start-container.sh` is the single runtime entry: when its mounts,
-> environment or hardening flags change, keep `dsh/scripts/start-container.sh`
+> environment or hardening flags change, keep `scripts/dsh-start-container.sh`
 > and any docs in sync with it.

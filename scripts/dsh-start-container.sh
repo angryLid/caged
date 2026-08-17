@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# dsh/scripts/start-container.sh — run the DeepSeek Harness web UI with the
-# native Apple `container` tool. Mirrors scripts/start-container.sh at the
-# repo root, scoped to the dsh image and its web server mode.
+# scripts/dsh-start-container.sh — run the DeepSeek Harness web UI with the
+# native Apple `container` tool. The dsh counterpart of
+# scripts/start-container.sh (pi), scoped to the dsh image and its web server
+# mode.
 #
 # How the browser reaches the UI (the port part):
 #   - dsh web binds 127.0.0.1 by default and its CLI *rejects* --host 0.0.0.0,
@@ -20,8 +21,8 @@ set -euo pipefail
 # /workspace — dsh's agents work on this code).
 CURRENT_PWD="$PWD"
 
-# SCRIPT_DIR: dsh/scripts/ (absolute). DSH_DIR: dsh/ (project root of this
-# image).
+# SCRIPT_DIR: scripts/ (absolute). DSH_DIR: the repo root (anchors both
+# images' scripts).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DSH_DIR="$(dirname "$SCRIPT_DIR")"
 
@@ -57,8 +58,8 @@ fi
 # --- Host path mapping ---
 # Workspace: prefer CAGED_WORKSPACE, fall back to the caller's current dir.
 WORKSPACE_HOST="${CAGED_WORKSPACE:-$CURRENT_PWD}"
-# Live $DSH_HOME: anchored at dsh/seed/.dsh under this image's root
-# (DSH_HOME_HOST overrides). Must exist on the host to be a bind source.
+# Live $DSH_HOME: anchored at seed/.dsh under the repo root (DSH_HOME_HOST
+# overrides). Must exist on the host to be a bind source.
 DSH_HOME_HOST="${DSH_HOME_HOST:-$DSH_DIR/seed/.dsh}"
 
 echo "==> Ensuring seed dir exists (live \$DSH_HOME): ${DSH_HOME_HOST}"

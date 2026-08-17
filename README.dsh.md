@@ -17,23 +17,27 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
   agent can read/edit workspace files, run bash, delegate, and plan. The Web UI
   lets you configure models and pick a workspace in the browser.
 - **Is NOT**: a network sandbox. dsh needs open networking to reach model
-  providers, exactly like caged — see the root [SECURITY.md](../docs/SECURITY.md)
+  providers, exactly like caged — see [docs/SECURITY.md](docs/SECURITY.md)
   for that accepted trade-off.
 
 ## Layout
 
+dsh is checked in **flat at the repo root** — sibling to the pi image (caged),
+sharing the same `scripts/` and `seed/` directories. The dsh files are:
+
 ```
-dsh/
-├── Containerfile          # image definition (node24, non-root, pinned dsh)
-├── .dockerignore
+caged/
+├── Containerfile        # pi image (caged) — the repo's default (see README.md)
+├── Containerfile.dsh    # dsh image (this one): node24, non-root, pinned dsh
+├── README.dsh.md        # this file
 ├── scripts/
-│   ├── entrypoint.sh      # fail-fast seed check + tini + default-workspace seed
-│   ├── ensure-workspace.mjs # best-effort: register /workspace as Web default
-│   ├── build-container.sh # Apple `container` build
-│   └── start-container.sh # Apple `container` run: web UI on host loopback
-└── seed/.dsh/             # LIVE $DSH_HOME bind source — ships our home-level
-                           # cordis.patch.yml; dsh generates profiles/settings/creds
-                           # here on first run
+│   ├── dsh-entrypoint.sh      # fail-fast seed check + tini + workspace seed
+│   ├── dsh-ensure-workspace.mjs # best-effort: register /workspace as Web default
+│   ├── dsh-build-container.sh # Apple `container` build
+│   └── dsh-start-container.sh # Apple `container` run: web UI on host loopback
+└── seed/.dsh/           # LIVE $DSH_HOME bind source — ships our home-level
+                         # cordis.patch.yml; dsh generates profiles/settings/creds
+                         # here on first run
 ```
 
 ## Run it
@@ -43,10 +47,10 @@ so there's no orchestration — and Apple's `container` tool (the runtime) has
 no compose support anyway. Build and run with the scripts:
 
 ```sh
-# build (context dsh/, build-arg DSH_VERSION)
-dsh/scripts/build-container.sh
+# build (context repo root, build-arg DSH_VERSION)
+scripts/dsh-build-container.sh
 # run the web UI; opens on the host loopback
-DSH_HOST_PORT=8080 dsh/scripts/start-container.sh
+DSH_HOST_PORT=8080 scripts/dsh-start-container.sh
 open http://127.0.0.1:3080
 ```
 
@@ -75,7 +79,7 @@ mode via the purpose-built env knob:
 DSH_PERMISSION_MODE=danger-full-access   # default here
 ```
 
-Set by `dsh/scripts/start-container.sh`; it makes the base bundle set
+Set by `scripts/dsh-start-container.sh`; it makes the base bundle set
 `sandbox/mode: danger-full-access` (bash/fs operations run as uid 1000 with no
 dsh-level file confinement) and `approval/policy: never` (no interactive
 approval prompts). The agent effectively has the full rights of the `pi` user
@@ -84,7 +88,7 @@ you want dsh's own sandbox + approval back.
 
 ### One-shot headless (no server, prints the answer and exits)
 
-Run with the `container` tool directly, mirroring `start-container.sh` but
+Run with the `container` tool directly, mirroring `scripts/dsh-start-container.sh` but
 adding `dsh --profile headless "…"` as the command:
 
 ```sh
@@ -98,7 +102,7 @@ container run --rm \
   dsh:latest dsh --profile headless "explain this repo and exit"
 ```
 
-`dsh/scripts/start-container.sh` starts the Web UI. It publishes
+`scripts/dsh-start-container.sh` starts the Web UI. It publishes
 `127.0.0.1:${DSH_HOST_PORT} -> 3080` via `container run -p` (host
 **loopback**, not the LAN), reaching the webserver (which binds `0.0.0.0:3080`
 inside the container via `cordis.patch.yml`). The container port is a stable
@@ -127,7 +131,7 @@ host browser :${DSH_HOST_PORT}  (host loopback)  --publish-->  container 0.0.0.0
 | `DSH_HOST_PORT` | `3080` | the host-loopback port you open in the browser (only this varies) |
 | container port | `3080` | fixed; pinned in `seed/.dsh/cordis.patch.yml` and dsh's default |
 
-Override only the host side, e.g. `DSH_HOST_PORT=8080 dsh/scripts/start-container.sh`.
+Override only the host side, e.g. `DSH_HOST_PORT=8080 scripts/dsh-start-container.sh`.
 No `--host 0.0.0.0` flag is passed anywhere — the CLI's RCE guard is preserved;
 we only set the runtime config to bind inside the container, and the host publish
 stays loopback-only.

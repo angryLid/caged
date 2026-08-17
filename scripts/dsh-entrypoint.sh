@@ -4,7 +4,7 @@
 # Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
 #   1. Fail-fast validation of the LIVE $DSH_HOME bind (seed/.dsh) BEFORE
 #      launching dsh. No config is baked into the image: $DSH_HOME must be the
-#      live bind mount of the host `dsh/seed/.dsh` (the Apple start script
+#      live bind mount of the host `seed/.dsh` (the Apple start script
 #      does this). If it is missing or not writable we exit non-zero
 #      with a clear message — never let dsh start half-configured.
 #   2. Best-effort bootstrap of cache dirs on the /tmp tmpfs (node never
@@ -30,8 +30,8 @@ fail() {
 
 [ -d "$DSH_HOME_PATH" ] || fail \
     "config home '$DSH_HOME_PATH' not found — \$DSH_HOME must be the live seed bind." \
-    "Run via 'dsh/scripts/start-container.sh' (mounts <caged>/dsh/seed/.dsh" \
-    "at /agent-home/.dsh), or mount it manually."
+    "Run via 'scripts/dsh-start-container.sh' (mounts <repo>/seed/.dsh at" \
+    "/agent-home/.dsh), or mount it manually."
 [ -w "$DSH_HOME_PATH" ] || fail \
     "'$DSH_HOME_PATH' is not writable — the live seed bind must be rw" \
     "(dsh auto-initializes profiles/ and stores settings/sessions here on first use)."
@@ -49,7 +49,7 @@ done
 # Seed a /workspace registration so the UI opens on the mounted code dir
 # instead of asking the user to "Choose workspace". Idempotent and best-effort
 # (never blocks boot, never clobbers user registrations) — see
-# scripts/ensure-workspace.mjs.
+# scripts/dsh-ensure-workspace.mjs.
 if [ -x /usr/local/bin/dsh-ensure-workspace ]; then
     dsh-ensure-workspace || echo "dsh: warn: default workspace seed skipped (non-fatal)" >&2 || true
 fi

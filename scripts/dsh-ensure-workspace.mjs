@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// dsh/scripts/ensure-workspace.mjs — make /workspace a registered dsh workspace.
+// scripts/dsh-ensure-workspace.mjs — make /workspace a registered dsh workspace.
 //
 // Why this exists: dsh's Web UI has NO environment variable for a default
 // workspace. The "which workspace did the user pick" state lives in the

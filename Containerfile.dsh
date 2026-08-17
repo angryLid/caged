@@ -3,7 +3,7 @@
 # dsh Containerfile — a hardened, disposable container for DeepSeek Harness
 # (`@deepseek-ai/dsh`, https://github.com/deepseek-ai/deepseek-harness).
 #
-# Sibling to the caged image (../Containerfile) with the same hardening
+# Sibling to the caged image (./Containerfile) with the same hardening
 # posture and the same "run the agent under the lowest privilege" goal — but
 # for dsh's browser Web UI instead of pi's TUI. Key differences:
 #
@@ -20,7 +20,7 @@
 #     start, no image rebuild.
 #
 # Design goals (mirror caged): non-root uid 1000, read-only rootfs, no caps,
-# hardening applied at runtime via dsh/scripts/start-container.sh. Network
+# hardening applied at runtime via scripts/dsh-start-container.sh. Network
 # stays OPEN by design (dsh needs to reach model providers).
 
 ARG NODE_IMAGE=node:24-slim
@@ -63,7 +63,7 @@ ARG DSH_VERSION=0.1.0-rc.6
 RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
 
 # $DSH_HOME is intentionally NOT copied into the image: at runtime
-# dsh/scripts/start-container.sh bind-mounts <caged>/dsh/seed/.dsh over
+# scripts/dsh-start-container.sh bind-mounts <repo>/seed/.dsh over
 # /agent-home/.dsh (rw), so $DSH_HOME is
 # exactly the host's seed/.dsh — one source of truth with no image copy to
 # drift. Only $DSH_HOME is a writable host mount; the rest of $HOME stays on
@@ -77,12 +77,12 @@ ENV HOME=/agent-home \
     DSH_HOME=/agent-home/.dsh \
     WORKSPACE=/workspace
 
-COPY scripts/entrypoint.sh /usr/local/bin/dsh-entrypoint
+COPY scripts/dsh-entrypoint.sh /usr/local/bin/dsh-entrypoint
 RUN chmod +x /usr/local/bin/dsh-entrypoint
 
-# best-effort default-workspace seeder (see scripts/ensure-workspace.mjs),
+# best-effort default-workspace seeder (see scripts/dsh-ensure-workspace.mjs),
 # invoked from the entrypoint so a fresh seed opens the Web UI on /workspace.
-COPY scripts/ensure-workspace.mjs /usr/local/bin/dsh-ensure-workspace
+COPY scripts/dsh-ensure-workspace.mjs /usr/local/bin/dsh-ensure-workspace
 RUN chmod +x /usr/local/bin/dsh-ensure-workspace
 
 USER pi

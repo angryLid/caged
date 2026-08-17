@@ -44,18 +44,21 @@ can only ever touch the workspace you explicitly hand it.
 ```
 caged/
 ├── Containerfile        # image definition (non-root, pinned pi version)
-├── seed/                # pi's home (~/.pi) — LIVE bind-mount source for $HOME
-│   └── .pi/agent/       # models.json (providers), settings.json, mcp.json,
-│                        # AGENTS.md, skills.json, skills/, scripts/ (CDP helpers)
+├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
+├── seed/                # agent homes — LIVE bind-mount sources
+│   ├── .pi/agent/       # pi's ~/.pi: models.json (providers), settings.json,
+│   │                    #   mcp.json, AGENTS.md, skills.json, skills/, scripts/
+│   └── .dsh/            # dsh's $DSH_HOME: cordis.patch.yml + generated config
 ├── scripts/
 │   ├── build-container.sh   # Apple `container` build (image from Containerfile)
+│   ├── dsh-build-container.sh # same, for the dsh image (Containerfile.dsh)
 │   ├── start-container.sh   # Apple `container` run (interactive pi TUI)
-│   ├── entrypoint.sh        # seed validation (fail-fast) + tini, runs as USER pi
+│   ├── dsh-start-container.sh # same, for dsh (Web UI on host loopback)
+│   ├── entrypoint.sh        # pi seed validation (fail-fast) + tini, runs as USER pi
+│   ├── dsh-entrypoint.sh    # dsh seed validation + tini
+│   ├── dsh-ensure-workspace.mjs # dsh: register /workspace as Web default
 │   └── skills-sync.mjs      # declarative skills sync (see `## Skills (“skills-sync”)`)
-├── dsh/                 # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) container
-│   ├── Containerfile    #   its own image (node24, non-root, pinned dsh)
-│   ├── scripts/         #   Apple `container` build/start (Web UI or headless)
-│   └── seed/.dsh/       #   live $DSH_HOME bind (like seed/.pi for dsh)
+├── README.dsh.md        # dsh docs: build/run, port mapping, security notes
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
     ├── CLI-AUTH.md           # glab/acli auth behavior, persistence & risks

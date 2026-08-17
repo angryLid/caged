@@ -65,6 +65,9 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
 - **Apple `container` is the runtime**, and it doesn't support orchestration
   anyway, which fits. Build/run via `scripts/build-container.sh` +
   `scripts/start-container.sh`; full detail in `docs/APPLE-CONTAINER.md`.
+- **dsh lives flat at the repo root** — `Containerfile.dsh`, `README.dsh.md`,
+  `scripts/dsh-*`, `seed/.dsh/`. It's a second agent image (DeepSeek
+  Harness), sibling to pi: keep it flat, don't re-nest it under a `dsh/` dir.
 - Skills can be synced by hand with `node scripts/skills-sync.mjs`
   (`--dry-run` to preview, `--link-only` / `--clone-only` for the split paths).
 - After changing any seed config, the change is only visible on the next
