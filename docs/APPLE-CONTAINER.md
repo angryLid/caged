@@ -64,6 +64,17 @@ path.
   3. **stops a leftover same-name container** (`container stop` — SIGTERM, 5s
      timeout) before running.
 
+`scripts/dsh-start-container.sh` keeps the same hardening flags and also
+passes `-it`, even though dsh is a web server (no TUI). That is a workaround:
+without a TTY, the tool's foreground signal path is broken upstream — the CLI
+XPCs SIGINT into the guest with a signal field the API service reads as a
+different type, so every Ctrl+C prints `failed to send signal: ... "missing
+signal in xpc message"` and the signal never reaches the container (see
+apple/container#1747, the SIGWINCH variant). With `-it` the host terminal is
+raw and Ctrl+C flows through the pty into the guest, stopping the container
+cleanly on one press. Don't "simplify" the flag away; the alternative stop is
+`container stop caged-dsh`.
+
 ## Reaching host services
 
 `models.json` points the `local-llm` provider at

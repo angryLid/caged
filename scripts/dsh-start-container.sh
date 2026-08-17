@@ -74,14 +74,24 @@ echo "==> Starting container '${CONTAINER_NAME}' (UI on http://127.0.0.1:${DSH_H
 # then fails with "container with id caged-dsh already exists".)
 container rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
-# Run the container. A web server, not a TUI, so no -it / no terminal is
-# attached; Ctrl+C (or SIGTERM) stops it. Hardening following the caged
-# posture implementable by the tool: --read-only, --cap-drop ALL, --tmpfs /tmp,
-# pinned memory. (No userns / no --security-opt on Apple's tool, same as
-# caged.)
+# Run the container with -it, even though dsh is a web server, not a TUI.
+# Without a TTY, Apple `container`'s foreground signal path is broken
+# upstream: the CLI forwards terminal SIGINT to the guest via XPC, but the
+# signal field is encoded as an Int64 while the API service decodes it as a
+# String, so every delivery fails with 'missing signal in xpc message' and the
+# signal never reaches the container — Ctrl+C only force-exits the CLI after
+# three presses ('Received 3 SIGINT/SIGTERM's, forcefully exiting.'). With -it
+# the host terminal is in raw mode and Ctrl+C travels as a byte through the
+# pty into the guest's line discipline, the same working path caged-pi uses;
+# the web container then stops cleanly on one press. (Same upstream bug,
+# SIGWINCH variant: https://github.com/apple/container/issues/1747.) Hardening
+# following the caged posture implementable by the tool: --read-only,
+# --cap-drop ALL, --tmpfs /tmp, pinned memory. (No userns / no --security-opt
+# on Apple's tool, same as caged.)
 exec container run \
   --name "${CONTAINER_NAME}" \
   --rm \
+  -it \
   --workdir /workspace \
   --read-only \
   --tmpfs /tmp \

@@ -54,6 +54,11 @@ DSH_HOST_PORT=8080 scripts/dsh-start-container.sh
 open http://127.0.0.1:3080
 ```
 
+**Stop it**: Ctrl+C in the terminal stops it cleanly on one press — the
+script runs the container with `-it` (why a server needs a TTY is explained
+under "Known gotchas"). From another terminal, `container stop caged-dsh`
+works too.
+
 - **Configure a model**: Settings → Models → paste a DeepSeek API key and save.
   The key is stored in `seed/.dsh/.credentials.yaml` (or, better, pass
   `DEEPSEEK_API_KEY` at launch — dsh gives the environment top, read-only
@@ -174,6 +179,19 @@ pi's `~/.pi`: `profiles/<name>/`, `settings.yaml`, `.credentials.yaml`,
   reach it.
 
 ## Known gotchas / untested on this host
+
+- **Ctrl+C needs a TTY to stop cleanly (upstream signal-forwarding bug).**
+  `scripts/dsh-start-container.sh` passes `-it` not because dsh is a TUI but
+  as a workaround: without a TTY, Apple `container`'s foreground CLI forwards
+  Ctrl+C (SIGINT) to the guest via XPC in a form its own API service can't
+  decode — every press prints `failed to send signal: ... "missing signal in
+  xpc message"` and "signal": 2, the signal never reaches the container, and
+  the CLI only force-exits after three presses. With `-it` the host terminal
+  is in raw mode and Ctrl+C flows through the pty into the guest line
+  discipline (the same path caged-pi uses), so one press stops the web
+  container. From another terminal, `container stop caged-dsh` works
+  regardless. Upstream: apple/container#1747 (SIGWINCH variant of the same
+  Int64-vs-String mismatch in the non-TTY signal path).
 
 - **node-pty must compile on Linux.** dsh's terminal dep `node-pty@1.1.0`
   ships no Linux prebuilds (only darwin/win32), so on Linux its install always
