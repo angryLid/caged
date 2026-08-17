@@ -43,15 +43,26 @@ DSH_HOST_PORT="${DSH_HOST_PORT:-3080}"
 DSH_PERMISSION_MODE="${DSH_PERMISSION_MODE:-danger-full-access}"
 
 # --- API key resolution ------------------------------------------------
-# pi uses MY_DEEPSEEK_API_KEY; dsh expects DEEPSEEK_API_KEY. Accept either, then
-# FAIL LOUD (don't pass a blank key) if neither is available — a blank env value
-# makes dsh throw "the API key resolved from DEEPSEEK_API_KEY is blank".
+# Forward every provider key the migrated seed routes reference (pi's
+# models.json names), so an operator-set env key authenticates that provider
+# and shows read-only in the Web UI Models page. DeepSeek is special-cased:
+# dsh's llm-deepseek adapter expects DEEPSEEK_API_KEY, so accept either
+# spelling. Empty values are SAFE to pass — dsh's credential resolution treats
+# an empty env value as absent (credentials-local resolves it to undefined) —
+# the fail-loud check below only catches an operator who set no key at all.
+# Routes whose ref is unset stay BYOK: enter the key in the Web UI after boot
+# ($DSH_HOME/.credentials.yaml).
 DSH_DEEPSEEK_KEY="${DEEPSEEK_API_KEY:-${MY_DEEPSEEK_API_KEY:-}}"
-if [ -z "$DSH_DEEPSEEK_KEY" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
+if [ -z "$DSH_DEEPSEEK_KEY" ] && [ -z "${OPENAI_API_KEY:-}" ] \
+   && [ -z "${VOLCENGINE_API_KEY:-}" ] && [ -z "${MY_OPENROUTER_API_KEY:-}" ] \
+   && [ -z "${LOCAL_API_KEY:-}" ]; then
     echo "Error: no provider API key available." >&2
-    echo "  Set one before starting, e.g.:" >&2
-    echo "    export DEEPSEEK_API_KEY=sk-..." >&2
-    echo "  or enter it once in the Web UI (Settings -> Models -> DeepSeek)." >&2
+    echo "  Set at least one before starting, e.g.:" >&2
+    echo "    export DEEPSEEK_API_KEY=sk-...        # DeepSeek (llm-deepseek)" >&2
+    echo "    export VOLCENGINE_API_KEY=...          # Volcengine Ark" >&2
+    echo "    export MY_OPENROUTER_API_KEY=...       # OpenRouter" >&2
+    echo "    export LOCAL_API_KEY=...               # local gateway" >&2
+    echo "  or enter any of them once in the Web UI (Settings -> Models)." >&2
     exit 1
 fi
 
@@ -104,6 +115,10 @@ exec container run \
   -e DSH_HOME="/agent-home/.dsh" \
   -e LANG="C.UTF-8" \
   -e DEEPSEEK_API_KEY="${DSH_DEEPSEEK_KEY}" \
+  -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}" \
+  -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}" \
+  -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" \
+  -e LOCAL_API_KEY="${LOCAL_API_KEY:-}" \
   -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
   -e DSH_PERMISSION_MODE="${DSH_PERMISSION_MODE}" \
   -e XDG_CONFIG_HOME="/tmp/.config" \

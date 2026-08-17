@@ -130,7 +130,10 @@ container run --rm \
   -v "$PWD:/workspace:rw" \
   -v "$PWD/seed/.dsh:/agent-home/.dsh:rw" \
   -e DSH_HOME=/agent-home/.dsh \
-  -e DEEPSEEK_API_KEY="$DEEPSEEK_API_KEY" \
+  -e DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-${MY_DEEPSEEK_API_KEY:-}}" \
+  -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}" \
+  -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" \
+  -e LOCAL_API_KEY="${LOCAL_API_KEY:-}" \
   -e DSH_PERMISSION_MODE=danger-full-access \
   dsh:latest dsh --profile headless "explain this repo and exit"
 ```
