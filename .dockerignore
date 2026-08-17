@@ -3,6 +3,7 @@
 /*.md
 docs/
 .pi/
+.dsh/
 
 # One .dockerignore serves both image builds — pi (./Containerfile) and dsh
 # (./Containerfile.dsh) both build from the repo-root context. seed/ is

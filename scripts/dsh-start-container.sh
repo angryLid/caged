@@ -71,6 +71,8 @@ fi
 WORKSPACE_HOST="${CAGED_WORKSPACE:-$CURRENT_PWD}"
 # Live $DSH_HOME: anchored at seed/.dsh under the repo root (DSH_HOME_HOST
 # overrides). Must exist on the host to be a bind source.
+# dsh session logs are configured natively in seed/.dsh/cordis.patch.yml to
+# root at /workspace/.dsh/sessions — no extra session volume mount needed.
 DSH_HOME_HOST="${DSH_HOME_HOST:-$DSH_DIR/seed/.dsh}"
 
 echo "==> Ensuring seed dir exists (live \$DSH_HOME): ${DSH_HOME_HOST}"

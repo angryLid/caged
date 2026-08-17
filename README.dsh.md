@@ -36,8 +36,10 @@ caged/
 │   ├── dsh-build-container.sh # Apple `container` build
 │   └── dsh-start-container.sh # Apple `container` run: web UI on host loopback
 └── seed/.dsh/           # LIVE $DSH_HOME bind source — ships our home-level
-                         # cordis.patch.yml; dsh generates profiles/settings/creds
-                         # here on first run
+                         # cordis.patch.yml; dsh generates profiles/settings/
+                         # creds/storages here on first run. Session logs do
+                         # NOT live here — they are per-project at
+                         # <workspace>/.dsh/sessions.
 ```
 
 ## Run it
@@ -67,8 +69,8 @@ works too.
   dir) as the default Web workspace on first boot, so the Web UI opens on your
   code without a manual "Choose workspace". If you ever see a stale workspace
   left from an earlier manual run (e.g. an `agent-home` leftover), remove it in
-  Settings or delete the runtime state (`seed/.dsh/storages/`+
-  `seed/.dsh/sessions/` — gitignored test artifacts).
+  Settings or delete the runtime state (`seed/.dsh/storages/` +
+  `<workspace>/.dsh/sessions/` — gitignored test artifacts).
 - **Run a task**: start a session and send a prompt.
 
 ### Models: pi provider set migrated (+ BYOK)
@@ -177,12 +179,15 @@ stays loopback-only.
 | Volume | Mount | Why |
 |---|---|---|
 | `${CAGED_WORKSPACE:-$PWD}` | `/workspace:rw` | the code dsh agents work on — **the default Web workspace** |
-| `${DSH_HOME_HOST:-./seed/.dsh}` | `/agent-home/.dsh:rw` | LIVE `$DSH_HOME` — persistence + live config |
+| `${DSH_HOME_HOST:-./seed/.dsh}` | `/agent-home/.dsh:rw` | LIVE `$DSH_HOME` — live config + non-session runtime state |
 
-`$DSH_HOME` (default `~/.dsh`) is dsh's single data root, the analogue of
-pi's `~/.pi`: `profiles/<name>/`, `settings.yaml`, `.credentials.yaml`,
-`.env`, and session data all live under it. In this repo it's a live bind of
-`seed/.dsh`, so:
+`$DSH_HOME` (default `~/.dsh`) is dsh's live config/data root, the analogue
+of pi's `~/.pi`: `profiles/<name>/`, `settings.yaml`, `.credentials.yaml`,
+`.env`, and storages live under it. Session logs are **not** kept there; the
+`session-persistence-jsonl` `root` config in `cordis.patch.yml` points them at
+`/workspace/.dsh/sessions` (mirroring pi's `$CAGED_WORKSPACE/.pi/sessions`
+without requiring an extra mount). In this repo the config root is a live bind
+of `seed/.dsh`, so:
 
 - dsh auto-initializes its `web`/`headless` profiles on first use. We ship one
   home-level patch (`seed/.dsh/cordis.patch.yml`) that binds the webserver to

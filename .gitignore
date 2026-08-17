@@ -13,6 +13,9 @@ node_modules/
 # pi session data (mounted from $CAGED_WORKSPACE/.pi/sessions)
 .pi/sessions/
 
+# dsh session data (mounted from $WORKSPACE/.dsh/sessions)
+.dsh/sessions/
+
 # Runtime state pi writes back into the live $HOME bind mount
 seed/.pi/agent/auth.json
 seed/.pi/agent/sessions/

@@ -7,6 +7,6 @@
   "lastChangelogVersion": "0.84.2",
   "theme": "dark",
   "defaultProvider": "local-llm",
-  "defaultModel": "qwen3.8-27b",
+  "defaultModel": "Coding2",
   "defaultThinkingLevel": "medium"
 }
