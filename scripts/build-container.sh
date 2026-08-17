@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 IMAGE_TAG="${CAGED_IMAGE:-caged:latest}"
-PI_VERSION="${PI_VERSION:-0.84.0}"
+PI_VERSION="${PI_VERSION:-0.84.2}"
 
 echo "==> Project Root: ${ROOT_DIR}"
 echo "==> Building image: ${IMAGE_TAG} (PI_VERSION=${PI_VERSION})..."

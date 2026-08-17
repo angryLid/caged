@@ -95,7 +95,7 @@ RUN userdel -r node 2>/dev/null || true \
 # Volatile layer: sits after all the slow, rarely-changing installs above so
 # a PI_VERSION bump only rebuilds this layer (and the few below it), keeping
 # apt/chrome/glab/acli/user cached.
-ARG PI_VERSION=0.84.0
+ARG PI_VERSION=0.84.2
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
 # Declarative skills — clone the configured skill repos into the image at

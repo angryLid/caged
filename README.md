@@ -375,7 +375,7 @@ These are known rough edges we've consciously chosen **not** to fix yet.
   `seed/.pi/agent/settings.json` (`"packages": []`), or accept the delay
   per container start.
 * The pi version is pinned via `ARG PI_VERSION`, fed from compose's
-  `build.args.PI_VERSION` (default `0.84.0`). A single-layer rebuild:
+  `build.args.PI_VERSION` (default `0.84.2`). A single-layer rebuild:
   `PI_VERSION=x.y.z podman compose build`. (We deliberately don't quote a
   number here — the project is still iterating.)
 
