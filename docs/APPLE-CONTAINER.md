@@ -61,7 +61,7 @@ path.
   `--tmpfs /tmp`, `-it`). It also adds three things compose handles for you:
   1. a **fail-fast host-side seed check** (`models.json` present) before
      starting,
-  2. **pre-creates `$WORKSPACE_HOST/sessions`** (podman-compose creates it on
+  2. **pre-creates `$WORKSPACE_HOST/.pi/sessions`** (podman-compose creates it on
      demand),
   3. **stops a leftover same-name container** (`container stop` — SIGTERM, 5s
      timeout) before running.

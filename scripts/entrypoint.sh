@@ -48,7 +48,7 @@ fi
 
 # The sessions mount must exist and the seed must be writable (both ways).
 [ -d "$AGENT_DIR/sessions" ] || fail \
-    "sessions dir '$AGENT_DIR/sessions' not found — \$CAGED_WORKSPACE/sessions should be" \
+    "sessions dir '$AGENT_DIR/sessions' not found — \$CAGED_WORKSPACE/.pi/sessions should be" \
     "mounted there (podman compose creates it)."
 [ -w "$AGENT_DIR" ] || fail "'$AGENT_DIR' is not writable — the live seed bind must be rw."
 

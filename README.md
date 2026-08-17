@@ -159,7 +159,7 @@ Both commands mount the **directory you run them from** as `/workspace`.
 | `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
 | `/agent-home/.pi` (`~/.pi`) | `<caged>/seed/.pi` (`$CAGED_PI_HOME`) | rw | **pi's live config home** — maps 1:1 to `seed/.pi`; everything pi configures lands back on the host |
 | `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
-| `/agent-home/.pi/agent/sessions` | `$CAGED_WORKSPACE/sessions` on the host | rw | **pi session data — per-project, on the host** |
+| `/agent-home/.pi/agent/sessions` | `$CAGED_WORKSPACE/.pi/sessions` on the host | rw | **pi session data — per-project, on the host** |
 
 `$HOME` is `/agent-home` and only `~/.pi` (`/agent-home/.pi`) is a live bind mount
 of `caged/seed/.pi` — one level of indirection below `$HOME`, so the repo tree
@@ -188,7 +188,7 @@ yet.
 
 **Session data lives per-project on the host** as a nested mount
 (`/agent-home/.pi/agent/sessions` is masked by it): when you run `caged compose
-… up` from `~/folder`, pi's sessions are written to `~/folder/sessions/`
+… up` from `~/folder`, pi's sessions are written to `~/folder/.pi/sessions/`
 (podman-compose creates the directory if missing). Deleting `seed/.pi/agent`
 or `auth.json` does **not** touch your sessions or your API keys' cached
 auth.

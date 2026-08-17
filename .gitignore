@@ -10,8 +10,8 @@ node_modules/
 .idea/
 .vscode/
 
-# pi session data (mounted from $CAGED_WORKSPACE/sessions)
-sessions/
+# pi session data (mounted from $CAGED_WORKSPACE/.pi/sessions)
+.pi/sessions/
 
 # Runtime state pi writes back into the live $HOME bind mount
 seed/.pi/agent/auth.json

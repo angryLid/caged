@@ -52,7 +52,7 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   half-configured. Preserve that property when you touch the entrypoint.
 - **Runtime state stays out of git.** `seed/.pi/agent/auth.json`,
   `seed/.pi/agent/sessions/`, `seed/.pi/agent/acli/` are gitignored. Sessions
-  are per-project on the host (`$CAGED_WORKSPACE/sessions`), not in the seed.
+  are per-project on the host (`$CAGED_WORKSPACE/.pi/sessions`), not in the seed.
 
 ## Working here
 

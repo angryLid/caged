@@ -47,7 +47,7 @@ if [ -n "${LOCAL_API_KEY:-}" ] && ! curl -sS --noproxy '*' -m 1 -o /dev/null "ht
 fi
 
 # Pre-create the host sessions directory (under the workspace directory).
-mkdir -p "${WORKSPACE_HOST}/sessions"
+mkdir -p "${WORKSPACE_HOST}/.pi/sessions"
 
 echo "==> Workspace host path: ${WORKSPACE_HOST}"
 echo "==> Seed host path:      ${PI_HOME_HOST}"
@@ -67,7 +67,7 @@ exec container run \
   --cap-drop ALL \
   -v "${WORKSPACE_HOST}:/workspace:rw" \
   -v "${PI_HOME_HOST}:/agent-home/.pi:rw" \
-  -v "${WORKSPACE_HOST}/sessions:/agent-home/.pi/agent/sessions:rw" \
+  -v "${WORKSPACE_HOST}/.pi/sessions:/agent-home/.pi/agent/sessions:rw" \
   -e HOME="/agent-home" \
   -e TERM="${TERM:-xterm-256color}" \
   -e COLORTERM="truecolor" \

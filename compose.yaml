@@ -57,6 +57,6 @@ services:
     volumes:
       - ${CAGED_WORKSPACE:-$PWD}:/workspace:rw  # your code (default: caller's dir)
       - ${CAGED_PI_HOME:-./seed/.pi}:/agent-home/.pi:rw  # live ~/.pi: seed/.pi maps 1:1 to pi's config home (synced both ways)
-      - ${CAGED_WORKSPACE:-$PWD}/sessions:/agent-home/.pi/agent/sessions  # pi sessions → per-project on host
+      - ${CAGED_WORKSPACE:-$PWD}/.pi/sessions:/agent-home/.pi/agent/sessions  # pi sessions → per-project on host, under workspace/.pi/sessions (future agents get their own .pi/<agent> dirs)
     stdin_open: true              # -i
     tty: true                     # -t
