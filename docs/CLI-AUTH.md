@@ -28,7 +28,7 @@ config dir, `glab api user` succeeds from `GITLAB_TOKEN` alone, while
 
 | | glab | acli |
 |---|---|---|
-| Persisted login dir | `~/.pi/agent/glab-cli/` — live `~/.pi` mount, set via `GLAB_CONFIG_DIR` in `compose.yaml` | `~/.pi/agent/acli/` — live `~/.pi` mount, set via `ACLI_CONFIG_DIR` |
+| Persisted login dir | `~/.pi/agent/glab-cli/` — live `~/.pi` mount, set via `GLAB_CONFIG_DIR` in `scripts/start-container.sh` | `~/.pi/agent/acli/` — live `~/.pi` mount, set via `ACLI_CONFIG_DIR` |
 | Token file | `glab-cli/config.yml` → `hosts.<hostname>.token` + per-host user/api/ssh settings; `aliases.yml` | `acli/acli/jira_config.yaml` (per-product configs; token in the jira one) |
 | Permissions | `0600` file, `0700` dir (verified) | `0600` file, `0700` dir (verified) |
 | Git | ignored via `.gitignore` | ignored via `.gitignore` |

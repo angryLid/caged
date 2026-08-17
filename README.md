@@ -44,22 +44,22 @@ can only ever touch the workspace you explicitly hand it.
 ```
 caged/
 ├── Containerfile        # image definition (non-root, pinned pi version)
-├── compose.yaml         # the single runtime entry (podman compose / podman-compose)
 ├── seed/                # pi's home (~/.pi) — LIVE bind-mount source for $HOME
 │   └── .pi/agent/       # models.json (providers), settings.json, mcp.json,
 │                        # AGENTS.md, skills.json, skills/, scripts/ (CDP helpers)
 ├── scripts/
-│   ├── entrypoint.sh    # seed validation (fail-fast) + tini, runs as USER pi
-│   └── skills-sync.mjs  # declarative skills sync (see `## Skills (“skills-sync”)`)
+│   ├── build-container.sh   # Apple `container` build (image from Containerfile)
+│   ├── start-container.sh   # Apple `container` run (interactive pi TUI)
+│   ├── entrypoint.sh        # seed validation (fail-fast) + tini, runs as USER pi
+│   └── skills-sync.mjs      # declarative skills sync (see `## Skills (“skills-sync”)`)
 ├── dsh/                 # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) container
 │   ├── Containerfile    #   its own image (node24, non-root, pinned dsh)
-│   ├── compose.yaml     #   the dsh runtime entry (Web UI on :3080, or headless)
-│   ├── scripts/         #   Apple `container` build/start (no compose there)
+│   ├── scripts/         #   Apple `container` build/start (Web UI or headless)
 │   └── seed/.dsh/       #   live $DSH_HOME bind (like seed/.pi for dsh)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
     ├── CLI-AUTH.md           # glab/acli auth behavior, persistence & risks
-    └── APPLE-CONTAINER.md    # running via Apple's container tool (no compose)
+    └── APPLE-CONTAINER.md    # running via Apple's container tool
 
 > `scripts/skills-sync.mjs` is also baked into the image (see `Containerfile`)
 > so the container start can install skills **without** the workspace mounted.
@@ -123,45 +123,35 @@ node scripts/skills-sync.mjs --clone-only    # clone/pull git sources only (imag
 
 ## Quickstart
 
-Requirements: podman >= 4 on macOS (or docker with `userns_mode` support) plus
-`podman-compose` (`brew install podman-compose`).
+Requirements: Apple's native [`container`](https://github.com/apple/container)
+tool on Apple silicon (Linux containers as lightweight VMs).
 
 ```sh
-# 1. build (only needed the first time, or when the Containerfile changes —
-#    compose auto-builds when the image is missing; force with
-#    `podman compose ... build --no-cache`)
-cd caged && podman compose build
+# 1. build (only needed the first time, or when the Containerfile changes).
+#    Optionally pick a pi version:   PI_VERSION=x.y.z scripts/build-container.sh
+scripts/build-container.sh
 
-# 2. interactive TUI — run from the repo you want as the workspace.
-#    Prefer `run` over `up`: podman-compose's `up` doesn't forward terminal
-#    size/SIGWINCH or TERM on macOS, which garbles pi's full-screen TUI.
-#    `run` shells out to `podman run -it` and forwards the terminal properly.
+# 2. interactive TUI — run from the repo you want as the workspace, then
+#    start the disposable container. It mounts the directory you run it from
+#    as /workspace and drops you into pi's TUI.
 cd /path/to/your/repo
-podman compose -f /path/to/caged/compose.yaml run --rm pi
-
-# 3. one-shot (non-interactive) run:
-podman compose -f /path/to/caged/compose.yaml run --rm pi pi --print "refactor this module"
+/path/to/caged/scripts/start-container.sh
 ```
 
-Both commands mount the **directory you run them from** as `/workspace`.
+`start-container.sh` mounts the **directory you run it from** as `/workspace`.
 
-> **On Apple silicon?** You can run the same stack with Apple's native
-> `container` tool instead of podman — it has no compose support and a
-> couple of hardening layers differ. See
+> **Why scripts, not compose?** caged runs a *single* disposable container — the
+> container's only job is isolation, so a compose/multi-container stack would add
+> nothing. And Apple's `container` tool doesn't support compose orchestration
+> anyway, which fits perfectly. Build/run via `scripts/build-container.sh` +
+> `scripts/start-container.sh`; full detail in
 > [docs/APPLE-CONTAINER.md](docs/APPLE-CONTAINER.md).
-
-> **TUI looks jagged/aliased?** (podman-compose 1.x `up` only) — that's a known
-> podman-compose TTY limitation: it creates a pty but never forwards the
-> terminal size or TERM. Fix: use `run` (above), or run the equivalent
-> `podman run -it` one-liner from [docs/SECURITY.md](docs/SECURITY.md)
-> (verify block) with your mounts. Resizing the terminal window once also
-> often snaps the renderer back into place.
 
 ## What gets mounted
 
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
-| `/workspace`   | dir you ran `compose` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
+| `/workspace`   | the dir you ran `start-container.sh` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
 | `/agent-home/.pi` (`~/.pi`) | `<caged>/seed/.pi` (`$CAGED_PI_HOME`) | rw | **pi's live config home** — maps 1:1 to `seed/.pi`; everything pi configures lands back on the host |
 | `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
 | `/agent-home/.pi/agent/sessions` | `$CAGED_WORKSPACE/.pi/sessions` on the host | rw | **pi session data — per-project, on the host** |
@@ -192,9 +182,10 @@ written the first time you authenticate, so don't worry if it doesn't exist
 yet.
 
 **Session data lives per-project on the host** as a nested mount
-(`/agent-home/.pi/agent/sessions` is masked by it): when you run `caged compose
-… up` from `~/folder`, pi's sessions are written to `~/folder/.pi/sessions/`
-(podman-compose creates the directory if missing). Deleting `seed/.pi/agent`
+(`/agent-home/.pi/agent/sessions` is masked by it): when you run
+`scripts/start-container.sh` from `~/folder`, pi's sessions are written to
+`~/folder/.pi/sessions/` (`start-container.sh` pre-creates the directory).
+Deleting `seed/.pi/agent`
 or `auth.json` does **not** touch your sessions or your API keys' cached
 auth.
 
@@ -224,26 +215,22 @@ round-trip.
 provider `$LOCAL_API_KEY`); pi expands these from the container
 environment at runtime. The local provider's `baseUrl` is the host
 `caddy-dev-server` proxy `http://192.168.64.1:8765/v1` — the Apple
-`container` vmnet gateway, i.e. the host as seen from inside a container
-(podman/docker mapping not implemented yet; see `docs/APPLE-CONTAINER.md`),
+`container` vmnet gateway, i.e. the host as seen from inside a container,
 which forwards to the internal LLM gateway with the Host header rewritten to
 the upstream hostname (that hostname lives only in the host's Caddyfile,
-never in this repo). Pass the keys when starting:
+never in this repo). Export the keys in your shell before starting:
 
 ```sh
 MY_DEEPSEEK_API_KEY=sk-... VOLCENGINE_API_KEY=ark-... \
-  LOCAL_API_KEY=... \
-  podman compose -f /path/to/caged/compose.yaml up
+  LOCAL_API_KEY=... scripts/start-container.sh
 ```
 
 For interactive TUI auth flows that don't use `models.json`, pi stores
-credentials in `auth.json` inside the agent dir:
-
-pi stores credentials in `auth.json` inside the agent dir
-(`/agent-home/.pi/agent/auth.json` on the volume). Two options:
+credentials in `auth.json` inside the agent dir
+(`/agent-home/.pi/agent/auth.json` on the volume):
 
 ```sh
-podman compose -f /path/to/caged/compose.yaml run --rm pi pi auth
+scripts/start-container.sh     # then run  pi auth  inside the TUI
 ```
 
 Never put API keys in `/workspace` — anything there is readable by pi.
@@ -256,8 +243,7 @@ the container-local port `19222` to the host's Chrome CDP and requires:
 1. Host Chrome running with `--remote-debugging-port=9222`
 2. Host Chrome's CDP reachable at `192.168.64.1:9222` (the Apple
    `container` vmnet gateway; on macOS Chrome binds loopback only, so bridge
-   it with socat — see `docs/APPLE-CONTAINER.md`. The podman/docker mapping
-   is not implemented yet.)
+   it with socat — see `docs/APPLE-CONTAINER.md`.)
 
 Without host Chrome listening, pi will report the MCP server as unavailable —
 that's expected, not a caged bug.
@@ -278,8 +264,8 @@ Two ways to authenticate:
   disk:
 
   ```sh
-  GITLAB_TOKEN=glpat-... \
-    podman compose -f /path/to/caged/compose.yaml run --rm pi glab issue list
+  GITLAB_TOKEN=glpat-... scripts/start-container.sh
+  # then run  glab issue list  inside the pi TUI
   ```
 
 * **Persisted login (interactive).** `GLAB_CONFIG_DIR` points at
@@ -288,8 +274,8 @@ Two ways to authenticate:
   `acli` and `auth.json`):
 
   ```sh
-  echo "$GITLAB_TOKEN" | podman compose -f /path/to/caged/compose.yaml run --rm \
-    pi glab auth login --hostname gitlab.example.com --stdin --git-protocol https
+  echo "$GITLAB_TOKEN" | scripts/start-container.sh
+  # then pipe the same token into  glab auth login ...  inside the TUI
   ```
 
   Run from any directory (the workspace can be a throwaway dir). The token is
@@ -309,9 +295,9 @@ Authenticate with an API token (created at
 `id.atlassian.com/manage-profile/security/api-tokens`) read from stdin:
 
 ```sh
-echo "$JIRA_API_TOKEN" | \
-  podman compose -f /path/to/caged/compose.yaml run --rm pi \
-    acli jira auth login --site "mysite.atlassian.net" --email you@example.com --token
+JIRA_API_TOKEN=... scripts/start-container.sh
+# then run  acli jira auth login --site "mysite.atlassian.net" \
+#     --email you@example.com --token   inside the TUI
 ```
 
 `ACLI_CONFIG_DIR` points at `/agent-home/.pi/agent/acli` — on the live
@@ -323,13 +309,14 @@ CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
 ## Environment knobs
 
-`compose.yaml` interpolates these from the calling shell; defaults listed.
+`scripts/start-container.sh` (and `scripts/build-container.sh`) read these from
+the calling shell; defaults listed.
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `CAGED_IMAGE` | `caged:latest` | image tag to run |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
-| `CAGED_PI_HOME` | `./seed/.pi` (relative to the compose file) | host dir bind-mounted at `/agent-home/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
+| `CAGED_PI_HOME` | `./seed/.pi` (relative to the repo root) | host dir bind-mounted at `/agent-home/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
@@ -337,7 +324,7 @@ CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 | `GITLAB_TOKEN` | *(unset)* | `glab` (GitLab CLI) API token (passed into container) |
 | `GITLAB_HOST` | *(unset)* | `glab` GitLab instance host (default `https://gitlab.com`) |
 
-## Runtime hardening (applied by compose.yaml)
+## Runtime hardening (applied by scripts/start-container.sh)
 
 * `--read-only` — root filesystem immutable (only `/workspace`, `~/.pi` (`/agent-home/.pi`), and `/tmp` writable)
 * `--tmpfs /tmp` — scratch, `noexec,nosuid`
@@ -367,9 +354,10 @@ These are known rough edges we've consciously chosen **not** to fix yet.
 
 ## Known limitations
 
-* Running on macOS: podman runs inside a Linux VM, so `/workspace` bind-mount
-  performance matters for large repos — see the earlier discussion about
-  small-file I/O. `npm install` in the workspace will be slower than native.
+* Running on macOS: Apple's `container` tool runs Linux containers as a VM, so
+  `/workspace` bind-mount performance matters for large repos — see the earlier
+  discussion about small-file I/O. `npm install` in the workspace will be
+  slower than native.
 * pi startup is slow while it loads its two extensions
   (`pi-mcp-adapter`, `pi-web-access`): the module imports take ~1.3s
   (measured ~820–960ms + ~470–520ms, `PI_TIMING=1`) before the TUI
@@ -379,12 +367,13 @@ These are known rough edges we've consciously chosen **not** to fix yet.
   bothers you: drop `pi-mcp-adapter`/`pi-web-access` from `packages` in
   `seed/.pi/agent/settings.json` (`"packages": []`), or accept the delay
   per container start.
-* The pi version is pinned via `ARG PI_VERSION`, fed from compose's
-  `build.args.PI_VERSION` (default `0.84.2`). A single-layer rebuild:
-  `PI_VERSION=x.y.z podman compose build`. (We deliberately don't quote a
-  number here — the project is still iterating.)
+* The pi version is pinned via `ARG PI_VERSION` (default `0.84.2`). Rebuild a
+  specific version with `PI_VERSION=x.y.z scripts/build-container.sh`. (We
+  deliberately don't quote a number here — the project is still iterating.)
 
 ## License / notes
 
-Internal project. Built for podman 6.x on macOS; should work on any podman >= 4
-or docker with `userns_mode` support.
+Internal project. Built with Apple's `container` tool on Apple silicon macOS.
+The image itself remains a plain OCI image, so it can also be run directly
+under podman/docker (with equivalent hardening flags) if you're not on Apple
+silicon — see docs/APPLE-CONTAINER.md.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # dsh/scripts/build-container.sh — build the dsh image with the native Apple
-# `container` tool (no compose support on Apple silicon; this mirrors
-# scripts/build-container.sh at the repo root, scoped to the dsh image).
+# `container` tool. Mirrors scripts/build-container.sh at the repo root,
+# scoped to the dsh image.
 
 set -euo pipefail
 

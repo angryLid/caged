@@ -17,8 +17,9 @@ serially in declaration order:
 
 This project is a container image ("caged") that runs pi. pi scans
 `~/.pi/agent/skills/`, and `~/.pi` is a **live bind mount** of the host
-`seed/.pi` dir (set up by compose.yaml). So skills are installed **into the
-seed** — `seed/.pi/agent/skills/` — not into a user's project working tree.
+`seed/.pi` dir (set up by `scripts/start-container.sh`). So skills are
+installed **into the seed** — `seed/.pi/agent/skills/` — not into a user's
+project working tree.
 
 Inside the seed, each enabled skill is a **real directory copy** (not a
 symlink) carrying a hidden `.caged-skill-managed` marker file. The marker lets
@@ -75,8 +76,8 @@ Exit codes: `0` ok, `1` fatal, `2` warnings only (missing skill / collision) —
   your own skill with the same name as an upstream one wins.
 - **New git repo sources require a rebuild.** Only skills whose repos are
   already baked into the image can be enabled at container start; adding a new
-  repo means a `podman compose build` (the build-time `--clone-only` step pulls
-  it). Local sources never require a rebuild.
+  repo means a `scripts/build-container.sh` rebuild (the build-time
+  `--clone-only` step pulls it). Local sources never require a rebuild.
 - Git repos are plain clones (not submodules) — `seed/.pi/agent/skills.json`
   is the source of truth, and a fresh image self-heals by re-cloning at build
   time.

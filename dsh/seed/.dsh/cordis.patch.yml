@@ -15,7 +15,7 @@
 #
 # The port is pinned to 3080 (dsh's default) and is the CONTAINER-internal port.
 # The host-side port is chosen by the operator via DSH_HOST_PORT in
-# compose.yaml / start-container.sh; changing it does not require touching this
+# start-container.sh; changing it does not require touching this
 # file. We deliberately do NOT use !!js to read DSH_PORT from the environment —
 # keep the container port a stable constant and vary only the host publish.
 #

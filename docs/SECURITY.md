@@ -1,9 +1,11 @@
 # caged SECURITY model
 
-caged runs @earendil-works/pi-coding-agent in a podman container. The agent has
-the ability to execute arbitrary shell commands in the workspace — that is its
-whole job. The point of caged is to make sure that power can never escape the
-workspace or compromise the host.
+caged runs @earendil-works/pi-coding-agent in a single disposable container
+designed purely for isolation (no orchestration — see
+[APPLE-CONTAINER.md](APPLE-CONTAINER.md)). The agent has the ability to
+execute arbitrary shell commands in the workspace — that is its whole job.
+The point of caged is to make sure that power can never escape the workspace
+or compromise the host.
 
 ## Threat model
 
@@ -15,9 +17,9 @@ the host filesystem beyond the mount, or persist on the host.
 |------|-----------|--------|
 | Read host files | only `/workspace`, `$CAGED_WORKSPACE/.pi/sessions` and `caged/seed/.pi` (mounted at `/agent-home/.pi`, pi's config home) are mounted; no `-v /`, rootfs is read-only | ✅ |
 | Write host files | read-only rootfs; `/workspace` rw and the live `~/.pi` bind at `/agent-home/.pi` (== `caged/seed/.pi`) rw are the only writable host-backed mounts | ✅ |
-| Escape via root | runs as UID 1000 non-root with `--userns=keep-id` | ✅ |
+| Escape via root | runs as UID 1000 non-root | ✅ |
 | Gain capabilities | `--cap-drop ALL` + `--security-opt no-new-privileges` | ✅ |
-| Kernel exploit | container seccomp profile (podman default) | ✅ |
+| Kernel exploit | container seccomp profile | ✅ |
 | Exfiltrate secrets via network | **⚠️ intentionally NOT mitigated** — network is fully open by design (pi talks to model providers). See notes below. | ⚠️ |
 | Persistence on host | live `~/.pi` bind `caged/seed/.pi` → `/agent-home/.pi` (config/auth/skills at `seed/.pi/agent`, sessions at `$CAGED_WORKSPACE/.pi/sessions`) | ✅ |
 | Zombie processes | tini as PID 1 | ✅ |
@@ -51,8 +53,10 @@ the host filesystem beyond the mount, or persist on the host.
 * Seed: `seed/` ships only **configuration, never secrets** — `models.json`
   references key env-var names, real values arrive via container env at
   runtime and live only in the process/volume `auth.json`.
-* Runtime (compose.yaml): read-only rootfs + tmpfs + cap_drop ALL +
-  no_new_privileges + keep-id userns.
+* Runtime (`scripts/start-container.sh` + `scripts/entrypoint.sh`): read-only
+  rootfs + tmpfs + cap_drop ALL (+ `no_new_privileges` and keep-id on podman/
+  docker; not expressible on Apple's `container` tool — see
+  [APPLE-CONTAINER.md](APPLE-CONTAINER.md)).
 * Volume hygiene: pi's config home lives in the live `~/.pi` bind
   (`caged/seed/.pi`, synced to the host repo); the rest of `$HOME` is
   read-only with caches on `/tmp`; sessions live per-project at
@@ -61,8 +65,8 @@ the host filesystem beyond the mount, or persist on the host.
 ## Verifying the container is actually restricted
 
 ```sh
-podman run --rm -it --read-only --cap-drop ALL --security-opt no-new-privileges \
-  --userns=keep-id -v "$PWD/seed/.pi:/agent-home/.pi" caged:latest sh -c '
+container run --rm -it --read-only --cap-drop ALL --tmpfs /tmp \
+  -v "$PWD/seed/.pi:/agent-home/.pi" caged:latest sh -c '
     id
     touch /etc/test 2>&1 | head -1
     touch /tmp/test && echo "tmp writable"

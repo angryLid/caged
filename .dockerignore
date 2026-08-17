@@ -2,7 +2,6 @@
 .gitignore
 /*.md
 docs/
-compose.yaml
 
 # seed/ is generally NOT needed in the build context: pi's config home
 # (~/.pi) is bind-mounted live at runtime (seed/.pi -> /agent-home/.pi),

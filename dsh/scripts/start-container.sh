@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # dsh/scripts/start-container.sh — run the DeepSeek Harness web UI with the
-# native Apple `container` tool (no compose on Apple silicon). Mirrors
-# scripts/start-container.sh at the repo root, scoped to the dsh image and its
-# web server mode.
+# native Apple `container` tool. Mirrors scripts/start-container.sh at the
+# repo root, scoped to the dsh image and its web server mode.
 #
 # How the browser reaches the UI (the port part):
 #   - dsh web binds 127.0.0.1 by default and its CLI *rejects* --host 0.0.0.0,
@@ -39,7 +38,7 @@ DSH_HOST_PORT="${DSH_HOST_PORT:-3080}"
 # DSH_PERMISSION_MODE: caged's container itself is the sandbox, so we disable
 # dsh's built-in sandbox + interactive approval prompts by default
 # (danger-full-access = dsh's official "allow all" preset). Override to get
-# dsh's own confinement back. Same knob as compose.yaml's.
+# dsh's own confinement back.
 DSH_PERMISSION_MODE="${DSH_PERMISSION_MODE:-danger-full-access}"
 
 # --- API key resolution ------------------------------------------------
@@ -75,9 +74,10 @@ echo "==> Starting container '${CONTAINER_NAME}' (UI on http://127.0.0.1:${DSH_H
 container rm -f "${CONTAINER_NAME}" 2>/dev/null || true
 
 # Run the container. A web server, not a TUI, so no -it / no terminal is
-# attached; Ctrl+C (or SIGTERM) stops it. Hardening mirrors the podman compose
+# attached; Ctrl+C (or SIGTERM) stops it. Hardening following the caged
 # posture implementable by the tool: --read-only, --cap-drop ALL, --tmpfs /tmp,
-# pinned memory. (No userns / no --security-opt on Apple's tool, same as caged.)
+# pinned memory. (No userns / no --security-opt on Apple's tool, same as
+# caged.)
 exec container run \
   --name "${CONTAINER_NAME}" \
   --rm \

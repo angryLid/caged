@@ -25,12 +25,11 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 ```
 dsh/
 ├── Containerfile          # image definition (node24, non-root, pinned dsh)
-├── compose.yaml           # the single runtime entry (podman compose)
 ├── .dockerignore
 ├── scripts/
 │   ├── entrypoint.sh      # fail-fast seed check + tini + default-workspace seed
 │   ├── ensure-workspace.mjs # best-effort: register /workspace as Web default
-│   ├── build-container.sh # Apple `container` build (no compose)
+│   ├── build-container.sh # Apple `container` build
 │   └── start-container.sh # Apple `container` run: web UI on host loopback
 └── seed/.dsh/             # LIVE $DSH_HOME bind source — ships our home-level
                            # cordis.patch.yml; dsh generates profiles/settings/creds
@@ -39,12 +38,15 @@ dsh/
 
 ## Run it
 
-Requires podman/docker compose **or** Apple's native `container` tool (no
-compose on Apple silicon — see the Apple section below). From the repo root:
+Like caged, dsh is a single disposable container whose only job is isolation,
+so there's no orchestration — and Apple's `container` tool (the runtime) has
+no compose support anyway. Build and run with the scripts:
 
 ```sh
-podman compose -f dsh/compose.yaml build
-podman compose -f dsh/compose.yaml up -d     # serve the Web UI
+# build (context dsh/, build-arg DSH_VERSION)
+dsh/scripts/build-container.sh
+# run the web UI; opens on the host loopback
+DSH_HOST_PORT=8080 dsh/scripts/start-container.sh
 open http://127.0.0.1:3080
 ```
 
@@ -73,7 +75,7 @@ mode via the purpose-built env knob:
 DSH_PERMISSION_MODE=danger-full-access   # default here
 ```
 
-Set by `compose.yaml` and `start-container.sh`; it makes the base bundle set
+Set by `dsh/scripts/start-container.sh`; it makes the base bundle set
 `sandbox/mode: danger-full-access` (bash/fs operations run as uid 1000 with no
 dsh-level file confinement) and `approval/policy: never` (no interactive
 approval prompts). The agent effectively has the full rights of the `pi` user
@@ -82,39 +84,36 @@ you want dsh's own sandbox + approval back.
 
 ### One-shot headless (no server, prints the answer and exits)
 
-```sh
-podman compose -f dsh/compose.yaml run --rm --no-deps dsh \
-  dsh --profile headless "explain this repo and exit"
-```
-
-## Apple silicon (`container`, no compose)
-
-Build and run with the native Apple tool, mirroring the root scripts:
+Run with the `container` tool directly, mirroring `start-container.sh` but
+adding `dsh --profile headless "…"` as the command:
 
 ```sh
-# build (context dsh/, build-arg DSH_VERSION)
-dsh/scripts/build-container.sh
-# run the web UI; opens on the host loopback
-DSH_HOST_PORT=8080 dsh/scripts/start-container.sh
-open http://127.0.0.1:3080     # or :${DSH_HOST_PORT}
+container run --rm \
+  --read-only --cap-drop ALL --tmpfs /tmp --memory 2g \
+  -v "$PWD:/workspace:rw" \
+  -v "$PWD/seed/.dsh:/agent-home/.dsh:rw" \
+  -e DSH_HOME=/agent-home/.dsh \
+  -e DEEPSEEK_API_KEY="$DEEPSEEK_API_KEY" \
+  -e DSH_PERMISSION_MODE=danger-full-access \
+  dsh:latest dsh --profile headless "explain this repo and exit"
 ```
 
-`start-container.sh` publishes `127.0.0.1:${DSH_HOST_PORT} -> 3080` via
-`container run -p` (host **loopback**, not the LAN), reaching the webserver
-(which binds `0.0.0.0:3080` inside the container via `cordis.patch.yml`). The
-container port is a stable 3080; only `DSH_HOST_PORT` varies. Hardening is the
-tool implementable subset of compose (`--read-only`, `--cap-drop ALL`,
-`--tmpfs /tmp`, pinned memory — no userns / no `--security-opt`, same as the
-pi image on Apple). Env knobs match compose: `DSH_IMAGE`, `DSH_VERSION`,
-`DSH_HOME_HOST`, `CAGED_WORKSPACE`, `DSH_MEMORY`.
+`dsh/scripts/start-container.sh` starts the Web UI. It publishes
+`127.0.0.1:${DSH_HOST_PORT} -> 3080` via `container run -p` (host
+**loopback**, not the LAN), reaching the webserver (which binds `0.0.0.0:3080`
+inside the container via `cordis.patch.yml`). The container port is a stable
+3080; only `DSH_HOST_PORT` varies. Hardening is the tool's implementable
+subset (same as the pi image): `--read-only`, `--cap-drop ALL`, `--tmpfs
+/tmp`, pinned memory — no userns / no `--security-opt`. Env knobs: `DSH_IMAGE`,
+`DSH_VERSION`, `DSH_HOME_HOST`, `CAGED_WORKSPACE`, `DSH_MEMORY`.
 
 ## Port mapping
 
 dsh web defaults to binding `127.0.0.1:3080` and its CLI **rejects**
-`--host 0.0.0.0`. Rootless podman and Apple's `container -p` publish ports to
-the *container IP*, not loopback, so a loopback-only bind is unreachable. We
-keep that CLI guard but set the webserver **config** to bind `0.0.0.0:3080`
-inside the container through the shipped home-level patch
+`--host 0.0.0.0`. Apple's `container -p` publishes ports to the *container
+IP*, not loopback, so a loopback-only bind is unreachable. We keep that CLI
+guard but set the webserver **config** to bind `0.0.0.0:3080` inside the
+container through the shipped home-level patch
 (`seed/.dsh/cordis.patch.yml`) — the *runtime schema* accepts `'0.0.0.0'`, only
 the *flag parser* rejects it. Every launch then publishes the HOST side to
 loopback only:
@@ -128,7 +127,7 @@ host browser :${DSH_HOST_PORT}  (host loopback)  --publish-->  container 0.0.0.0
 | `DSH_HOST_PORT` | `3080` | the host-loopback port you open in the browser (only this varies) |
 | container port | `3080` | fixed; pinned in `seed/.dsh/cordis.patch.yml` and dsh's default |
 
-Override only the host side, e.g. `DSH_HOST_PORT=8080 podman compose -f dsh/compose.yaml up`.
+Override only the host side, e.g. `DSH_HOST_PORT=8080 dsh/scripts/start-container.sh`.
 No `--host 0.0.0.0` flag is passed anywhere — the CLI's RCE guard is preserved;
 we only set the runtime config to bind inside the container, and the host publish
 stays loopback-only.
@@ -154,11 +153,10 @@ pi's `~/.pi`: `profiles/<name>/`, `settings.yaml`, `.credentials.yaml`,
 
 ## Security notes
 
-- Same hardening as caged on the podman/compose path: `--cap-drop ALL`,
-  `--no-new-privileges`, `--userns=keep-id`, read-only rootfs, `noexec` /tmp,
-  `init: true`. On the Apple `container` path the implementable subset applies
-  (`--cap-drop ALL`, read-only rootfs, `/tmp` tmpfs; no userns / no
-  `--security-opt`), matching the pi image on Apple — see the Apple section.
+- Same hardening as caged: `--cap-drop ALL`, non-root, read-only rootfs,
+  `/tmp` tmpfs. On Apple's `container` tool the implementable subset applies
+  (no userns / no `--security-opt`), matching the pi image — see the root
+  docs/APPLE-CONTAINER.md.
 - dsh ships its own Landlock sandbox (`native/landlock-run`). It is **not**
   enabled here — the container already is the sandbox; nesting it adds no
   isolation and may fight the read-only rootfs. See docs/SECURITY.md. Combined

@@ -20,8 +20,8 @@
 #     start, no image rebuild.
 #
 # Design goals (mirror caged): non-root uid 1000, read-only rootfs, no caps,
-# hardening applied at runtime via compose.yaml. Network stays OPEN by design
-# (dsh needs to reach model providers).
+# hardening applied at runtime via dsh/scripts/start-container.sh. Network
+# stays OPEN by design (dsh needs to reach model providers).
 
 ARG NODE_IMAGE=node:24-slim
 
@@ -62,14 +62,16 @@ RUN userdel -r node 2>/dev/null || true \
 ARG DSH_VERSION=0.1.0-rc.6
 RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
 
-# $DSH_HOME is intentionally NOT copied into the image: at runtime compose.yaml
-# bind-mounts <caged>/dsh/seed/.dsh over /agent-home/.dsh (rw), so $DSH_HOME is
+# $DSH_HOME is intentionally NOT copied into the image: at runtime
+# dsh/scripts/start-container.sh bind-mounts <caged>/dsh/seed/.dsh over
+# /agent-home/.dsh (rw), so $DSH_HOME is
 # exactly the host's seed/.dsh — one source of truth with no image copy to
 # drift. Only $DSH_HOME is a writable host mount; the rest of $HOME stays on
 # the read-only rootfs with caches redirected to /tmp. The entrypoint validates
 # the bind is in place and fails fast otherwise. Keys stay out of seed/:
 # dsh's credential resolution gives the inherited process environment top
-# (read-only) precedence, so compose forwards DEEPSEEK_API_KEY & friends.
+# (read-only) precedence, so start-container.sh forwards DEEPSEEK_API_KEY &
+# friends.
 
 ENV HOME=/agent-home \
     DSH_HOME=/agent-home/.dsh \

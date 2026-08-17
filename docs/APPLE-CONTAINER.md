@@ -1,22 +1,21 @@
-# Apple `container` — alternative runtime
+# Apple `container` — the runtime
 
-caged's reference runtime is podman/docker **compose** (`compose.yaml`). On
-Apple silicon Macs you can instead run the same stack with Apple's native
-[`container`](https://github.com/apple/container) tool — Linux containers as
-lightweight VMs, optimized for Apple silicon. It has **no compose support**,
-and its build-context indexing mishandles the classic deep-negation
-`.dockerignore` form, so this path is two scripts plus an adjusted
-`.dockerignore`:
+caged runs a **single disposable container whose only job is isolation**, so
+container orchestration is unnecessary — and Apple's own native
+[`container`](https://github.com/apple/container) tool (Linux containers as
+lightweight VMs, optimized for Apple silicon) has **no compose support**
+anyway, which fits. The runtime is therefore two scripts plus an adjusted
+`.dockerignore` (its build-context indexing mishandles the classic
+deep-negation `.dockerignore` form):
 
-| What | podman / docker | Apple `container` |
-|---|---|---|
-| Build image | `podman compose build` | `scripts/build-container.sh` |
-| Run (TUI) | `podman compose -f compose.yaml run --rm pi` | `scripts/start-container.sh` |
+| What | Command |
+|---|---|
+| Build image | `scripts/build-container.sh` |
+| Run (TUI) | `scripts/start-container.sh` |
 
-Both scripts honor the same env knobs as compose (`CAGED_IMAGE`,
-`CAGED_WORKSPACE`, `CAGED_PI_HOME`) plus `CONTAINER_NAME` (default
-`caged-pi`), and pass the provider/CLI keys from the caller's environment
-exactly like `compose.yaml`'s `environment:` block.
+The scripts honor the env knobs `CAGED_IMAGE`, `CAGED_WORKSPACE` and
+`CAGED_PI_HOME` plus `CONTAINER_NAME` (default `caged-pi`), and pass the
+provider/CLI keys from the caller's environment.
 
 ## `.dockerignore`: per-level negation
 
@@ -53,16 +52,15 @@ path.
 
 - **`scripts/build-container.sh`** — `container build` with the project root
   as context and an absolute Containerfile path (works from any cwd);
-  `PI_VERSION` build-arg, same default as compose.
-- **`scripts/start-container.sh`** — `container run` translating
-  compose.yaml's `run` semantics: the same three mounts (`/workspace`, the
-  live seed `~/.pi`, per-project `sessions`), the same environment, and the
-  hardening flags the tool supports (`--read-only`, `--cap-drop ALL`,
-  `--tmpfs /tmp`, `-it`). It also adds three things compose handles for you:
+  `PI_VERSION` build-arg (default `0.84.2`).
+- **`scripts/start-container.sh`** — `container run` wiring the three mounts
+  (`/workspace`, the live seed `~/.pi`, per-project `sessions`), the
+  environment, and the hardening flags the tool supports (`--read-only`,
+  `--cap-drop ALL`, `--tmpfs /tmp`, `-it`). It also adds three things it
+  manages for you:
   1. a **fail-fast host-side seed check** (`models.json` present) before
      starting,
-  2. **pre-creates `$WORKSPACE_HOST/.pi/sessions`** (podman-compose creates it on
-     demand),
+  2. **pre-creates `$WORKSPACE_HOST/.pi/sessions`**,
   3. **stops a leftover same-name container** (`container stop` — SIGTERM, 5s
      timeout) before running.
 
@@ -105,32 +103,32 @@ pf rules that die on reboot, Private Relay caveats — see
 [#346](https://github.com/apple/container/issues/346)). A static IP avoids
 all of it.
 
-### podman/docker (compose) compatibility — deferred
+> **Note.** The image remains a plain OCI image, so it can also be run
+> directly under podman/docker with equivalent hardening flags if you're not
+> on Apple silicon. The `models.json` local-provider `baseUrl`
+> (`http://192.168.64.1:8765/v1`) targets the Apple vmnet gateway; if you run
+> the image under podman/docker instead, set a resolver that maps the host
+> bridge into that path. We only support the Apple `container` path here.
 
-`models.json` is shared between the Apple and compose runtimes, and pi does
-not interpolate env vars in `baseUrl`, so the single static value above
-targets the Apple vmnet gateway; the compose/podman path currently can't
-reach it. To implement later: map a stable host address in `compose.yaml`
-(Docker Desktop's `host.docker.internal` or podman's `host.containers.internal`
-with `extra_hosts: host-gateway`) and bind caddy per runtime. Not done yet,
-by design.
+## Hardening applied
 
-## Deliberate divergences from compose.yaml
+The image's own hardening (non-root, read-only rootfs, tini as PID 1) is in
+the Containerfile and `scripts/entrypoint.sh`. `start-container.sh` adds what
+the tool supports: `--read-only`, `--cap-drop ALL`, `--tmpfs /tmp`, `-it`.
 
-Compatibility-driven, not oversights. Keep them in mind when diffing the
-script against compose:
+Layers the tool cannot express (compared to a podman `--run` equivalent):
 
-| compose.yaml | start-container.sh | Why / consequence |
+| Flag you'd use on podman | Apple `container` | Why / consequence |
 |---|---|---|
 | `init: true` (podman init as PID 1) | omitted | **No loss here**: the image's entrypoint already `exec tini -s --` as PID 1 (`scripts/entrypoint.sh`), which reaps children and forwards signals. `container run --init` exists if you want the outer init too. |
-| `tmpfs: /tmp:rw,noexec,nosuid,size=512m` | `--tmpfs /tmp` | The tool's `--tmpfs` takes only a path — **no size cap, no `noexec`/`nosuid`** on the Apple path |
-| `security_opt: no-new-privileges` | omitted | **No `--security-opt` in the tool** — the no-setuid-escalation layer is lost on this path |
-| `userns_mode: keep-id` | omitted | **No userns support** — the guest runs as the host user directly, so uid remap is neither possible nor needed |
+| `--tmpfs /tmp:rw,noexec,nosuid,size=512m` | `--tmpfs /tmp` | The tool's `--tmpfs` takes only a path — **no size cap, no `noexec`/`nosuid`** on the Apple path |
+| `--security-opt=no-new-privileges` | omitted | **No `--security-opt` in the tool** — the no-setuid-escalation layer is lost on this path |
+| `--userns=keep-id` | omitted | **No userns support** — the guest runs as the host user directly, so uid remap is neither possible nor needed |
 
-Net security posture vs podman: `--cap-drop ALL`, non-root, and the
-read-only rootfs still apply; the two lost layers (`no-new-privileges`,
-userns keep-id) make the Apple path **slightly less hardened**. podman
-remains the reference posture — see [SECURITY.md](SECURITY.md).
+Net posture: `--cap-drop ALL`, non-root, and the read-only rootfs still
+apply; the two lost layers (`no-new-privileges`, userns keep-id) make this
+path **slightly less hardened** than a podman equivalent — see
+[SECURITY.md](SECURITY.md).
 
 ## Resource defaults
 
@@ -149,7 +147,6 @@ A machine-wide default is possible via the tool's own config file
 [container-system-config](https://github.com/apple/container/blob/main/docs/container-system-config.md))
 — the script pins the value instead so behavior is reproducible on any host.
 
-## Keeping them in sync
-
-`compose.yaml` is the reference: when its volumes or `environment:` list
-change, mirror the change in `start-container.sh`.
+> `scripts/start-container.sh` is the single runtime entry: when its mounts,
+> environment or hardening flags change, keep `dsh/scripts/start-container.sh`
+> and any docs in sync with it.

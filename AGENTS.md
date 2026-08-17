@@ -3,7 +3,7 @@
 You are working on the **caged** source repo: a hardened, disposable podman
 container that runs `pi` (and other coding agents) as a non-root user on a
 read-only filesystem. Your job is to improve this repo — the image, the
-compose stack, the seed config, the scripts, the docs.
+run scripts, the seed config, the docs.
 
 Read [README.md](README.md) for the full picture; this file captures what the
 README doesn't — the conventions and gotchas that govern how you work here.
@@ -35,7 +35,8 @@ agents. Don't conflate them:
 Provider keys (`$MY_DEEPSEEK_API_KEY`, `$VOLCENGINE_API_KEY`,
 `$MY_OPENROUTER_API_KEY`, `$LOCAL_API_KEY`) and `GITLAB_TOKEN` are passed as
 container env vars by the operator. They are referenced by name in
-`models.json` / `compose.yaml` and expanded at runtime. Never write a real key
+`models.json` and expanded at runtime by `scripts/start-container.sh`. Never
+write a real key
 into `/workspace` — anything there is readable by the agent you're caging.
 If a key is missing, tell the user which env var to set; don't fabricate one.
 
@@ -56,14 +57,14 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
 
 ## Working here
 
-- Tools: `glab` for GitLab CLI, `acli` for Atlassian/Jira, `podman compose`
-  for the stack. Prefer them over raw curl. Their auth/persistence behavior
-  and trade-offs: `docs/CLI-AUTH.md`.
-- The single runtime entry is `compose.yaml`. Prefer `run` over `up` for
-  interactive TUI (podman-compose `up` doesn't forward terminal size/TERM).
-  On Apple silicon, build/run with Apple's native `container` tool instead
-  via `scripts/build-container.sh` + `scripts/start-container.sh` (no compose
-  support; divergences in docs/APPLE-CONTAINER.md).
+- Tools: `glab` for GitLab CLI, `acli` for Atlassian/Jira. Prefer them over
+  raw curl. Their auth/persistence behavior and trade-offs: `docs/CLI-AUTH.md`.
+- **No container orchestration.** The container's only job is file isolation,
+  so a compose/multi-container stack would add nothing worthwhile; run a
+  single disposable container.
+- **Apple `container` is the runtime**, and it doesn't support orchestration
+  anyway, which fits. Build/run via `scripts/build-container.sh` +
+  `scripts/start-container.sh`; full detail in `docs/APPLE-CONTAINER.md`.
 - Skills can be synced by hand with `node scripts/skills-sync.mjs`
   (`--dry-run` to preview, `--link-only` / `--clone-only` for the split paths).
 - After changing any seed config, the change is only visible on the next

@@ -6,7 +6,7 @@
  *
  * The caged container runs @earendil-works/pi-coding-agent. pi scans
  * ~/.pi/agent/skills/ for skills, and ~/.pi is a live bind mount of the host
- * `seed/.pi` dir (compose.yaml). So skills must be installed INTO the seed —
+ * `seed/.pi` dir (scripts/start-container.sh). So skills must be installed INTO the seed —
  * `seed/.pi/agent/skills/` — NOT into a user's project working tree.
  *
  * Skills come from two kinds of source, resolved serially in declaration

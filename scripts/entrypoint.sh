@@ -4,8 +4,9 @@
 # Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
 #   1. Fail-fast validation BEFORE launching pi. There is deliberately no
 #      config baked into the image: ~/.pi (=/agent-home/.pi) must be the live
-#      bind mount of the host `seed/.pi` directory (compose.yaml does this).
-#      If the seed is missing, incomplete, or internally inconsistent, we
+#      bind mount of the host `seed/.pi` directory (scripts/start-container.sh
+#      does this). If the seed is missing, incomplete, or internally
+#      inconsistent, we
 #      exit non-zero with a clear message — never let pi start
 #      half-configured.
 #   2. Best-effort ownership bootstrap (matters for fresh named volumes) and
@@ -28,7 +29,7 @@ fail() {
 
 [ -d "$AGENT_DIR" ] || fail \
     "config dir '$AGENT_DIR' not found — ~/.pi must be the live seed bind." \
-    "Run caged via 'podman compose up' (mounts <caged>/seed/.pi at /agent-home/.pi), or mount it manually."
+    "Run caged via 'scripts/start-container.sh' (mounts <caged>/seed/.pi at /agent-home/.pi), or mount it manually."
 
 for f in models.json settings.json AGENTS.md; do
     [ -f "$AGENT_DIR/$f" ] || fail \
@@ -49,7 +50,7 @@ fi
 # The sessions mount must exist and the seed must be writable (both ways).
 [ -d "$AGENT_DIR/sessions" ] || fail \
     "sessions dir '$AGENT_DIR/sessions' not found — \$CAGED_WORKSPACE/.pi/sessions should be" \
-    "mounted there (podman compose creates it)."
+    "mounted there (scripts/start-container.sh pre-creates it)."
 [ -w "$AGENT_DIR" ] || fail "'$AGENT_DIR' is not writable — the live seed bind must be rw."
 
 # --- 2. bootstrap (best-effort) ------------------------------------------

@@ -29,7 +29,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 const DSH_HOME = process.env.DSH_HOME || resolve(process.env.HOME || '/agent-home', '.dsh')
-const WS_ROOT = '/workspace' // the container's fixed code mount (see compose.yaml / start-container.sh)
+const WS_ROOT = '/workspace' // the container's fixed code mount (see start-container.sh)
 const TITLE = 'workspace' // basename(WS_ROOT); matches dsh's workspaceTitleOf()
 
 const workspaceJson = resolve(DSH_HOME, 'storages', 'workspace.json')

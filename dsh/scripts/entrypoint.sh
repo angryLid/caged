@@ -4,8 +4,8 @@
 # Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
 #   1. Fail-fast validation of the LIVE $DSH_HOME bind (seed/.dsh) BEFORE
 #      launching dsh. No config is baked into the image: $DSH_HOME must be the
-#      live bind mount of the host `dsh/seed/.dsh` (compose.yaml / the Apple
-#      start script do this). If it is missing or not writable we exit non-zero
+#      live bind mount of the host `dsh/seed/.dsh` (the Apple start script
+#      does this). If it is missing or not writable we exit non-zero
 #      with a clear message — never let dsh start half-configured.
 #   2. Best-effort bootstrap of cache dirs on the /tmp tmpfs (node never
 #      touches the RO home or the repo-clean $DSH_HOME).
@@ -18,7 +18,7 @@
 
 set -e
 
-# compose sets DSH_HOME=/agent-home/.dsh; honour an override.
+# the start script sets DSH_HOME=/agent-home/.dsh; honour an override.
 DSH_HOME_PATH="${DSH_HOME:-/agent-home/.dsh}"
 
 fail() {
@@ -30,7 +30,7 @@ fail() {
 
 [ -d "$DSH_HOME_PATH" ] || fail \
     "config home '$DSH_HOME_PATH' not found — \$DSH_HOME must be the live seed bind." \
-    "Run via 'podman compose -f dsh/compose.yaml up' (mounts <caged>/dsh/seed/.dsh" \
+    "Run via 'dsh/scripts/start-container.sh' (mounts <caged>/dsh/seed/.dsh" \
     "at /agent-home/.dsh), or mount it manually."
 [ -w "$DSH_HOME_PATH" ] || fail \
     "'$DSH_HOME_PATH' is not writable — the live seed bind must be rw" \

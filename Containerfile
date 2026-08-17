@@ -9,14 +9,15 @@
 #     single volume: /agent-home
 #   * user code lives on a separate volume: /workspace
 #   * hardening (read-only rootfs, NO_NEW_PRIVILEGES, cap-drop) is applied
-#     at runtime via compose.yaml, not baked into the image
+#     at runtime via scripts/start-container.sh, not baked into the image
 #
 # Layer ordering for cache friendliness: the most volatile / frequently
 # changing layers (pi install, skills clone, entrypoint) sit at the BOTTOM,
 # so the slow, rarely-changing installs (apt, chrome-devtools-mcp, glab,
 # acli, user) are cached and reused across rebuilds. PI_VERSION is passed as
-# a build-arg from compose (default below) so a version bump is a single-layer
-# rebuild, not a Dockerfile edit that invalidates everything after it.
+# a build-arg to scripts/build-container.sh (default below) so a version bump
+# is a single-layer rebuild, not a Dockerfile edit that invalidates everything
+# after it.
 
 ARG NODE_IMAGE=node:24-slim
 
@@ -114,7 +115,7 @@ RUN node /opt/caged/skills-sync.mjs \
     && rm -f /opt/caged/skills.json
 
 # pi's config (~/.pi) is intentionally NOT copied into the image: at runtime
-# compose.yaml bind-mounts <caged>/seed/.pi over /agent-home/.pi (rw), so
+# scripts/start-container.sh bind-mounts <caged>/seed/.pi over /agent-home/.pi (rw), so
 # ~/.pi is exactly the host's seed/.pi directory — a single source of truth
 # with no image copy to drift or go stale. Only ~/.pi is a writable host
 # mount; the rest of $HOME stays read-only (rootfs) with caches redirected
