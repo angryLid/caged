@@ -73,6 +73,12 @@
           "name": "Gemma 4 31B (Local)",
           "contextWindow": 270000,
           "maxTokens": 16384
+        },
+        {
+          "id": "qwen3.8-27b",
+          "name": "Qwen3.8 27B (Local)",
+          "contextWindow": 270000,
+          "maxTokens": 16384
         }
       ]
     }

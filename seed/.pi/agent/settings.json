@@ -4,9 +4,9 @@
     "npm:pi-mcp-adapter",
     "npm:pi-web-access"
   ],
-  "lastChangelogVersion": "0.84.0",
+  "lastChangelogVersion": "0.84.2",
   "theme": "dark",
-  "defaultProvider": "DeepSeek-API",
-  "defaultModel": "deepseek-v4-flash",
+  "defaultProvider": "local-llm",
+  "defaultModel": "qwen3.8-27b",
   "defaultThinkingLevel": "medium"
 }
