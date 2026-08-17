@@ -134,11 +134,20 @@ remains the reference posture — see [SECURITY.md](SECURITY.md).
 
 ## Resource defaults
 
-The guest is a VM with **1 GB RAM / 4 CPUs by default**, and the BuildKit
-builder builds with **2 CPUs / 2 GB**. The scripts don't override
-`--memory`/`--cpus`. If pi or a workspace build feels slow (or pi OOMs),
-raise them, e.g. `container run ... --memory 8g --cpus 8` (or edit
-`start-container.sh`).
+The tool's guest is a VM with **1 GB RAM / 4 CPUs by default**, and the
+BuildKit builder builds with **2 CPUs / 2 GB**.
+
+- `start-container.sh` pins `--memory 2g` at runtime — the 1 GB default OOMs
+  pi on larger tasks. Override with `CAGED_MEMORY` (e.g.
+  `CAGED_MEMORY=8g scripts/start-container.sh`). CPUs stay at the 4-CPU
+  default; if heavy workspace builds feel slow, add `--cpus` alongside.
+- `build-container.sh` keeps the builder defaults (2 CPU / 2 GB); if an image
+  build OOMs, add `--memory` there too.
+
+A machine-wide default is possible via the tool's own config file
+(`[container] memory`/`cpus` keys, see
+[container-system-config](https://github.com/apple/container/blob/main/docs/container-system-config.md))
+— the script pins the value instead so behavior is reproducible on any host.
 
 ## Keeping them in sync
 

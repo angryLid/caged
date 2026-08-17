@@ -14,6 +14,10 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 IMAGE_TAG="${CAGED_IMAGE:-caged:latest}"
 CONTAINER_NAME="${CONTAINER_NAME:-caged-pi}"
+# RAM for the container VM. Apple's `container` defaults the guest to 1 GB
+# (docs/APPLE-CONTAINER.md -> "Resource defaults"), which OOMs pi on larger
+# tasks; pin 2 GB, override with CAGED_MEMORY (e.g. 8g).
+CAGED_MEMORY="${CAGED_MEMORY:-2g}"
 
 # --- Host path mapping ---
 # Workspace: prefer CAGED_WORKSPACE, fall back to the caller's current directory.
@@ -64,6 +68,7 @@ exec container run \
   --workdir /workspace \
   --read-only \
   --tmpfs /tmp \
+  --memory "${CAGED_MEMORY}" \
   --cap-drop ALL \
   -v "${WORKSPACE_HOST}:/workspace:rw" \
   -v "${PI_HOME_HOST}:/agent-home/.pi:rw" \
