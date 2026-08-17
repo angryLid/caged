@@ -71,6 +71,39 @@ works too.
   `seed/.dsh/sessions/` — gitignored test artifacts).
 - **Run a task**: start a session and send a prompt.
 
+### Models: pi provider set migrated (+ BYOK)
+
+The image ships the same four provider routes as the pi agent's
+`seed/.pi/agent/models.json`, as the composition base in
+`seed/.dsh/cordis.patch.yml` (`llm-pi-ai` entry):
+
+| route | key env / credential ref | protocol |
+|---|---|---|
+| `DeepSeek-API` | `MY_DEEPSEEK_API_KEY` | openai-completions (`api.deepseek.com`) |
+| `volcengine` | `VOLCENGINE_API_KEY` | anthropic-messages (Ark coding) |
+| `my-openrouter` | `MY_OPENROUTER_API_KEY` | openai-completions |
+| `local-llm` | `LOCAL_API_KEY` | openai-completions (host `192.168.64.1:8765`) |
+
+**BYOK works out of the box**: dsh configs reference keys by name
+(`apiKeyEnv`, no value ever in config/settings). Users paste their own key in
+the Web UI (Settings → Models → card → key field); dsh stores it in
+`seed/.dsh/.credentials.yaml` and resolves it per request — no restart, no
+operator env needed. An operator-injected env var of the same name (e.g. via
+`scripts/dsh-start-container.sh`) shadows the stored value and renders the
+field read-only. The `llm-pi-ai` adapter is dormant-capable: removing the
+patch entry empties the route set while the full pi-ai catalog stays
+configurable from the Models page.
+
+Settings resolve as schema defaults < the patch base < the user settings
+section (`seed/.dsh/settings.yaml`, gitignored), so a Models-page edit layers
+on top of the shipped routes instead of replacing them. Editing the routes
+once saved: the patch entry is the composition base — change it to re-baseline.
+
+Mapping notes: pi's `"$VAR"` refs become bare names; pi-only compat flags
+(`supportsEagerToolInputStreaming`, `supportsStrictTools`) have no dsh
+surface and are dropped; `reasoning: true` maps to the nearest dsh knob
+(`reasoning: high` + `compat.thinkingFormat` where the dialect is known).
+
 ### Permission model (danger-full-access by default)
 
 dsh ships its own process sandbox (bwrap / Landlock / seatbelt) and interactive
