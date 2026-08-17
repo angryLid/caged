@@ -89,4 +89,4 @@ llm-pi-ai:
           contextWindow: 270000
           maxTokens: 16384
 agent-presets:
-  default: minimal
+  default: standard

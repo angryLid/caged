@@ -34,4 +34,4 @@
   config:
     root: /workspace/.dsh/sessions
     compression: none
-    packChunks: false
+    packChunks: true
