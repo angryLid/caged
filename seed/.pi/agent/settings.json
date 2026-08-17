@@ -1,5 +1,6 @@
 {
   "defaultProjectTrust": "always",
+  "sessionDir": "/workspace/.pi/sessions",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:pi-web-access"

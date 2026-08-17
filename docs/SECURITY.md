@@ -15,7 +15,7 @@ the host filesystem beyond the mount, or persist on the host.
 
 | Risk | Mitigation | Status |
 |------|-----------|--------|
-| Read host files | only `/workspace`, `$CAGED_WORKSPACE/.pi/sessions` and `caged/seed/.pi` (mounted at `/agent-home/.pi`, pi's config home) are mounted; no `-v /`, rootfs is read-only | ✅ |
+| Read host files | only `/workspace` (which backs per-project session data at `/workspace/.pi/sessions`) and `caged/seed/.pi` (mounted at `/agent-home/.pi`, pi's config home) are mounted; no `-v /`, rootfs is read-only | ✅ |
 | Write host files | read-only rootfs; `/workspace` rw and the live `~/.pi` bind at `/agent-home/.pi` (== `caged/seed/.pi`) rw are the only writable host-backed mounts | ✅ |
 | Escape via root | runs as UID 1000 non-root | ✅ |
 | Gain capabilities | `--cap-drop ALL` + `--security-opt no-new-privileges` | ✅ |

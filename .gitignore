@@ -10,7 +10,8 @@ node_modules/
 .idea/
 .vscode/
 
-# pi session data (mounted from $CAGED_WORKSPACE/.pi/sessions)
+# pi session data (written via the sessionDir setting to /workspace/.pi/sessions,
+# i.e. $CAGED_WORKSPACE/.pi/sessions on the host)
 .pi/sessions/
 
 # dsh session data (mounted from $WORKSPACE/.dsh/sessions)

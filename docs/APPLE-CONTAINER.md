@@ -53,21 +53,23 @@ path.
 - **`scripts/build-container.sh`** — `container build` with the project root
   as context and an absolute Containerfile path (works from any cwd);
   `PI_VERSION` build-arg (default `0.84.2`).
-- **`scripts/start-container.sh`** — `container run` wiring the three mounts
-  (`/workspace`, the live seed `~/.pi`, per-project `sessions`), the
+- **`scripts/start-container.sh`** — `container run` wiring the two mounts
+  (`/workspace`, the live seed `~/.pi`), the
   environment, and the hardening flags the tool supports (`--read-only`,
-  `--cap-drop ALL`, `--tmpfs /tmp`, `-it`). It also adds three things it
+  `--cap-drop ALL`, `--tmpfs /tmp`, `-it`). It also adds two things it
   manages for you:
   1. a **fail-fast host-side seed check** (`models.json` present) before
      starting,
-  2. **pre-creates `$WORKSPACE_HOST/.pi/sessions`**,
-  3. **stops a leftover same-name container** (`container stop` — SIGTERM, 5s
+  2. **stops a leftover same-name container** (`container stop` — SIGTERM, 5s
      timeout) before running.
 
 `scripts/dsh-start-container.sh` keeps the same hardening flags and also
 passes `-it`, even though dsh is a web server (no TUI). dsh session logs are
 routed to `/workspace/.dsh/sessions` natively via `seed/.dsh/cordis.patch.yml`
-(no extra session volume mount needed). That is a workaround:
+(no extra session volume mount needed). pi does the same for its sessions:
+`seed/.pi/agent/settings.json` sets `sessionDir` to `/workspace/.pi/sessions`,
+so they land in `$CAGED_WORKSPACE/.pi/sessions` through the `/workspace` bind
+— no dedicated mount there either. That is a workaround:
 without a TTY, the tool's foreground signal path is broken upstream — the CLI
 XPCs SIGINT into the guest with a signal field the API service reads as a
 different type, so every Ctrl+C prints `failed to send signal: ... "missing

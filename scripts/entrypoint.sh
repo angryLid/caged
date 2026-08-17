@@ -47,10 +47,24 @@ if [ -f "$AGENT_DIR/mcp.json" ]; then
     done
 fi
 
-# The sessions mount must exist and the seed must be writable (both ways).
-[ -d "$AGENT_DIR/sessions" ] || fail \
-    "sessions dir '$AGENT_DIR/sessions' not found — \$CAGED_WORKSPACE/.pi/sessions should be" \
-    "mounted there (scripts/start-container.sh pre-creates it)."
+# The seed must be writable (both ways) and pi's session dir must be usable.
+# Sessions are no longer a separate bind mount: seed/.pi/agent/settings.json
+# sets "sessionDir": "/workspace/.pi/sessions", and /workspace is already the
+# rw workspace bind, so sessions land in $CAGED_WORKSPACE/.pi/sessions on the
+# host with no extra mount. pi creates the dir itself; we resolve the setting
+# (falling back to the default ~/.pi/agent/sessions) and fail fast here if the
+# target isn't writable, instead of letting pi start half-configured.
+SESSION_DIR="$(sed -nE 's/.*"sessionDir"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$AGENT_DIR/settings.json" 2>/dev/null | head -n1)"
+[ -n "$SESSION_DIR" ] || SESSION_DIR="$AGENT_DIR/sessions"
+case "$SESSION_DIR" in
+    ~/*) SESSION_DIR="$HOME/${SESSION_DIR#\~/}" ;;
+    /*) ;;
+    *) SESSION_DIR="$PWD/$SESSION_DIR" ;;
+esac
+mkdir -p "$SESSION_DIR"
+[ -w "$SESSION_DIR" ] || fail \
+    "sessions dir '$SESSION_DIR' is not writable — pi runs as uid 1000, so the" \
+    "corresponding host directory must be writable by that uid."
 [ -w "$AGENT_DIR" ] || fail "'$AGENT_DIR' is not writable — the live seed bind must be rw."
 
 # --- 2. bootstrap (best-effort) ------------------------------------------

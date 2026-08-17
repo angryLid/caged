@@ -154,10 +154,9 @@ cd /path/to/your/repo
 
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
-| `/workspace`   | the dir you ran `start-container.sh` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** |
+| `/workspace`   | the dir you ran `start-container.sh` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** (also backs pi's per-project session data, see below) |
 | `/agent-home/.pi` (`~/.pi`) | `<caged>/seed/.pi` (`$CAGED_PI_HOME`) | rw | **pi's live config home** — maps 1:1 to `seed/.pi`; everything pi configures lands back on the host |
 | `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
-| `/agent-home/.pi/agent/sessions` | `$CAGED_WORKSPACE/.pi/sessions` on the host | rw | **pi session data — per-project, on the host** |
 
 `$HOME` is `/agent-home` and only `~/.pi` (`/agent-home/.pi`) is a live bind mount
 of `caged/seed/.pi` — one level of indirection below `$HOME`, so the repo tree
@@ -184,13 +183,22 @@ Keep runtime state out of git: `seed/.pi/agent/auth.json` and
 written the first time you authenticate, so don't worry if it doesn't exist
 yet.
 
-**Session data lives per-project on the host** as a nested mount
-(`/agent-home/.pi/agent/sessions` is masked by it): when you run
-`scripts/start-container.sh` from `~/folder`, pi's sessions are written to
-`~/folder/.pi/sessions/` (`start-container.sh` pre-creates the directory).
-Deleting `seed/.pi/agent`
-or `auth.json` does **not** touch your sessions or your API keys' cached
-auth.
+**Session data lives per-project on the host without a dedicated mount**: pi
+no longer writes sessions into its config home. `seed/.pi/agent/settings.json`
+sets `"sessionDir": "/workspace/.pi/sessions"`, and since `/workspace` is the
+live workspace bind, that lands in `$CAGED_WORKSPACE/.pi/sessions` on the host
+— the same location as before, so no directory-level migration is needed.
+`pi -c`, `pi -r` and the `/resume` picker scan that directory. Deleting
+`seed/.pi/agent` or `auth.json` does **not** touch your sessions or your API
+keys' cached auth.
+
+> **Layout note for pre-existing sessions:** with a custom `sessionDir`, pi
+> stores session files *flat* in that directory instead of under a per-cwd
+> subdirectory. Sessions written by an older container (which mounted
+> `/agent-home/.pi/agent/sessions`) live in `.pi/sessions/<encoded-workspace-path>/`
+> and no longer show up in the picker automatically — open them with
+> `pi --session <path>` or move the `.jsonl` files up one level into
+> `.pi/sessions/`.
 
 ## Seed config (`seed/`)
 
