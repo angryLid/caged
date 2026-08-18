@@ -1,7 +1,7 @@
 #!/bin/sh
 # caged entrypoint.
 #
-# Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
+# Runs as the non-root user `agent` (USER agent in the image). Responsibilities:
 #   1. Fail-fast validation BEFORE launching pi. There is deliberately no
 #      config baked into the image: ~/.pi (=/agent-home/.pi) must be the live
 #      bind mount of the host `seed/.pi` directory (scripts/start-container.sh
@@ -63,7 +63,7 @@ case "$SESSION_DIR" in
 esac
 mkdir -p "$SESSION_DIR"
 [ -w "$SESSION_DIR" ] || fail \
-    "sessions dir '$SESSION_DIR' is not writable — pi runs as uid 1000, so the" \
+    "sessions dir '$SESSION_DIR' is not writable — the agent runs as uid 1000, so the" \
     "corresponding host directory must be writable by that uid."
 [ -w "$AGENT_DIR" ] || fail "'$AGENT_DIR' is not writable — the live seed bind must be rw."
 

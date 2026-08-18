@@ -46,7 +46,7 @@ RUN apt-get update \
 # dsh's `$DSH_HOME` dir on the persistent volume (the base only creates
 # /agent-home; the .dsh subdir is dsh-specific).
 RUN mkdir -p /agent-home/.dsh \
-    && chown -R pi:pi /agent-home/.dsh
+    && chown -R agent:agent /agent-home/.dsh
 
 # Install dsh (pinned) globally. Open network at build time (npm registry).
 # This is the volatile layer: a DSH_VERSION bump rebuilds only this (and the
@@ -79,7 +79,7 @@ RUN chmod +x /usr/local/bin/dsh-entrypoint
 COPY scripts/dsh-ensure-workspace.mjs /usr/local/bin/dsh-ensure-workspace
 RUN chmod +x /usr/local/bin/dsh-ensure-workspace
 
-USER pi
+USER agent
 WORKDIR /workspace
 
 # Default: serve the Web UI. Override the args for other modes, e.g.

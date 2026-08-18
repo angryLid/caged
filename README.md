@@ -69,7 +69,7 @@ caged/
 │   ├── build-caged-base.sh  # shared base image build (Containerfile.base) — built automatically by the one below
 │   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh|webui  (arg required, no default)
 │   ├── start-container.sh   # Apple `container` run: pi|webui|dsh + command args
-│   ├── entrypoint.sh        # pi seed validation (fail-fast) + tini, runs as USER pi
+│   ├── entrypoint.sh        # pi seed validation (fail-fast) + tini, runs as USER agent
 │   ├── dsh-entrypoint.sh    # dsh seed validation + tini
 │   ├── dsh-ensure-workspace.mjs # dsh: register /workspace as Web default
 │   └── skills-sync.mjs      # declarative skills sync (see `## Skills (“skills-sync”)`)

@@ -26,7 +26,7 @@ ARG CAGED_IMAGE=caged:latest
 
 FROM ${CAGED_IMAGE}
 
-# The pi image ends with USER pi. Switch back to root for the build-time
+# The pi image ends with USER agent. Switch back to root for the build-time
 # package installation; apt needs to create /var/lib/apt/lists/partial and
 # npm must install the global package into the image's system prefix.
 USER root
@@ -52,9 +52,9 @@ RUN npm install -g --allow-scripts=node-pty,@google/genai,protobufjs pi-web-ui@$
     && pi-web-ui --version
 
 # Restore the non-root runtime identity inherited conceptually from the pi
-# image. Override the args for one-off server commands, e.g.
+# image (USER agent). Override the args for one-off server commands, e.g.
 # `pi-web-ui --port 9000`. Run via scripts/start-container.sh webui, which
 # maps 127.0.0.1:8787 to the container and sets PI_WEB_HOST=0.0.0.0 inside it.
-USER pi
+USER agent
 WORKDIR /workspace
 CMD ["pi-web-ui"]

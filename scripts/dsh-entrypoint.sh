@@ -1,7 +1,7 @@
 #!/bin/sh
 # dsh entrypoint.
 #
-# Runs as the non-root user `pi` (USER pi in the image). Responsibilities:
+# Runs as the non-root user `agent` (USER agent in the image). Responsibilities:
 #   1. Fail-fast validation of the LIVE $DSH_HOME bind (seed/.dsh) BEFORE
 #      launching dsh. No config is baked into the image: $DSH_HOME must be the
 #      live bind mount of the host `seed/.dsh` (the Apple start script

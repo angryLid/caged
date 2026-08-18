@@ -6,7 +6,7 @@
 # rarely-changing layers are built and cached ONCE:
 #   * minimal runtime essentials (git, ca-certificates, curl, tini)
 #   * the pinned project CLIs (glab, acli) — both agents' tools use them
-#   * the non-root `pi` runtime user (uid 1000) + the persistent dirs
+#   * the non-root `agent` runtime user (uid 1000) + the persistent dirs
 #     (/agent-home, /workspace)
 #
 # Both ./Containerfile (pi) and ./Containerfile.dsh build FROM this image
@@ -78,15 +78,15 @@ RUN set -eux; \
 
 # Non-root runtime user + persistent dirs (shared convention).
 # The node base image ships a `node` user at UID 1000; we free that UID up
-# for our own `pi` user so "uid 1000" stays stable across base image updates.
+# for our own `agent` user so "uid 1000" stays stable across base image updates.
 # The user's home is /agent-home — named generically (not "pi-agent") so the
 # image stays reusable for other agents/tools that hang state off $HOME.
 # Derived images add their own home subdirs on top (pi: /agent-home/.pi,
 # dsh: /agent-home/.dsh).
 RUN userdel -r node 2>/dev/null || true \
-    && useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash pi \
+    && useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash agent \
     && mkdir -p /workspace /agent-home \
-    && chown -R pi:pi /workspace /agent-home
+    && chown -R agent:agent /workspace /agent-home
 
 # HOME=/agent-home so $HOME/.pi (pi's default config location) and $HOME/.dsh
 # (dsh's data root) land on the persistent volume; WORKSPACE names the

@@ -14,7 +14,7 @@
 # This file builds FROM the shared base image ./Containerfile.base (built
 # first by `scripts/build-container.sh pi` via scripts/build-caged-base.sh): the
 # base carries the slow, rarely-changing layers — apt essentials, the pinned
-# glab/acli CLIs, the non-root user. What remains here is pi-specific and
+# glab/acli CLIs, the shared non-root `agent` user. What remains here is pi-specific and
 # volatile — chrome-devtools-mcp, the pi npm install, the build-time skill
 # clone, the entrypoint — so a PI_VERSION bump only rebuilds these bottom
 # layers, and a CLI/base-image update is a single-file change in
@@ -32,7 +32,7 @@ RUN npm install -g chrome-devtools-mcp@1.6.0
 # pi's `~/.pi` home dir on the persistent volume (the base only creates
 # /agent-home; the .pi subdir is pi-specific).
 RUN mkdir -p /agent-home/.pi/agent \
-    && chown -R pi:pi /agent-home/.pi
+    && chown -R agent:agent /agent-home/.pi
 
 # Install pi (pinned) globally. Open network at build time (npm registry).
 # Volatile layer: sits after the cached base layers above so a PI_VERSION
@@ -66,7 +66,7 @@ RUN node /opt/caged/skills-sync.mjs \
 COPY scripts/entrypoint.sh /usr/local/bin/caged-entrypoint
 RUN chmod +x /usr/local/bin/caged-entrypoint
 
-USER pi
+USER agent
 WORKDIR /workspace
 
 # `pi` requires a prompt; pass one or use -it to get the interactive TUI.
