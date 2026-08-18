@@ -47,6 +47,27 @@ the host filesystem beyond the mount, or persist on the host.
    [CLI-AUTH.md](CLI-AUTH.md) for the full risk analysis. `glab`
    still prefers `GITLAB_TOKEN` from the env when it is set.
 
+## pi-web-ui (Web UI) mode
+
+`scripts/webui-start-container.sh` serves the same agent through a browser
+instead of the TUI. The threat surface is unchanged **in kind** — whoever can
+drive the WebSocket can run the agent with exactly the TUI's power (arbitrary
+bash in `/workspace`, read of the live seed) — so the extra surface is the
+listening port plus the origin check:
+
+* The server binds `0.0.0.0` **inside** the container (required for the
+  `-p` mapping to reach it), but the host side is published to
+  `127.0.0.1:8787` **only** — the UI is not reachable from the LAN. Keep it
+  that way; anyone who can reach the port controls the agent.
+* Cross-origin WebSocket pages are rejected (403, Origin/Host same-authority
+  check); `PI_WEB_ALLOW_ORIGINS` is deliberately not set.
+* Provider `headers` / API keys never leave the server process (not sent to
+  the browser; the model UI edits everything else and the server preserves
+  the headers).
+* Everything else is the same hardened container: read-only rootfs, uid
+  1000, `--cap-drop ALL`, the same two mounts (`/workspace`, the live
+  seed), open network with the same accepted exfiltration trade-off.
+
 ## Layered defense quick reference
 
 * Image: non-root USER pi, pinned agent version, minimal base layer.

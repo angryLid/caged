@@ -36,6 +36,10 @@ can only ever touch the workspace you explicitly hand it.
 * **Live seed config** — pi's entire `~/.pi` is a two-way bind mount of
   `seed/`: edit configs in this repo and they take effect on the next
   container start — no image rebuild.
+* **pi-web-ui Web UI (optional)** — a browser chat frontend for pi, in a
+  separate additive image (`scripts/build-container.sh webui` +
+  `scripts/webui-start-container.sh`) — see
+  [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
 * **Open networking** — deliberate, so pi can reach model providers and the
   internet (see [docs/SECURITY.md](docs/SECURITY.md) for the trade-offs).
 
@@ -46,15 +50,17 @@ caged/
 ├── Containerfile        # pi image (non-root, pinned pi version)
 ├── Containerfile.base   # shared base for both images: apt essentials, glab, acli, non-root user
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
+├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
 ├── seed/                # agent homes — LIVE bind-mount sources
 │   ├── .pi/agent/       # pi's ~/.pi: models.json (providers), settings.json,
 │   │                    #   mcp.json, AGENTS.md, skills.json, skills/, scripts/
 │   └── .dsh/            # dsh's $DSH_HOME: cordis.patch.yml + generated config
 ├── scripts/
 │   ├── build-caged-base.sh  # shared base image build (Containerfile.base) — built automatically by the one below
-│   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh  (arg required, no default)
+│   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh|webui  (arg required, no default)
 │   ├── start-container.sh   # Apple `container` run (interactive pi TUI)
 │   ├── dsh-start-container.sh # same, for dsh (Web UI on host loopback)
+│   ├── webui-start-container.sh # same, for pi-web-ui (Web UI on host loopback)
 │   ├── entrypoint.sh        # pi seed validation (fail-fast) + tini, runs as USER pi
 │   ├── dsh-entrypoint.sh    # dsh seed validation + tini
 │   ├── dsh-ensure-workspace.mjs # dsh: register /workspace as Web default
@@ -323,9 +329,75 @@ is needed; unlike `glab` there is no env-token passthrough, so authenticating
 once per setup is the supported path. Auth behavior and pitfalls for both
 CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
+## pi-web-ui (Web UI)
+
+[`pi-web-ui`](https://pi.dev/packages/pi-web-ui) is a browser chat interface
+for pi: the pi SDK runs in-process in a Node server and streams thinking
+blocks, tool calls and bash output to the browser over WebSocket — with a
+built-in terminal, file tree, git panel, model management, multiple parallel
+conversations and a goal mode. This repo ships it as an **optional second
+frontend** for the same caged container, mirroring how dsh runs as a Web UI
+sibling.
+
+**Build** — a separate additive image, so TUI-only users never carry the
+web toolchain:
+
+```sh
+scripts/build-container.sh webui        # builds base -> pi -> webui (caged-webui:latest)
+```
+
+`Containerfile.webui` is a thin layer `FROM caged:latest`: it adds only the
+node-pty build toolchain (`python3` + `build-essential` — `node-pty` ships
+no Linux prebuilds, so it must `node-gyp rebuild` at install time) and the
+pinned `pi-web-ui`, then changes the CMD. The entrypoint, the build-time
+skill vendor and the chrome-devtools MCP are inherited unchanged. Rollback
+is trivial: stop using it, the pi TUI image is untouched.
+
+**Run** — same workflow as the TUI, from the repo you want as the workspace:
+
+```sh
+cd /path/to/your/repo
+/path/to/caged/scripts/webui-start-container.sh   # UI on http://127.0.0.1:8787
+```
+
+The web container gets the same hardening (`--read-only`, `--cap-drop ALL`,
+`--tmpfs /tmp`) and the same two mounts (`/workspace`, the live seed), and
+`pi-web-ui` reads `PI_CODING_AGENT_DIR` (`/agent-home/.pi/agent`) exactly
+like the pi CLI — so `seed/.pi/agent`'s `models.json`, skills, settings and
+`AGENTS.md` apply as-is, with no extra configuration. Differences from the
+TUI run:
+
+* The server binds `0.0.0.0:8787` **inside** the container (`PI_WEB_HOST`)
+  and the host side is published to `127.0.0.1:${PI_WEBUI_HOST_PORT}` only
+  (`PI_WEBUI_HOST_PORT=8787`) — the UI is reachable at
+  `http://127.0.0.1:8787` and stays off the LAN.
+* Chat history is per-project: `PI_WEB_DATA_DIR=/workspace/.pi-web`
+  (= `$CAGED_WORKSPACE/.pi-web` on the host), the same pattern as sessions.
+  Gitignore `.pi-web/` in your workspace repo.
+* Memory defaults to 4 GB (`PI_WEBUI_MEMORY`): the web mode keeps agents
+  running in-process and conversations alive in the background.
+
+Caveats:
+
+* **Updating pi-web-ui = bump `PI_WEB_UI_VERSION` and rebuild the image.**
+  The runtime rootfs is read-only, so the UI's in-app self-update and
+  `pi-web-ui server install` (systemd/launchd) don't apply inside caged —
+  run the foreground server only (which is what the script does).
+* The web server bundles its own pi SDK copy (`^0.83`), which can lag the
+  pinned global pi (`0.84.2`). The seed config format is compatible and the
+  two don't interfere.
+* One caged container at a time per seed: don't run the TUI (`caged-pi`)
+  and the Web UI (`caged-pi-webui`) simultaneously against the same
+  `seed/.pi` (both mount it rw).
+* The `/webui` pi extension (from `pi install npm:pi-web-ui`) is **not**
+  used: inside caged it would spawn the server bound to the container
+  loopback — unreachable from the host browser — and would force the build
+  toolchain into the pi image. The standalone web mode above covers the
+  use case.
+
 ## Environment knobs
 
-`scripts/start-container.sh` (and `scripts/build-container.sh pi|dsh` /
+`scripts/start-container.sh` (and `scripts/build-container.sh pi|dsh|webui` /
 `scripts/build-caged-base.sh`) read these from the calling shell; defaults
 listed.
 
@@ -336,6 +408,11 @@ listed.
 | `CAGED_SKIP_BASE` | `0` | set to `1` to skip the automatic base rebuild when building a derived image |
 | `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |
 | `ACLI_VERSION` | `1.3.22` | acli version pin (build time, `build-caged-base.sh`) |
+| `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
+| `PI_WEB_UI_VERSION` | `0.26.0` | pi-web-ui version pin (build time, `build-container.sh webui`) |
+| `CAGED_SKIP_PI` | `0` | set to `1` to skip the pi image build when building `webui` (e.g. it is already current) |
+| `PI_WEBUI_HOST_PORT` | `8787` | host-loopback port of the Web UI (`http://127.0.0.1:8787`) |
+| `PI_WEBUI_MEMORY` | `4g` | RAM for the web-mode container VM (`CAGED_MEMORY` for the TUI) |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
 | `CAGED_PI_HOME` | `./seed/.pi` (relative to the repo root) | host dir bind-mounted at `/agent-home/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
@@ -391,6 +468,9 @@ These are known rough edges we've consciously chosen **not** to fix yet.
 * The pi version is pinned via `ARG PI_VERSION` (default `0.84.2`). Rebuild a
   specific version with `PI_VERSION=x.y.z scripts/build-container.sh pi`. (We
   deliberately don't quote a number here — the project is still iterating.)
+* The web mode (`caged-webui`) bundles its own pi SDK copy (`^0.83`), which
+  can lag the pinned global pi — config format is compatible, they don't
+  interfere; see [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
 
 ## License / notes
 

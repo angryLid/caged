@@ -7,7 +7,7 @@
   ],
   "lastChangelogVersion": "0.84.2",
   "theme": "dark",
-  "defaultProvider": "local-llm",
-  "defaultModel": "Coding2",
+  "defaultProvider": "my-openrouter",
+  "defaultModel": "openai/gpt-5.6-luna",
   "defaultThinkingLevel": "medium"
 }

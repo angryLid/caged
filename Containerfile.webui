@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1
+#
+# caged-webui — the pi-web-ui web chat UI for the pi agent.
+#
+# A thin ADDITIVE layer on top of the pi image (./Containerfile, tag
+# caged:latest): it inherits everything pi-specific (the pinned pi CLI, the
+# chrome-devtools MCP, the build-time skill vendor, the caged entrypoint)
+# and only adds what a web server needs on top:
+#
+#   * a node-gyp toolchain — pi-web-ui's terminal feature depends on
+#     node-pty@1.1.0, which ships NO Linux prebuilds (darwin/win32 only), so
+#     on Linux its install always runs `node-gyp rebuild` (python3 + a C++
+#     compiler). Same trade-off as the dsh image (Containerfile.dsh).
+#   * the pi-web-ui npm package, pinned.
+#   * a different CMD — the entrypoint (fail-fast seed validation + skills
+#     sync + tini) is inherited unchanged and just execs pi-web-ui.
+#
+# Keeping this separate from ./Containerfile means TUI-only users never pay
+# for the ~400MB toolchain — build only what you need:
+#   scripts/build-container.sh webui      (builds base -> pi -> webui)
+#
+# Runtime hardening is identical (read-only rootfs, cap-drop all, tmpfs)
+# and is applied by scripts/webui-start-container.sh.
+
+ARG CAGED_IMAGE=caged:latest
+
+FROM ${CAGED_IMAGE}
+
+# The pi image ends with USER pi. Switch back to root for the build-time
+# package installation; apt needs to create /var/lib/apt/lists/partial and
+# npm must install the global package into the image's system prefix.
+USER root
+
+# node-gyp toolchain, webui-specific: node-pty@1.1.0 ships no Linux
+# prebuilds (only darwin-*/win32-*), so its install script always falls back
+# to `node-gyp rebuild`, which needs Python + a C++ compiler. This layer is
+# cached, so it does not churn on PI_WEB_UI_VERSION bumps.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3 build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# pi-web-ui (pinned) — web chat UI running the pi SDK in-process. Installed
+# INTO the image at build time (the runtime rootfs is read-only). The pi SDK
+# / pi-web-ui config comes from the live seed mount at runtime, exactly like
+# the TUI: pi-web-ui reads PI_CODING_AGENT_DIR (= /agent-home/.pi/agent).
+# --allow-scripts is required on npm >= 12 (install scripts default-deny,
+# which would silently skip node-pty's compile and break the terminal at
+# runtime) and is a no-op on npm 11.
+ARG PI_WEB_UI_VERSION=0.26.0
+RUN npm install -g --allow-scripts=node-pty,@google/genai,protobufjs pi-web-ui@${PI_WEB_UI_VERSION} \
+    && pi-web-ui --version
+
+# Restore the non-root runtime identity inherited conceptually from the pi
+# image. Override the args for one-off server commands, e.g.
+# `pi-web-ui --port 9000`. Run via scripts/webui-start-container.sh, which
+# maps 127.0.0.1:8787 to the container and sets PI_WEB_HOST=0.0.0.0 inside it.
+USER pi
+WORKDIR /workspace
+CMD ["pi-web-ui"]

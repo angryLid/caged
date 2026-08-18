@@ -75,6 +75,11 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   it: CLI/pin/base updates belong in the base, agent-specific layers in the
   derived files. `scripts/build-container.sh pi|dsh` rebuilds the base
   automatically unless `CAGED_SKIP_BASE=1`.
+  `Containerfile.webui` (pi-web-ui Web UI, `scripts/build-container.sh webui`)
+  is a third, **additive layer on top of the pi image** (`FROM caged:latest`,
+  not the base): it inherits the entrypoint/skill vendor and adds only the
+  node-pty toolchain + the pinned `pi-web-ui`, so TUI users never pay for
+  the toolchain. Don't move it onto the base — dsh would inherit the bloat.
 - Skills can be synced by hand with `node scripts/skills-sync.mjs`
   (`--dry-run` to preview, `--link-only` / `--clone-only` for the split paths).
 - After changing any seed config, the change is only visible on the next

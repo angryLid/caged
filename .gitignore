@@ -14,6 +14,10 @@ node_modules/
 # i.e. $CAGED_WORKSPACE/.pi/sessions on the host)
 .pi/sessions/
 
+# pi-web-ui chat data (per-project: /workspace/.pi-web on the host — when a
+# web-mode container runs against this repo as its workspace)
+.pi-web/
+
 # dsh session data (mounted from $WORKSPACE/.dsh/sessions)
 .dsh/sessions/
 

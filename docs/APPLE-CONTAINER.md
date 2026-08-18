@@ -4,14 +4,15 @@ caged runs a **single disposable container whose only job is isolation**, so
 container orchestration is unnecessary — and Apple's own native
 [`container`](https://github.com/apple/container) tool (Linux containers as
 lightweight VMs, optimized for Apple silicon) has **no compose support**
-anyway, which fits. The runtime is therefore two scripts plus an adjusted
+anyway, which fits. The runtime is therefore three scripts plus an adjusted
 `.dockerignore` (its build-context indexing mishandles the classic
 deep-negation `.dockerignore` form):
 
 | What | Command |
 |---|---|
-| Build image | `scripts/build-container.sh pi` (`scripts/build-container.sh dsh` for dsh) |
+| Build image | `scripts/build-container.sh pi` (`dsh` / `webui` for the other two images) |
 | Run (TUI) | `scripts/start-container.sh` |
+| Run (Web UI) | `scripts/webui-start-container.sh` |
 
 The scripts honor the env knobs `CAGED_IMAGE`, `CAGED_WORKSPACE` and
 `CAGED_PI_HOME` plus `CONTAINER_NAME` (default `caged-pi`), and pass the
@@ -50,12 +51,15 @@ path.
 
 ## The scripts
 
-- **`scripts/build-container.sh pi|dsh`** — `container build` with the project
+- **`scripts/build-container.sh pi|dsh|webui`** — `container build` with the project
   root as context and an absolute Containerfile path (works from any cwd). The
   image is a required argument (`pi` → `./Containerfile`, `dsh` →
-  `./Containerfile.dsh`); a build without one fails. Per-image build args:
+  `./Containerfile.dsh`, `webui` → `./Containerfile.webui`); a build without
+  one fails. Per-image build args:
   `PI_VERSION` (default `0.84.2`) for pi, `DSH_VERSION` (default
-  `0.1.0-rc.6`) for dsh. It builds the shared base image first —
+  `0.1.0-rc.6`) for dsh, `PI_WEB_UI_VERSION` (default `0.26.0`) for webui.
+  The `webui` target builds the pi image first (`Containerfile.webui` is
+  `FROM caged:latest`); skip with `CAGED_SKIP_PI=1`.
   `Containerfile.base` via `scripts/build-caged-base.sh` (apt essentials,
   glab, acli, non-root user; tag `caged-base:latest`) — so the pi and dsh
   image builds share one cached base. Skip that with `CAGED_SKIP_BASE=1`,
@@ -171,4 +175,4 @@ A machine-wide default is possible via the tool's own config file
 
 > `scripts/start-container.sh` is the single runtime entry: when its mounts,
 > environment or hardening flags change, keep `scripts/dsh-start-container.sh`
-> and any docs in sync with it.
+> and `scripts/webui-start-container.sh` and any docs in sync with it.
