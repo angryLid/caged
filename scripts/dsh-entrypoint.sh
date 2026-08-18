@@ -2,11 +2,10 @@
 # dsh entrypoint.
 #
 # Runs as the non-root user `agent` (USER agent in the image). Responsibilities:
-#   1. Fail-fast validation of the LIVE $DSH_HOME bind (seed/.dsh) BEFORE
-#      launching dsh. No config is baked into the image: $DSH_HOME must be the
-#      live bind mount of the host `seed/.dsh` (the Apple start script
-#      does this). If it is missing or not writable we exit non-zero
-#      with a clear message — never let dsh start half-configured.
+#   1. Fail-fast validation of the LIVE shared agent home (seed) BEFORE
+#      launching dsh. $DSH_HOME remains /agent-home/.dsh inside that shared
+#      home. If it is missing or not writable we exit non-zero with a clear
+#      message — never let dsh start half-configured.
 #   2. Best-effort bootstrap of cache dirs on the /tmp tmpfs (node never
 #      touches the RO home or the repo-clean $DSH_HOME).
 #   3. Launch the requested command under tini so spawned bash subprocesses
@@ -29,16 +28,16 @@ fail() {
 # --- 1. fail-fast validation of the live seed bind -----------------------
 
 [ -d "$DSH_HOME_PATH" ] || fail \
-    "config home '$DSH_HOME_PATH' not found — \$DSH_HOME must be the live seed bind." \
-    "Run via 'scripts/start-container.sh dsh' (mounts <repo>/seed/.dsh at" \
-    "/agent-home/.dsh), or mount it manually."
+    "config home '$DSH_HOME_PATH' not found — /agent-home must be the live seed bind containing .dsh." \
+    "Run via 'scripts/start-container.sh dsh' (mounts <repo>/seed at /agent-home)," \
+    "or mount it manually."
 [ -w "$DSH_HOME_PATH" ] || fail \
     "'$DSH_HOME_PATH' is not writable — the live seed bind must be rw" \
     "(dsh auto-initializes profiles/ and stores settings/sessions here on first use)."
 
 # --- 2. bootstrap (best-effort caches on the /tmp tmpfs) ------------------
 
-for dir in /tmp/.npm /tmp/.cache /tmp/.config; do
+for dir in /agent-home/cli-auth/glab /agent-home/cli-auth/acli /tmp/.npm /tmp/.cache /tmp/.config; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done

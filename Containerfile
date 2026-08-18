@@ -29,10 +29,10 @@ FROM ${CAGED_BASE_IMAGE}
 # fails with "Permission denied".
 RUN npm install -g chrome-devtools-mcp@1.6.0
 
-# pi's `~/.pi` home dir on the persistent volume (the base only creates
-# /agent-home; the .pi subdir is pi-specific).
-RUN mkdir -p /agent-home/.pi/agent \
-    && chown -R agent:agent /agent-home/.pi
+# The complete seed is mounted at /agent-home at runtime. pi uses .pi and
+# shared CLI authentication uses the common cli-auth subdirectories.
+RUN mkdir -p /agent-home/.pi/agent /agent-home/cli-auth/glab /agent-home/cli-auth/acli \
+    && chown -R agent:agent /agent-home
 
 # Install pi (pinned) globally. Open network at build time (npm registry).
 # Volatile layer: sits after the cached base layers above so a PI_VERSION
@@ -55,12 +55,10 @@ RUN node /opt/caged/skills-sync.mjs \
         --clone-only \
     && rm -f /opt/caged/skills.json
 
-# pi's config (~/.pi) is intentionally NOT copied into the image: at runtime
-# scripts/start-container.sh bind-mounts <caged>/seed/.pi over /agent-home/.pi (rw), so
-# ~/.pi is exactly the host's seed/.pi directory — a single source of truth
-# with no image copy to drift or go stale. Only ~/.pi is a writable host
-# mount; the rest of $HOME stays read-only (rootfs) with caches redirected
-# to /tmp. The entrypoint validates that the bind is in place and fails fast
+# The agent home is intentionally NOT copied into the image: at runtime
+# scripts/start-container.sh bind-mounts <caged>/seed over /agent-home (rw),
+# so .pi, .dsh, and shared CLI authentication are all live host state. The
+# entrypoint validates the expected pi config below /agent-home and fails fast
 # otherwise. Keys stay out of seed/: models.json references $ENV names only.
 
 COPY scripts/entrypoint.sh /usr/local/bin/caged-entrypoint

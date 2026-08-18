@@ -7,7 +7,7 @@ and its risk analysis live here as well.
 ## Decision status
 
 **Accepted, by design (2026-08).** Persisting `glab`'s token at rest on the
-live seed mount supersedes the earlier "env-only, no persistence" posture
+live shared agent-home seed mount supersedes the earlier "env-only, no persistence" posture
 (previously listed in the README's known issues), and mirrors the existing
 `acli` pattern.
 
@@ -28,7 +28,7 @@ config dir, `glab api user` succeeds from `GITLAB_TOKEN` alone, while
 
 | | glab | acli |
 |---|---|---|
-| Persisted login dir | `~/.pi/agent/glab-cli/` — live `~/.pi` mount, set via `GLAB_CONFIG_DIR` in `scripts/start-container.sh` | `~/.pi/agent/acli/` — live `~/.pi` mount, set via `ACLI_CONFIG_DIR` |
+| Persisted login dir | `/agent-home/cli-auth/glab/` — shared live agent-home mount used by pi, pi-webui, and dsh | `/agent-home/cli-auth/acli/` — shared live agent-home mount used by pi, pi-webui, and dsh |
 | Token file | `glab-cli/config.yml` → `hosts.<hostname>.token` + per-host user/api/ssh settings; `aliases.yml` | `acli/acli/jira_config.yaml` (per-product configs; token in the jira one) |
 | Permissions | `0600` file, `0700` dir (verified) | `0600` file, `0700` dir (verified) |
 | Git | ignored via `.gitignore` | ignored via `.gitignore` |
@@ -41,8 +41,9 @@ Secret Service), so both CLIs fall back to a plaintext config file.
 - **Login once per token lifetime, not per container start.** Both CLIs
   reuse the stored credential on every command; without persistence every
   restart needs the token fed in again.
-- **Restart survival.** The config dirs point into the live `~/.pi` seed
-  mount, so the login outlives the container.
+- **Restart survival.** The config dirs point into the live shared
+  `/agent-home` seed mount, so the login outlives the container and is
+  available to pi, pi-webui, and dsh.
 - **glab keeps its automation fast path.** `GITLAB_TOKEN` still wins when
   set, so one-shot and CI runs behave exactly as before — persistence only
   adds a fallback. acli has no env fast path, so persistence is its only

@@ -30,13 +30,13 @@ seed/.pi/agent/mcp-cache.json
 seed/.pi/agent/web-search-cache/
 # pi's regenerable model catalog cache (from `pi update --models`)
 seed/.pi/agent/models-store.json
-# acli (Atlassian CLI) credentials: `acli jira auth login` stores its token
-# here via ACLI_CONFIG_DIR — persisted across restarts but never committed
-seed/.pi/agent/acli/
-# glab (GitLab CLI) credentials: `glab auth login` stores host tokens here
-# via GLAB_CONFIG_DIR — persisted across restarts but never committed (see
-# docs/CLI-AUTH.md for the trade-offs)
-seed/.pi/agent/glab-cli/
+# Shared CLI authentication state. `acli jira auth login` and `glab auth
+# login` persist credentials here for all agent modes, but these files must
+# never be committed (see docs/CLI-AUTH.md).
+seed/cli-auth/glab/*
+seed/cli-auth/acli/*
+!seed/cli-auth/glab/.gitkeep
+!seed/cli-auth/acli/.gitkeep
 
 # skills-sync: local-dev clones of external skill repos (only used when running
 # skills-sync.mjs by hand; at container start the repos come from the image-

@@ -33,27 +33,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 WORKSPACE_HOST="${CAGED_WORKSPACE:-$CURRENT_PWD}"
 
-# Select image, persistent seed, resources, and the command for this mode.
+# Select image, shared agent home, resources, and the command for this mode.
+# The complete seed is mounted at /agent-home for every mode so pi, pi-webui,
+# and dsh share CLI authentication and other agent state.
+AGENT_HOME_HOST="${CAGED_AGENT_HOME:-$ROOT_DIR/seed}"
+
 case "$MODE" in
   pi)
     IMAGE_TAG="${CAGED_IMAGE:-caged:latest}"
     CONTAINER_NAME="${CONTAINER_NAME:-caged-pi}"
     MEMORY="${CAGED_MEMORY:-2g}"
-    PI_HOME_HOST="${CAGED_PI_HOME:-$ROOT_DIR/seed/.pi}"
     PORT=""
     ;;
   webui)
     IMAGE_TAG="${CAGED_WEB_IMAGE:-caged-webui:latest}"
     CONTAINER_NAME="${CONTAINER_NAME:-caged-pi-webui}"
     MEMORY="${PI_WEBUI_MEMORY:-4g}"
-    PI_HOME_HOST="${CAGED_PI_HOME:-$ROOT_DIR/seed/.pi}"
     PORT="${PI_WEBUI_HOST_PORT:-8787}"
     ;;
   dsh)
     IMAGE_TAG="${DSH_IMAGE:-dsh:latest}"
     CONTAINER_NAME="${CONTAINER_NAME:-caged-dsh}"
     MEMORY="${DSH_MEMORY:-4g}"
-    DSH_HOME_HOST="${DSH_HOME_HOST:-$ROOT_DIR/seed/.dsh}"
+    DSH_HOME_HOST="$AGENT_HOME_HOST/.dsh"
     PORT="${DSH_HOST_PORT:-3080}"
     DSH_PERMISSION_MODE="${DSH_PERMISSION_MODE:-danger-full-access}"
     DSH_DEEPSEEK_KEY="${DEEPSEEK_API_KEY:-${MY_DEEPSEEK_API_KEY:-}}"
@@ -69,11 +71,17 @@ case "$MODE" in
     ;;
 esac
 
+if [ ! -d "$AGENT_HOME_HOST" ]; then
+  echo "Error: shared agent home '$AGENT_HOME_HOST' does not exist." >&2
+  echo "Ensure it points to <caged>/seed (override with CAGED_AGENT_HOME)." >&2
+  exit 1
+fi
+
 # pi and pi-web-ui both use the live pi seed and require its model config.
 if [ "$MODE" != dsh ]; then
-  if [ ! -f "$PI_HOME_HOST/agent/models.json" ]; then
-    echo "Error: required seed file '$PI_HOME_HOST/agent/models.json' not found." >&2
-    echo "Ensure the path points to <caged>/seed/.pi (override with CAGED_PI_HOME)." >&2
+  if [ ! -f "$AGENT_HOME_HOST/.pi/agent/models.json" ]; then
+    echo "Error: required seed file '$AGENT_HOME_HOST/.pi/agent/models.json' not found." >&2
+    echo "Ensure CAGED_AGENT_HOME points to <caged>/seed." >&2
     exit 1
   fi
   if [ -n "${LOCAL_API_KEY:-}" ] && ! curl -sS --noproxy '*' -m 1 -o /dev/null \
@@ -84,11 +92,13 @@ fi
 
 if [ "$MODE" = dsh ]; then
   echo "==> Workspace: $WORKSPACE_HOST"
-  echo "==> DSH seed:  $DSH_HOME_HOST"
+  echo "==> Agent home: $AGENT_HOME_HOST"
+  echo "==> DSH home:   $DSH_HOME_HOST"
   echo "==> Starting dsh at http://127.0.0.1:$PORT"
 else
   echo "==> Workspace: $WORKSPACE_HOST"
-  echo "==> Pi seed:   $PI_HOME_HOST"
+  echo "==> Agent home: $AGENT_HOME_HOST"
+  echo "==> Pi config:  $AGENT_HOME_HOST/.pi"
   [ "$MODE" = webui ] && echo "==> Starting pi-web-ui at http://127.0.0.1:$PORT" || echo "==> Starting pi TUI"
 fi
 
@@ -99,14 +109,20 @@ RUN_ARGS=(
   --name "$CONTAINER_NAME" --rm -it --workdir /workspace --read-only
   --tmpfs /tmp --memory "$MEMORY" --cap-drop ALL
   -v "$WORKSPACE_HOST:/workspace:rw"
+  -v "$AGENT_HOME_HOST:/agent-home:rw"
   -e HOME=/agent-home -e LANG=C.UTF-8
+  -e GLAB_SEND_TELEMETRY=false
+  -e GLAB_CONFIG_DIR=/agent-home/cli-auth/glab
+  -e ACLI_CONFIG_DIR=/agent-home/cli-auth/acli
+  -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" -e GITLAB_HOST="${GITLAB_HOST:-}"
+  -e JIRA_API_TOKEN="${JIRA_API_TOKEN:-}"
   -e XDG_CONFIG_HOME=/tmp/.config -e npm_config_cache=/tmp/.npm
   -e XDG_CACHE_HOME=/tmp/.cache
 )
 
 if [ "$MODE" = dsh ]; then
   RUN_ARGS+=(
-    -p "127.0.0.1:$PORT:3080" -v "$DSH_HOME_HOST:/agent-home/.dsh:rw"
+    -p "127.0.0.1:$PORT:3080"
     -e DSH_HOME=/agent-home/.dsh
     -e DEEPSEEK_API_KEY="$DSH_DEEPSEEK_KEY"
     -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}"
@@ -118,7 +134,7 @@ if [ "$MODE" = dsh ]; then
   DEFAULT_CMD=(dsh web)
 elif [ "$MODE" = webui ]; then
   RUN_ARGS+=(
-    -p "127.0.0.1:$PORT:8787" -v "$PI_HOME_HOST:/agent-home/.pi:rw"
+    -p "127.0.0.1:$PORT:8787"
     -e TERM="${TERM:-xterm-256color}" -e PI_CODING_AGENT_DIR=/agent-home/.pi/agent
     -e PORT=8787 -e PI_WEB_HOST=0.0.0.0 -e PI_WEB_CWD=/workspace
     -e PI_WEB_DATA_DIR=/workspace/.pi-web
@@ -126,21 +142,24 @@ elif [ "$MODE" = webui ]; then
   DEFAULT_CMD=(pi-web-ui --no-browser)
 else
   RUN_ARGS+=(
-    -v "$PI_HOME_HOST:/agent-home/.pi:rw"
     -e TERM="${TERM:-xterm-256color}" -e PI_CODING_AGENT_DIR=/agent-home/.pi/agent
   )
   DEFAULT_CMD=(pi)
 fi
 
-# Provider and CLI credentials are shared by both pi modes; harmlessly empty
-# values preserve the old scripts' environment contract.
+# Provider credentials are shared by all modes; harmlessly empty values
+# preserve the old scripts' environment contract. CLI auth is deliberately
+# shared under /agent-home/cli-auth because the complete seed is mounted at
+# /agent-home for every container.
+RUN_ARGS+=(
+  -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}" -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}"
+  -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" -e LOCAL_API_KEY="${LOCAL_API_KEY:-}"
+  -e CDP_HOST=192.168.64.1
+)
+
 if [ "$MODE" != dsh ]; then
   RUN_ARGS+=(
-    -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}" -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}"
-    -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" -e LOCAL_API_KEY="${LOCAL_API_KEY:-}"
-    -e CDP_HOST=192.168.64.1 -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" -e GITLAB_HOST="${GITLAB_HOST:-}"
-    -e GLAB_SEND_TELEMETRY=false -e GLAB_CONFIG_DIR=/agent-home/.pi/agent/glab-cli
-    -e JIRA_API_TOKEN="${JIRA_API_TOKEN:-}" -e ACLI_CONFIG_DIR=/agent-home/.pi/agent/acli
+    -e TERM="${TERM:-xterm-256color}"
   )
 fi
 

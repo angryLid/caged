@@ -39,9 +39,9 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness).
 * **Multiple LLM providers** — DeepSeek, Volcengine Ark, OpenRouter, plus a
   private local gateway; keys are passed via environment variables, never
   baked into the image or committed to the repo.
-* **Live seed config** — pi's entire `~/.pi` is a two-way bind mount of
-  `seed/`: edit configs in this repo and they take effect on the next
-  container start — no image rebuild.
+* **Live shared agent home** — the complete `seed/` directory is a two-way bind
+  mount of `/agent-home` for all modes; pi uses `.pi`, dsh uses `.dsh`, and
+  shared CLI auth lives under `cli-auth/`.
 * **pi-web-ui Web UI (optional)** — a browser chat frontend for pi, in a
   separate additive image (`scripts/build-container.sh webui` +
   `scripts/start-container.sh webui`) — see
@@ -174,15 +174,15 @@ cd /path/to/your/repo
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
 | `/workspace`   | the dir you ran `start-container.sh` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** (also backs pi's per-project session data, see below) |
-| `/agent-home/.pi` (`~/.pi`) | `<caged>/seed/.pi` (`$CAGED_PI_HOME`) | rw | **pi's live config home** — maps 1:1 to `seed/.pi`; everything pi configures lands back on the host |
+| `/agent-home` (`$HOME`) | `<caged>/seed` (`$CAGED_AGENT_HOME`) | rw | **shared live agent home** — contains `.pi`, `.dsh`, and shared CLI auth; all agent modes use the same mount |
 | `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
 
-`$HOME` is `/agent-home` and only `~/.pi` (`/agent-home/.pi`) is a live bind mount
-of `caged/seed/.pi` — one level of indirection below `$HOME`, so the repo tree
-only ever reflects pi's config home, never stray `$HOME` state. Whatever pi
-writes under `~/.pi` (settings, models, mcp.json, skills, even `auth.json`)
-lands directly in the repo tree. There is **no baked-in config inside the
-image** and no fresh-volume seeding step — the seed *is* the live config.
+`$HOME` is `/agent-home`, and the complete `caged/seed` directory is a live
+bind mount there for every mode. Pi uses `/agent-home/.pi`, dsh uses
+`/agent-home/.dsh`, and shared CLI authentication uses
+`/agent-home/cli-auth`. Whatever an agent writes under this home lands directly
+in the repo tree. There is **no baked-in config inside the image** and no
+fresh-volume seeding step — the seed *is* the live agent home.
 Iterate on seed files and they take effect on the *next* container start —
 no image rebuild required.
 
@@ -193,9 +193,8 @@ container stateful-free apart from the two mounts and scratch.
 The entrypoint validates the mount **before** launching pi: if the seed is
 missing or incomplete, `mcp.json` references a missing executable, or the
 seed is read-only, it exits non-zero with a diagnostic instead of letting pi
-run half-configured. This also catches a wrong `$CAGED_PI_HOME` — e.g. an
-old value that pointed at a higher-level dir (a dangling `~/.pi/agent` fails
-the required-files check immediately).
+run half-configured. This also catches a wrong `$CAGED_AGENT_HOME` — e.g. a path that does not
+contain `.pi/agent` (the required-files check fails immediately).
 
 Keep runtime state out of git: `seed/.pi/agent/auth.json` and
 `seed/.pi/agent/sessions/` are ignored (see `.gitignore`). `auth.json` is
@@ -300,7 +299,7 @@ Two ways to authenticate:
   ```
 
 * **Persisted login (interactive).** `GLAB_CONFIG_DIR` points at
-  `/agent-home/.pi/agent/glab-cli` on the live `~/.pi` mount, so
+  `/agent-home/cli-auth/glab` on the live shared `/agent-home` mount, so
   `glab auth login` state survives container restarts (gitignored, like
   `acli` and `auth.json`):
 
@@ -332,9 +331,9 @@ JIRA_API_TOKEN=... scripts/start-container.sh
 #     --email you@example.com --token   inside the TUI
 ```
 
-`ACLI_CONFIG_DIR` points at `/agent-home/.pi/agent/acli` — on the live
-`~/.pi` mount, so login state survives restarts while the token stays out of
-git (`seed/.pi/agent/acli/` is ignored, like `auth.json`). No secret env var
+`ACLI_CONFIG_DIR` points at `/agent-home/cli-auth/acli` — on the live shared
+`/agent-home` mount, so login state survives restarts while the token stays out
+of git (`seed/cli-auth/acli/` is ignored, like `auth.json`). No secret env var
 is needed; unlike `glab` there is no env-token passthrough, so authenticating
 once per setup is the supported path. Auth behavior and pitfalls for both
 CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
@@ -535,7 +534,7 @@ adding `dsh --profile headless "…"` as the command:
 container run --rm \
   --read-only --cap-drop ALL --tmpfs /tmp --memory 2g \
   -v "$PWD:/workspace:rw" \
-  -v "$PWD/seed/.dsh:/agent-home/.dsh:rw" \
+  -v "$PWD/seed:/agent-home:rw" \
   -e DSH_HOME=/agent-home/.dsh \
   -e DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-${MY_DEEPSEEK_API_KEY:-}}" \
   -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}" \
@@ -552,7 +551,7 @@ inside the container via `cordis.patch.yml`). The container port is a stable
 3080; only `DSH_HOST_PORT` varies. Hardening is the tool's implementable
 subset (same as the pi image): `--read-only`, `--cap-drop ALL`, `--tmpfs
 /tmp`, pinned memory — no userns / no `--security-opt`. Env knobs: `DSH_IMAGE`,
-`DSH_VERSION`, `DSH_HOME_HOST`, `CAGED_WORKSPACE`, `DSH_MEMORY` (build:
+`DSH_VERSION`, `CAGED_AGENT_HOME`, `CAGED_WORKSPACE`, `DSH_MEMORY` (build:
 `CAGED_BASE_IMAGE`, `CAGED_SKIP_BASE`, `GLAB_VERSION`, `ACLI_VERSION`).
 
 ### Port mapping
@@ -585,7 +584,7 @@ stays loopback-only.
 | Volume | Mount | Why |
 |---|---|---|
 | `${CAGED_WORKSPACE:-$PWD}` | `/workspace:rw` | the code dsh agents work on — **the default Web workspace** |
-| `${DSH_HOME_HOST:-./seed/.dsh}` | `/agent-home/.dsh:rw` | LIVE `$DSH_HOME` — live config + non-session runtime state |
+| `${CAGED_AGENT_HOME:-./seed}` | `/agent-home:rw` | Shared live agent home; dsh uses `/agent-home/.dsh`, including its config and non-session runtime state |
 
 `$DSH_HOME` (default `~/.dsh`) is dsh's live config/data root, the analogue
 of pi's `~/.pi`: `profiles/<name>/`, `settings.yaml`, `.credentials.yaml`,
@@ -667,7 +666,7 @@ listed.
 | `PI_WEBUI_HOST_PORT` | `8787` | host-loopback port of the Web UI (`http://127.0.0.1:8787`) |
 | `PI_WEBUI_MEMORY` | `4g` | RAM for the web-mode container VM (`CAGED_MEMORY` for the TUI) |
 | `CAGED_WORKSPACE` | `$PWD` | host dir mounted at `/workspace` |
-| `CAGED_PI_HOME` | `./seed/.pi` (relative to the repo root) | host dir bind-mounted at `/agent-home/.pi` (`~/.pi`) — live seed: `seed/.pi` == `~/.pi`, synced both ways |
+| `CAGED_AGENT_HOME` | `./seed` (relative to the repo root) | host dir bind-mounted at `/agent-home` (`$HOME`) — complete shared live agent home |
 | `MY_DEEPSEEK_API_KEY` | *(unset)* | DeepSeek provider key (passed into container) |
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
@@ -675,13 +674,13 @@ listed.
 | `GITLAB_TOKEN` | *(unset)* | `glab` (GitLab CLI) API token (passed into container) |
 | `GITLAB_HOST` | *(unset)* | `glab` GitLab instance host (default `https://gitlab.com`) |
 
-> dsh's dedicated knobs — `DSH_IMAGE`, `DSH_VERSION`, `DSH_HOME_HOST`,
-> `DSH_HOST_PORT`, `DSH_MEMORY`, `DSH_PERMISSION_MODE` — are documented in the
+> dsh's dedicated knobs — `DSH_IMAGE`, `DSH_VERSION`, `DSH_HOST_PORT`,
+> `DSH_MEMORY`, `DSH_PERMISSION_MODE` — are documented in the
 > [dsh (DeepSeek Harness)](#dsh-deepseek-harness) section.
 
 ## Runtime hardening (applied by scripts/start-container.sh)
 
-* `--read-only` — root filesystem immutable (only `/workspace`, `~/.pi` (`/agent-home/.pi`), and `/tmp` writable)
+* `--read-only` — root filesystem immutable (only `/workspace`, the shared `/agent-home`, and `/tmp` writable)
 * `--tmpfs /tmp` — scratch, `noexec,nosuid`
 * `--cap-drop ALL` — container process gets zero kernel capabilities
 * `--security-opt no-new-privileges` — no setuid-style privilege escalation

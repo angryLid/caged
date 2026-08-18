@@ -15,13 +15,13 @@ the host filesystem beyond the mount, or persist on the host.
 
 | Risk | Mitigation | Status |
 |------|-----------|--------|
-| Read host files | only `/workspace` (which backs per-project session data at `/workspace/.pi/sessions`) and `caged/seed/.pi` (mounted at `/agent-home/.pi`, pi's config home) are mounted; no `-v /`, rootfs is read-only | ✅ |
-| Write host files | read-only rootfs; `/workspace` rw and the live `~/.pi` bind at `/agent-home/.pi` (== `caged/seed/.pi`) rw are the only writable host-backed mounts | ✅ |
+| Read host files | only `/workspace` (which backs per-project session data) and the shared `caged/seed` bind at `/agent-home` are mounted; no `-v /`, rootfs is read-only | ✅ |
+| Write host files | read-only rootfs; `/workspace` rw and the shared `/agent-home` bind (== `caged/seed`) rw are the only writable host-backed mounts | ✅ |
 | Escape via root | runs as UID 1000 non-root | ✅ |
 | Gain capabilities | `--cap-drop ALL` + `--security-opt no-new-privileges` | ✅ |
 | Kernel exploit | container seccomp profile | ✅ |
 | Exfiltrate secrets via network | **⚠️ intentionally NOT mitigated** — network is fully open by design (pi talks to model providers). See notes below. | ⚠️ |
-| Persistence on host | live `~/.pi` bind `caged/seed/.pi` → `/agent-home/.pi` (config/auth/skills at `seed/.pi/agent`, sessions at `$CAGED_WORKSPACE/.pi/sessions`) | ✅ |
+| Persistence on host | shared `caged/seed` → `/agent-home` (pi config at `seed/.pi`, dsh state at `seed/.dsh`, CLI auth at `seed/cli-auth`, sessions under `$CAGED_WORKSPACE`) | ✅ |
 | Zombie processes | tini as PID 1 | ✅ |
 
 ## Deliberate trade-offs (accepted risks)
@@ -42,7 +42,7 @@ the host filesystem beyond the mount, or persist on the host.
    document why.
 
 4. **GitLab CLI token at rest in the live seed.** `glab auth login` persists
-   a plaintext token to `seed/.pi/agent/glab-cli/config.yml` (gitignored,
+   a plaintext token to `seed/cli-auth/glab/config.yml` (gitignored,
    `0600`) so interactive auth survives container restarts — see
    [CLI-AUTH.md](CLI-AUTH.md) for the full risk analysis. `glab`
    still prefers `GITLAB_TOKEN` from the env when it is set.
@@ -87,7 +87,7 @@ listening port plus the origin check:
 
 ```sh
 container run --rm -it --read-only --cap-drop ALL --tmpfs /tmp \
-  -v "$PWD/seed/.pi:/agent-home/.pi" caged:latest sh -c '
+  -v "$PWD/seed:/agent-home" caged:latest sh -c '
     id
     touch /etc/test 2>&1 | head -1
     touch /tmp/test && echo "tmp writable"

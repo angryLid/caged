@@ -15,8 +15,9 @@ deep-negation `.dockerignore` form):
 
 
 The scripts honor the env knobs `CAGED_IMAGE`, `CAGED_WORKSPACE` and
-`CAGED_PI_HOME` plus `CONTAINER_NAME` (default `caged-pi`), and pass the
-provider/CLI keys from the caller's environment.
+`CAGED_AGENT_HOME` plus `CONTAINER_NAME` (default `caged-pi`), and pass the
+provider/CLI keys from the caller's environment. The complete `seed` is
+mounted at `/agent-home` for all modes, including shared CLI auth.
 
 ## `.dockerignore`: per-level negation
 

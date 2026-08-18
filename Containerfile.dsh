@@ -46,8 +46,8 @@ RUN apt-get update \
 
 # dsh's `$DSH_HOME` dir on the persistent volume (the base only creates
 # /agent-home; the .dsh subdir is dsh-specific).
-RUN mkdir -p /agent-home/.dsh \
-    && chown -R agent:agent /agent-home/.dsh
+RUN mkdir -p /agent-home/.dsh /agent-home/cli-auth/glab /agent-home/cli-auth/acli \
+    && chown -R agent:agent /agent-home
 
 # Install dsh (pinned) globally. Open network at build time (npm registry).
 # This is the volatile layer: a DSH_VERSION bump rebuilds only this (and the

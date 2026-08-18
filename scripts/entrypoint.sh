@@ -3,9 +3,9 @@
 #
 # Runs as the non-root user `agent` (USER agent in the image). Responsibilities:
 #   1. Fail-fast validation BEFORE launching pi. There is deliberately no
-#      config baked into the image: ~/.pi (=/agent-home/.pi) must be the live
-#      bind mount of the host `seed/.pi` directory (scripts/start-container.sh
-#      does this). If the seed is missing, incomplete, or internally
+#      config baked into the image: /agent-home must be the live bind mount of
+#      the host `seed` directory (scripts/start-container.sh does this). If
+#      the seed is missing, incomplete, or internally
 #      inconsistent, we
 #      exit non-zero with a clear message — never let pi start
 #      half-configured.
@@ -28,13 +28,13 @@ fail() {
 # --- 1. fail-fast validation of the live seed bind -----------------------
 
 [ -d "$AGENT_DIR" ] || fail \
-    "config dir '$AGENT_DIR' not found — ~/.pi must be the live seed bind." \
-    "Run caged via 'scripts/start-container.sh' (mounts <caged>/seed/.pi at /agent-home/.pi), or mount it manually."
+    "config dir '$AGENT_DIR' not found — /agent-home must be the live seed bind containing .pi/agent." \
+    "Run caged via 'scripts/start-container.sh' (mounts <caged>/seed at /agent-home), or mount it manually."
 
 for f in models.json settings.json AGENTS.md; do
     [ -f "$AGENT_DIR/$f" ] || fail \
         "required config file missing: '$AGENT_DIR/$f' — the live seed mount is incomplete" \
-        "(check CAGED_PI_HOME: it must point at <caged>/seed/.pi so ~/.pi/agent has the seed files)."
+        "(check CAGED_AGENT_HOME: it must point at <caged>/seed so /agent-home/.pi/agent has the seed files)."
 done
 
 # mcp.json is optional, but every command it references must exist — a
@@ -69,7 +69,7 @@ mkdir -p "$SESSION_DIR"
 
 # --- 2. bootstrap (best-effort) ------------------------------------------
 
-for dir in "$PI_HOME" "$PI_HOME/agent" /tmp/.npm /tmp/.cache; do
+for dir in "$PI_HOME" "$PI_HOME/agent" /agent-home/cli-auth/glab /agent-home/cli-auth/acli /tmp/.npm /tmp/.cache; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done
