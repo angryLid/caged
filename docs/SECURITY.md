@@ -49,7 +49,7 @@ the host filesystem beyond the mount, or persist on the host.
 
 ## pi-web-ui (Web UI) mode
 
-`scripts/webui-start-container.sh` serves the same agent through a browser
+`scripts/start-container.sh webui` serves the same agent through a browser
 instead of the TUI. The threat surface is unchanged **in kind** — whoever can
 drive the WebSocket can run the agent with exactly the TUI's power (arbitrary
 bash in `/workspace`, read of the live seed) — so the extra surface is the

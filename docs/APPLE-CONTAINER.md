@@ -11,8 +11,8 @@ deep-negation `.dockerignore` form):
 | What | Command |
 |---|---|
 | Build image | `scripts/build-container.sh pi` (`dsh` / `webui` for the other two images) |
-| Run (TUI) | `scripts/start-container.sh` |
-| Run (Web UI) | `scripts/webui-start-container.sh` |
+| Run (all modes) | `scripts/start-container.sh [pi|webui|dsh] [command args...]` |
+
 
 The scripts honor the env knobs `CAGED_IMAGE`, `CAGED_WORKSPACE` and
 `CAGED_PI_HOME` plus `CONTAINER_NAME` (default `caged-pi`), and pass the
@@ -74,7 +74,7 @@ path.
   2. **stops a leftover same-name container** (`container stop` — SIGTERM, 5s
      timeout) before running.
 
-`scripts/dsh-start-container.sh` keeps the same hardening flags and also
+`scripts/start-container.sh dsh` keeps the same hardening flags and also
 passes `-it`, even though dsh is a web server (no TUI). dsh session logs are
 routed to `/workspace/.dsh/sessions` natively via `seed/.dsh/cordis.patch.yml`
 (no extra session volume mount needed). pi does the same for its sessions:
@@ -173,6 +173,6 @@ A machine-wide default is possible via the tool's own config file
 [container-system-config](https://github.com/apple/container/blob/main/docs/container-system-config.md))
 — the script pins the value instead so behavior is reproducible on any host.
 
-> `scripts/start-container.sh` is the single runtime entry: when its mounts,
-> environment or hardening flags change, keep `scripts/dsh-start-container.sh`
-> and `scripts/webui-start-container.sh` and any docs in sync with it.
+> `scripts/start-container.sh` is the single runtime entry. Select `pi`
+> (default), `webui`, or `dsh` as its first argument; remaining arguments
+> replace the image's default command.

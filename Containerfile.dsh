@@ -25,7 +25,7 @@
 #     start, no image rebuild.
 #
 # Design goals (mirror caged): non-root uid 1000, read-only rootfs, no caps,
-# hardening applied at runtime via scripts/dsh-start-container.sh. Network
+# hardening applied at runtime via scripts/start-container.sh dsh. Network
 # stays OPEN by design (dsh needs to reach model providers).
 
 ARG CAGED_BASE_IMAGE=caged-base:latest
@@ -59,7 +59,7 @@ ARG DSH_VERSION=0.1.0-rc.6
 RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
 
 # $DSH_HOME is intentionally NOT copied into the image: at runtime
-# scripts/dsh-start-container.sh bind-mounts <repo>/seed/.dsh over
+# scripts/start-container.sh dsh bind-mounts <repo>/seed/.dsh over
 # /agent-home/.dsh (rw), so $DSH_HOME is
 # exactly the host's seed/.dsh — one source of truth with no image copy to
 # drift. Only $DSH_HOME is a writable host mount; the rest of $HOME stays on

@@ -38,7 +38,7 @@ can only ever touch the workspace you explicitly hand it.
   container start — no image rebuild.
 * **pi-web-ui Web UI (optional)** — a browser chat frontend for pi, in a
   separate additive image (`scripts/build-container.sh webui` +
-  `scripts/webui-start-container.sh`) — see
+  `scripts/start-container.sh webui`) — see
   [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
 * **Open networking** — deliberate, so pi can reach model providers and the
   internet (see [docs/SECURITY.md](docs/SECURITY.md) for the trade-offs).
@@ -58,9 +58,8 @@ caged/
 ├── scripts/
 │   ├── build-caged-base.sh  # shared base image build (Containerfile.base) — built automatically by the one below
 │   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh|webui  (arg required, no default)
-│   ├── start-container.sh   # Apple `container` run (interactive pi TUI)
-│   ├── dsh-start-container.sh # same, for dsh (Web UI on host loopback)
-│   ├── webui-start-container.sh # same, for pi-web-ui (Web UI on host loopback)
+│   ├── start-container.sh   # Apple `container` run: pi|webui|dsh + command args
+
 │   ├── entrypoint.sh        # pi seed validation (fail-fast) + tini, runs as USER pi
 │   ├── dsh-entrypoint.sh    # dsh seed validation + tini
 │   ├── dsh-ensure-workspace.mjs # dsh: register /workspace as Web default
@@ -143,14 +142,16 @@ tool on Apple silicon (Linux containers as lightweight VMs).
 #    version:   PI_VERSION=x.y.z scripts/build-container.sh pi
 scripts/build-container.sh pi
 
-# 2. interactive TUI — run from the repo you want as the workspace, then
-#    start the disposable container. It mounts the directory you run it from
-#    as /workspace and drops you into pi's TUI.
+# 2. run from the repo you want as the workspace. The unified launcher accepts
+#    a mode (pi, webui, or dsh); pi is the default.
 cd /path/to/your/repo
-/path/to/caged/scripts/start-container.sh
+/path/to/caged/scripts/start-container.sh              # pi TUI
+/path/to/caged/scripts/start-container.sh webui       # pi Web UI
+/path/to/caged/scripts/start-container.sh dsh         # dsh Web UI
+/path/to/caged/scripts/start-container.sh pi --continue # pass command args
 ```
 
-`start-container.sh` mounts the **directory you run it from** as `/workspace`.
+`start-container.sh` mounts the **directory you run it from** as `/workspace`. Its first argument selects the runtime (`pi`, `webui`, or `dsh`, defaulting to `pi`); remaining arguments replace the image's default command.
 
 > **Why scripts, not compose?** caged runs a *single* disposable container — the
 > container's only job is isolation, so a compose/multi-container stack would add
@@ -357,7 +358,7 @@ is trivial: stop using it, the pi TUI image is untouched.
 
 ```sh
 cd /path/to/your/repo
-/path/to/caged/scripts/webui-start-container.sh   # UI on http://127.0.0.1:8787
+/path/to/caged/scripts/start-container.sh webui # UI on http://127.0.0.1:8787
 ```
 
 The web container gets the same hardening (`--read-only`, `--cap-drop ALL`,

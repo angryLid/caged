@@ -20,7 +20,7 @@
 #   scripts/build-container.sh webui      (builds base -> pi -> webui)
 #
 # Runtime hardening is identical (read-only rootfs, cap-drop all, tmpfs)
-# and is applied by scripts/webui-start-container.sh.
+# and is applied by scripts/start-container.sh webui.
 
 ARG CAGED_IMAGE=caged:latest
 
@@ -53,7 +53,7 @@ RUN npm install -g --allow-scripts=node-pty,@google/genai,protobufjs pi-web-ui@$
 
 # Restore the non-root runtime identity inherited conceptually from the pi
 # image. Override the args for one-off server commands, e.g.
-# `pi-web-ui --port 9000`. Run via scripts/webui-start-container.sh, which
+# `pi-web-ui --port 9000`. Run via scripts/start-container.sh webui, which
 # maps 127.0.0.1:8787 to the container and sets PI_WEB_HOST=0.0.0.0 inside it.
 USER pi
 WORKDIR /workspace

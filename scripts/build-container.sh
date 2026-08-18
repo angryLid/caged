@@ -103,9 +103,9 @@ container build \
 echo "==> Build complete: ${IMAGE_TAG}"
 case "${1}" in
 dsh)
-    echo "==> Start it with: ${SCRIPT_DIR}/dsh-start-container.sh"
+    echo "==> Start it with: ${SCRIPT_DIR}/start-container.sh dsh"
     ;;
 webui)
-    echo "==> Start it with: ${SCRIPT_DIR}/webui-start-container.sh"
+    echo "==> Start it with: ${SCRIPT_DIR}/start-container.sh webui"
     ;;
 esac

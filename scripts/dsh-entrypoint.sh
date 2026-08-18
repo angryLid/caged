@@ -30,7 +30,7 @@ fail() {
 
 [ -d "$DSH_HOME_PATH" ] || fail \
     "config home '$DSH_HOME_PATH' not found — \$DSH_HOME must be the live seed bind." \
-    "Run via 'scripts/dsh-start-container.sh' (mounts <repo>/seed/.dsh at" \
+    "Run via 'scripts/start-container.sh dsh' (mounts <repo>/seed/.dsh at" \
     "/agent-home/.dsh), or mount it manually."
 [ -w "$DSH_HOME_PATH" ] || fail \
     "'$DSH_HOME_PATH' is not writable — the live seed bind must be rw" \

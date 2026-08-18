@@ -39,7 +39,7 @@ caged/
 │   ├── dsh-ensure-workspace.mjs # best-effort: register /workspace as Web default
 │   ├── build-caged-base.sh    # shared base image build (built first automatically)
 │   ├── build-container.sh     # Apple `container` build — run with argument `dsh`
-│   └── dsh-start-container.sh # Apple `container` run: web UI on host loopback
+│   └── start-container.sh       # Apple `container` run: use mode `dsh`
 └── seed/.dsh/           # LIVE $DSH_HOME bind source — ships our home-level
                          # cordis.patch.yml; dsh generates profiles/settings/
                          # creds/storages here on first run. Session logs do
@@ -58,7 +58,7 @@ no compose support anyway. Build and run with the scripts:
 # then the dsh image with build-arg DSH_VERSION)
 scripts/build-container.sh dsh
 # run the web UI; opens on the host loopback
-DSH_HOST_PORT=8080 scripts/dsh-start-container.sh
+DSH_HOST_PORT=8080 scripts/start-container.sh dsh
 open http://127.0.0.1:3080
 ```
 
@@ -98,7 +98,7 @@ in `seed/.dsh/.gitignore`, and `$DSH_HOME` is the live bind of `seed/.dsh`):
 the Web UI (Settings → Models → card → key field); dsh stores it in
 `seed/.dsh/.credentials.yaml` and resolves it per request — no restart, no
 operator env needed. An operator-injected env var of the same name (e.g. via
-`scripts/dsh-start-container.sh`) shadows the stored value and renders the
+`scripts/start-container.sh dsh`) shadows the stored value and renders the
 field read-only. The `llm-pi-ai` adapter is dormant-capable: removing the
 section empties the route set while the full pi-ai catalog stays configurable
 from the Models page.
@@ -120,7 +120,7 @@ mode via the purpose-built env knob:
 DSH_PERMISSION_MODE=danger-full-access   # default here
 ```
 
-Set by `scripts/dsh-start-container.sh`; it makes the base bundle set
+Set by `scripts/start-container.sh dsh`; it makes the base bundle set
 `sandbox/mode: danger-full-access` (bash/fs operations run as uid 1000 with no
 dsh-level file confinement) and `approval/policy: never` (no interactive
 approval prompts). The agent effectively has the full rights of the `pi` user
@@ -129,7 +129,7 @@ you want dsh's own sandbox + approval back.
 
 ### One-shot headless (no server, prints the answer and exits)
 
-Run with the `container` tool directly, mirroring `scripts/dsh-start-container.sh` but
+Run with the `container` tool directly, mirroring `scripts/start-container.sh dsh` but
 adding `dsh --profile headless "…"` as the command:
 
 ```sh
@@ -146,7 +146,7 @@ container run --rm \
   dsh:latest dsh --profile headless "explain this repo and exit"
 ```
 
-`scripts/dsh-start-container.sh` starts the Web UI. It publishes
+`scripts/start-container.sh dsh` starts the Web UI. It publishes
 `127.0.0.1:${DSH_HOST_PORT} -> 3080` via `container run -p` (host
 **loopback**, not the LAN), reaching the webserver (which binds `0.0.0.0:3080`
 inside the container via `cordis.patch.yml`). The container port is a stable
@@ -176,7 +176,7 @@ host browser :${DSH_HOST_PORT}  (host loopback)  --publish-->  container 0.0.0.0
 | `DSH_HOST_PORT` | `3080` | the host-loopback port you open in the browser (only this varies) |
 | container port | `3080` | fixed; pinned in `seed/.dsh/cordis.patch.yml` and dsh's default |
 
-Override only the host side, e.g. `DSH_HOST_PORT=8080 scripts/dsh-start-container.sh`.
+Override only the host side, e.g. `DSH_HOST_PORT=8080 scripts/start-container.sh dsh`.
 No `--host 0.0.0.0` flag is passed anywhere — the CLI's RCE guard is preserved;
 we only set the runtime config to bind inside the container, and the host publish
 stays loopback-only.
@@ -224,7 +224,7 @@ of `seed/.dsh`, so:
 ## Known gotchas / untested on this host
 
 - **Ctrl+C needs a TTY to stop cleanly (upstream signal-forwarding bug).**
-  `scripts/dsh-start-container.sh` passes `-it` not because dsh is a TUI but
+  `scripts/start-container.sh dsh` passes `-it` not because dsh is a TUI but
   as a workaround: without a TTY, Apple `container`'s foreground CLI forwards
   Ctrl+C (SIGINT) to the guest via XPC in a form its own API service can't
   decode — every press prints `failed to send signal: ... "missing signal in
