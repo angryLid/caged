@@ -81,7 +81,9 @@ routed to `/workspace/.dsh/sessions` natively via `seed/.dsh/cordis.patch.yml`
 (no extra session volume mount needed). pi does the same for its sessions:
 `seed/.pi/agent/settings.json` sets `sessionDir` to `/workspace/.pi/sessions`,
 so they land in `$CAGED_WORKSPACE/.pi/sessions` through the `/workspace` bind
-— no dedicated mount there either. That is a workaround:
+— no dedicated mount there either. Web UI mode also passes
+`PI_CODING_AGENT_SESSION_DIR=/workspace/.pi/sessions` explicitly because its
+embedded pi SDK does not necessarily use the seed settings file. That is a workaround:
 without a TTY, the tool's foreground signal path is broken upstream — the CLI
 XPCs SIGINT into the guest with a signal field the API service reads as a
 different type, so every Ctrl+C prints `failed to send signal: ... "missing

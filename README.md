@@ -383,7 +383,10 @@ TUI run:
   `http://127.0.0.1:8787` and stays off the LAN.
 * Chat history is per-project: `PI_WEB_DATA_DIR=/workspace/.pi-web`
   (= `$CAGED_WORKSPACE/.pi-web` on the host), the same pattern as sessions.
-  Gitignore `.pi-web/` in your workspace repo.
+  Gitignore `.pi-web/` in your workspace repo. The launcher also passes
+  `PI_CODING_AGENT_SESSION_DIR=/workspace/.pi/sessions` explicitly, so the
+  Web UI's embedded pi SDK uses the same session directory as the TUI rather
+  than falling back to `/agent-home/.pi/agent/sessions`.
 * Memory defaults to 4 GB (`PI_WEBUI_MEMORY`): the web mode keeps agents
   running in-process and conversations alive in the background.
 

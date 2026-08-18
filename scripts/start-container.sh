@@ -111,6 +111,9 @@ RUN_ARGS=(
   -v "$WORKSPACE_HOST:/workspace:rw"
   -v "$AGENT_HOME_HOST:/agent-home:rw"
   -e HOME=/agent-home -e LANG=C.UTF-8
+  # Keep pi and pi-web-ui on the same per-workspace pi session directory.
+  # The explicit override also wins over SDK defaults used by webui.
+  -e PI_CODING_AGENT_SESSION_DIR="${PI_CODING_AGENT_SESSION_DIR:-/workspace/.pi/sessions}"
   -e GLAB_SEND_TELEMETRY=false
   -e GLAB_CONFIG_DIR=/agent-home/cli-auth/glab
   -e ACLI_CONFIG_DIR=/agent-home/cli-auth/acli
