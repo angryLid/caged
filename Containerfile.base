@@ -5,7 +5,7 @@
 # Everything the two agent images have in common lives here, so the slow,
 # rarely-changing layers are built and cached ONCE:
 #   * minimal runtime essentials (git, ca-certificates, curl, tini)
-#   * the pinned project CLIs (glab, acli) — both agents' tools use them
+#   * the pinned project CLIs (glab, gh, acli) — both agents' tools use them
 #   * the non-root `agent` runtime user (uid 1000) + the persistent dirs
 #     (/agent-home, /workspace)
 #
@@ -53,6 +53,28 @@ RUN set -eux; \
     && install -m 0755 /tmp/glab/bin/glab /usr/local/bin/glab \
     && rm -rf /tmp/glab /tmp/glab.tar.gz \
     && glab version
+
+# gh — official GitHub CLI (https://github.com/cli/cli).
+# Single static Go binary: pinned version + sha256 verified against the
+# official per-release gh_<ver>_checksums.txt. TARGETARCH comes from BuildKit
+# and both amd64/arm64 linux assets exist, so the same Dockerfile builds for
+# either.
+ARG GH_VERSION=2.97.0
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) sha=a2c9b8497e1f85b1ad0dfcb78b5a622e098801b8e461e459e88e1ee12f018112;; \
+      arm64) sha=73ea440ecad9c9e284429997ee6f93577bc6f7bc6fba357ef62c53ad8fb641a5;; \
+      *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    curl -fsSL -o /tmp/gh.tar.gz \
+      "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    echo "${sha}  /tmp/gh.tar.gz" | sha256sum -c -; \
+    mkdir -p /tmp/gh \
+    && tar -xzf /tmp/gh.tar.gz -C /tmp/gh \
+    && install -m 0755 /tmp/gh/gh_${GH_VERSION}_linux_${TARGETARCH}/bin/gh /usr/local/bin/gh \
+    && rm -rf /tmp/gh /tmp/gh.tar.gz \
+    && gh version
 
 # acli — official Atlassian Command Line Interface (Jira Cloud, Confluence,
 # Bitbucket, admin APIs; https://developer.atlassian.com/cloud/acli/).

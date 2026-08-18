@@ -30,6 +30,9 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness).
 * **GitLab CLI (`glab` v1.112.0)** — official GitLab CLI baked into the
   image: MRs, issues, pipelines, releases. Authenticate once with
   `GITLAB_TOKEN` (env var), nothing stored in the repo.
+* **GitHub CLI (`gh` v2.97.0)** — official GitHub CLI baked into the
+  image: PRs, issues, releases, Actions workflows. Authenticate once with
+  `GH_TOKEN` (env var) or a persisted `gh auth login`.
 * **Atlassian CLI (`acli` v1.3.22)** — official Atlassian CLI baked in:
   **Jira Cloud** work items, projects, admin APIs (also Confluence &
   Bitbucket). API-token login; state survives restarts.
@@ -58,7 +61,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness).
 ```
 caged/
 ├── Containerfile        # pi image (non-root, pinned pi version)
-├── Containerfile.base   # shared base for both images: apt essentials (including python3), glab, acli, non-root user
+├── Containerfile.base   # shared base for both images: apt essentials (including python3), glab, gh, acli, non-root user
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
 ├── seed/                # agent homes — LIVE bind-mount sources
@@ -76,7 +79,7 @@ caged/
 ├── README.md             # this file — docs for both images (pi by default, dsh as sibling)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
-    ├── CLI-AUTH.md           # glab/acli auth behavior, persistence & risks
+    ├── CLI-AUTH.md           # glab/gh/acli auth behavior, persistence & risks
     └── APPLE-CONTAINER.md    # running via Apple's container tool
 
 > `scripts/skills-sync.mjs` is also baked into the image (see `Containerfile`)
@@ -147,7 +150,7 @@ tool on Apple silicon (Linux containers as lightweight VMs).
 ```sh
 # 1. build (only needed the first time, or when the images change). The
 #    shared base image (Containerfile.base: apt essentials including python3,
-#    glab, acli, non-root user) is built automatically first. Optionally pick a pi
+#    glab, gh, acli, non-root user) is built automatically first. Optionally pick a pi
 #    version:   PI_VERSION=x.y.z scripts/build-container.sh pi
 scripts/build-container.sh pi
 
@@ -312,6 +315,39 @@ Two ways to authenticate:
   stored as plaintext (`0600`, gitignored) — the trade-offs are analysed in
   [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
+## gh (GitHub CLI)
+
+[`gh`](https://cli.github.com/) — the official GitHub CLI — is baked into the
+shared base image (v2.97.0, pinned `ARG GH_VERSION` in
+`Containerfile.base`, sha256-verified against the official per-release
+checksums); both the pi and the dsh image inherit it. Use it for PRs, issues,
+releases, and Actions workflows instead of hand-rolled curl against the
+GitHub API.
+
+Two ways to authenticate (mirroring `glab`):
+
+* **Env token (primary, for automated runs).** Pass `GH_TOKEN` (+ `GH_HOST`
+  for a GitHub Enterprise host) when starting; it takes precedence over
+  stored credentials and never touches disk:
+
+  ```sh
+  GH_TOKEN=github_pat_... scripts/start-container.sh
+  # then run  gh pr list  inside the pi TUI
+  ```
+
+* **Persisted login (interactive).** `GH_CONFIG_DIR` points at
+  `/agent-home/cli-auth/gh` on the live shared `/agent-home` mount, so
+  `gh auth login` state survives container restarts (gitignored, like
+  `glab`/`acli` and `auth.json`):
+
+  ```sh
+  GH_TOKEN=github_pat_... scripts/start-container.sh
+  # then run  gh auth login --with-token  inside the TUI
+  ```
+
+  The token is stored as plaintext (`0600`, gitignored) — the trade-offs are
+  analysed alongside `glab`/`acli` in [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
+
 ## acli (Atlassian CLI)
 
 [`acli`](https://developer.atlassian.com/cloud/acli/) — Atlassian's official
@@ -421,7 +457,7 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 > `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.0-rc.6`) so a
 > release bump is explicit. dsh builds on the repo's shared base image
 > `Containerfile.base` (built automatically by the build script), which
-> provides apt essentials including `python3`, the glab/acli CLIs and the
+> provides apt essentials including `python3`, the glab/gh/acli CLIs and the
 > non-root user — the same CLI tooling pi ships.
 
 ### What it is / isn't
@@ -662,6 +698,7 @@ listed.
 | `CAGED_BASE_IMAGE` | `caged-base:latest` | shared base image tag — built first by `build-caged-base.sh`, imported via FROM in both Containerfiles |
 | `CAGED_SKIP_BASE` | `0` | set to `1` to skip the automatic base rebuild when building a derived image |
 | `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |
+| `GH_VERSION` | `2.97.0` | gh version pin (build time, `build-caged-base.sh`) |
 | `ACLI_VERSION` | `1.3.22` | acli version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
 | `PI_WEB_UI_VERSION` | `0.26.0` | pi-web-ui version pin (build time, `build-container.sh webui`) |
@@ -676,6 +713,8 @@ listed.
 | `LOCAL_API_KEY` | *(unset)* | Local LLM provider key (passed into container) |
 | `GITLAB_TOKEN` | *(unset)* | `glab` (GitLab CLI) API token (passed into container) |
 | `GITLAB_HOST` | *(unset)* | `glab` GitLab instance host (default `https://gitlab.com`) |
+| `GH_TOKEN` | *(unset)* | `gh` (GitHub CLI) API token (passed into container) |
+| `GH_HOST` | *(unset)* | `gh` GitHub Enterprise host (default `github.com`) |
 
 > dsh's dedicated knobs — `DSH_IMAGE`, `DSH_VERSION`, `DSH_HOST_PORT`,
 > `DSH_MEMORY`, `DSH_PERMISSION_MODE` — are documented in the

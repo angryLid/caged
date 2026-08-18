@@ -41,11 +41,12 @@ the host filesystem beyond the mount, or persist on the host.
    need them, you are expanding the blast radius — add them explicitly and
    document why.
 
-4. **GitLab CLI token at rest in the live seed.** `glab auth login` persists
-   a plaintext token to `seed/cli-auth/glab/config.yml` (gitignored,
-   `0600`) so interactive auth survives container restarts — see
-   [CLI-AUTH.md](CLI-AUTH.md) for the full risk analysis. `glab`
-   still prefers `GITLAB_TOKEN` from the env when it is set.
+4. **CLI tokens at rest in the live seed.** `glab auth login`, `gh auth
+   login`, and `acli jira auth login` persist plaintext tokens to
+   `seed/cli-auth/{glab,gh,acli}/` (gitignored, `0600`) so interactive auth
+   survives container restarts — see [CLI-AUTH.md](CLI-AUTH.md) for the full
+   risk analysis. `glab` and `gh` still prefer `GITLAB_TOKEN` / `GH_TOKEN`
+   from the env when set; acli has no env path.
 
 ## pi-web-ui (Web UI) mode
 

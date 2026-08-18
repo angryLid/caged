@@ -117,7 +117,9 @@ RUN_ARGS=(
   -e GLAB_SEND_TELEMETRY=false
   -e GLAB_CONFIG_DIR=/agent-home/cli-auth/glab
   -e ACLI_CONFIG_DIR=/agent-home/cli-auth/acli
+  -e GH_CONFIG_DIR=/agent-home/cli-auth/gh
   -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" -e GITLAB_HOST="${GITLAB_HOST:-}"
+  -e GH_TOKEN="${GH_TOKEN:-}"
   -e JIRA_API_TOKEN="${JIRA_API_TOKEN:-}"
   -e XDG_CONFIG_HOME=/tmp/.config -e npm_config_cache=/tmp/.npm
   -e XDG_CACHE_HOME=/tmp/.cache

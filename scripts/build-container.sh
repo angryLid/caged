@@ -62,7 +62,7 @@ webui)
 esac
 
 # Shared base image (Containerfile.base): apt essentials including python3,
-# glab, acli, non-root user. Override the tag with CAGED_BASE_IMAGE (must exist or be built); skip
+# glab, gh, acli, non-root user. Override the tag with CAGED_BASE_IMAGE (must exist or be built); skip
 # the automatic base rebuild with CAGED_SKIP_BASE=1 (e.g. when using a
 # prebuilt/pre-pushed base).
 CAGED_BASE_IMAGE="${CAGED_BASE_IMAGE:-caged-base:latest}"
