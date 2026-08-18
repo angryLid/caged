@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # scripts/build-caged-base.sh — build the shared caged-base image
-# (./Containerfile.base: apt essentials, glab, acli, non-root user).
+# (./Containerfile.base: apt essentials including python3, glab, acli,
+# non-root user).
 #
 # Called automatically by scripts/build-container.sh (run with the argument
 # `pi` or `dsh`) before it builds the derived image;

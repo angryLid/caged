@@ -25,11 +25,12 @@ FROM ${NODE_IMAGE}
 #   git          - pi/dsh agents manage repos / commits on user code
 #   ca-certificates - TLS for npm/model provider calls
 #   curl         - net debugging / provider curl use
+#   python3      - common scripting tool and node-gyp's Python runtime
 #   tini         - proper PID 1 for Node (zombie reaping of bash subprocesses)
 # (dsh adds a node-gyp toolchain on top of this in Containerfile.dsh.)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        git ca-certificates curl tini \
+        git ca-certificates curl python3 tini \
     && rm -rf /var/lib/apt/lists/*
 
 # glab — official GitLab CLI (https://gitlab.com/gitlab-org/cli).

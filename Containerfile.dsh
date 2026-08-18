@@ -32,15 +32,16 @@ ARG CAGED_BASE_IMAGE=caged-base:latest
 
 FROM ${CAGED_BASE_IMAGE}
 
-# node-gyp toolchain, dsh-specific: dsh's terminal dep node-pty@1.1.0 ships
+# C++ build toolchain, dsh-specific: dsh's terminal dep node-pty@1.1.0 ships
 # NO Linux prebuilds (only darwin-*/win32-*); on Linux its install always
-# does `node-gyp rebuild`, which needs Python + a C++ compiler. This layer
-# is cached, so the toolchain does not churn on dsh version bumps.
+# does `node-gyp rebuild`, which needs Python (provided by the shared base)
+# and a C++ compiler. This layer is cached, so the compiler does not churn
+# on dsh version bumps.
 # (node-addon-require-builtin ships prebuilt linux-* binaries, so node-pty
 # is the only package that must compile.)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        python3 build-essential \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # dsh's `$DSH_HOME` dir on the persistent volume (the base only creates

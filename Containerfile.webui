@@ -31,13 +31,14 @@ FROM ${CAGED_IMAGE}
 # npm must install the global package into the image's system prefix.
 USER root
 
-# node-gyp toolchain, webui-specific: node-pty@1.1.0 ships no Linux
+# C++ build toolchain, webui-specific: node-pty@1.1.0 ships no Linux
 # prebuilds (only darwin-*/win32-*), so its install script always falls back
-# to `node-gyp rebuild`, which needs Python + a C++ compiler. This layer is
-# cached, so it does not churn on PI_WEB_UI_VERSION bumps.
+# to `node-gyp rebuild`, which needs Python (provided by the shared base) and
+# a C++ compiler. This layer is cached, so it does not churn on
+# PI_WEB_UI_VERSION bumps.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        python3 build-essential \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # pi-web-ui (pinned) — web chat UI running the pi SDK in-process. Installed

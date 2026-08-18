@@ -58,7 +58,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness).
 ```
 caged/
 ├── Containerfile        # pi image (non-root, pinned pi version)
-├── Containerfile.base   # shared base for both images: apt essentials, glab, acli, non-root user
+├── Containerfile.base   # shared base for both images: apt essentials (including python3), glab, acli, non-root user
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
 ├── seed/                # agent homes — LIVE bind-mount sources
@@ -146,8 +146,8 @@ tool on Apple silicon (Linux containers as lightweight VMs).
 
 ```sh
 # 1. build (only needed the first time, or when the images change). The
-#    shared base image (Containerfile.base: apt essentials, glab, acli,
-#    non-root user) is built automatically first. Optionally pick a pi
+#    shared base image (Containerfile.base: apt essentials including python3,
+#    glab, acli, non-root user) is built automatically first. Optionally pick a pi
 #    version:   PI_VERSION=x.y.z scripts/build-container.sh pi
 scripts/build-container.sh pi
 
@@ -357,9 +357,10 @@ scripts/build-container.sh webui        # builds base -> pi -> webui (caged-webu
 ```
 
 `Containerfile.webui` is a thin layer `FROM caged:latest`: it adds only the
-node-pty build toolchain (`python3` + `build-essential` — `node-pty` ships
-no Linux prebuilds, so it must `node-gyp rebuild` at install time) and the
-pinned `pi-web-ui`, then changes the CMD. The entrypoint, the build-time
+node-pty C++ build toolchain (`build-essential`; `python3` is already in the
+shared base as a common scripting runtime — node-pty ships no Linux prebuilds,
+so it must `node-gyp rebuild` at install time) and the pinned `pi-web-ui`,
+then changes the CMD. The entrypoint, the build-time
 skill vendor and the chrome-devtools MCP are inherited unchanged. Rollback
 is trivial: stop using it, the pi TUI image is untouched.
 
@@ -418,8 +419,8 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 > `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.0-rc.6`) so a
 > release bump is explicit. dsh builds on the repo's shared base image
 > `Containerfile.base` (built automatically by the build script), which
-> provides apt essentials, the glab/acli CLIs and the non-root user — the
-> same CLI tooling pi ships.
+> provides apt essentials including `python3`, the glab/acli CLIs and the
+> non-root user — the same CLI tooling pi ships.
 
 ### What it is / isn't
 
@@ -637,8 +638,8 @@ of `seed/.dsh`, so:
 - **node-pty must compile on Linux.** dsh's terminal dep `node-pty@1.1.0`
   ships no Linux prebuilds (only darwin/win32), so on Linux its install always
   runs `node-gyp rebuild`. The image therefore installs a C++ toolchain
-  (`python3 build-essential`) in the cached base layer. First build is slow;
-  subsequent ones are cached.
+  (`python3` in the shared base and `build-essential` in the cached dsh
+  layer). First build is slow; subsequent ones are cached.
 
 - First build needs enough memory for npm's dependency resolution (the whole
   `@deepseek-ai/dsh` tree is large). On a memory-constrained builder, raise it
