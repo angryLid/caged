@@ -10,9 +10,8 @@ FROM ${NODE_IMAGE}
 # Runtime and native-build packages: git (version control), ca-certificates (TLS), curl (HTTP), python3 (scripting/node-gyp), jq (JSON), tini (PID 1), and build-essential (native npm modules).
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 jq tini build-essential && rm -rf /var/lib/apt/lists/*
 
-# Keep the conventional `python` command available in interactive Bash shells.
-RUN printf '%s\n' 'alias python=python3' > /etc/profile.d/python-alias.sh \
-    && printf '%s\n' 'alias python=python3' >> /etc/bash.bashrc
+# Keep the conventional `python` command available in all shells and scripts.
+RUN ln -s /usr/bin/python3 /usr/local/bin/python
 
 # glab — official GitLab CLI, pinned and sha256-verified.
 ARG GLAB_VERSION=1.112.0
