@@ -1,31 +1,33 @@
 #!/usr/bin/env bash
 # Run one of caged's agent images with the native Apple container tool.
-# Usage: start-container.sh [pi|webui|dsh] [command arguments...]
+# Usage: start-container.sh [pi|webui|dsh|cmdc] [command arguments...]
 
 set -euo pipefail
 
 MODE="${1:-pi}"
 if [ "$#" -gt 0 ]; then shift; fi
 case "$MODE" in
-  pi|webui|dsh) ;;
+  pi|webui|dsh|cmdc) ;;
   --help|-h)
     cat >&2 <<'EOF'
-Usage: start-container.sh [pi|webui|dsh] [command arguments...]
+Usage: start-container.sh [pi|webui|dsh|cmdc] [command arguments...]
 
 Modes:
-  pi       Interactive pi TUI (default)
-  webui    pi-web-ui on http://127.0.0.1:${PI_WEBUI_HOST_PORT:-8787}
-  dsh      DeepSeek Harness on http://127.0.0.1:${DSH_HOST_PORT:-3080}
+  pi         Interactive pi TUI (default)
+  webui      pi-web-ui on http://127.0.0.1:${PI_WEBUI_HOST_PORT:-8787}
+  dsh        DeepSeek Harness on http://127.0.0.1:${DSH_HOST_PORT:-3080}
+  cmdc       Interactive Command Code CLI
 
 The remaining arguments replace the image's default command. Examples:
   start-container.sh
   start-container.sh webui
   start-container.sh dsh
+  start-container.sh cmdc
   start-container.sh pi --continue
 EOF
     exit 0
     ;;
-  *) echo "Error: unknown mode '$MODE' (expected pi, webui, or dsh)." >&2; exit 2 ;;
+  *) echo "Error: unknown mode '$MODE' (expected pi, webui, dsh, or cmdc)." >&2; exit 2 ;;
 esac
 
 CURRENT_PWD="$PWD"
@@ -69,6 +71,14 @@ case "$MODE" in
     fi
     mkdir -p "$DSH_HOME_HOST"
     ;;
+  cmdc)
+    IMAGE_TAG="${COMMANDCODE_IMAGE:-commandcode:latest}"
+    CONTAINER_NAME="${CONTAINER_NAME:-caged-commandcode}"
+    MEMORY="${COMMANDCODE_MEMORY:-4g}"
+    PORT=""
+    COMMANDCODE_HOME_HOST="$AGENT_HOME_HOST/.commandcode"
+    mkdir -p "$COMMANDCODE_HOME_HOST"
+    ;;
 esac
 
 if [ ! -d "$AGENT_HOME_HOST" ]; then
@@ -78,7 +88,7 @@ if [ ! -d "$AGENT_HOME_HOST" ]; then
 fi
 
 # pi and pi-web-ui both use the live pi seed and require its model config.
-if [ "$MODE" != dsh ]; then
+if [ "$MODE" = pi ] || [ "$MODE" = webui ]; then
   if [ ! -f "$AGENT_HOME_HOST/.pi/agent/models.json" ]; then
     echo "Error: required seed file '$AGENT_HOME_HOST/.pi/agent/models.json' not found." >&2
     echo "Ensure CAGED_AGENT_HOME points to <caged>/seed." >&2
@@ -98,8 +108,18 @@ if [ "$MODE" = dsh ]; then
 else
   echo "==> Workspace: $WORKSPACE_HOST"
   echo "==> Agent home: $AGENT_HOME_HOST"
-  echo "==> Pi config:  $AGENT_HOME_HOST/.pi"
-  [ "$MODE" = webui ] && echo "==> Starting pi-web-ui at http://127.0.0.1:$PORT" || echo "==> Starting pi TUI"
+  if [ "$MODE" = cmdc ]; then
+    echo "==> Command Code state: $AGENT_HOME_HOST/.commandcode"
+  else
+    echo "==> Pi config:  $AGENT_HOME_HOST/.pi"
+  fi
+  if [ "$MODE" = webui ]; then
+    echo "==> Starting pi-web-ui at http://127.0.0.1:$PORT"
+  elif [ "$MODE" = cmdc ]; then
+    echo "==> Starting Command Code CLI"
+  else
+    echo "==> Starting pi TUI"
+  fi
 fi
 
 # --rm normally handles cleanup; rm also covers a previous interrupted run.
@@ -145,6 +165,13 @@ elif [ "$MODE" = webui ]; then
     -e PI_WEB_DATA_DIR=/workspace/.pi-web
   )
   DEFAULT_CMD=(pi-web-ui --no-browser)
+elif [ "$MODE" = cmdc ]; then
+  RUN_ARGS+=(
+    -e COMMANDCODE_HOME=/agent-home/.commandcode
+    -e COMMAND_CODE_HOME=/agent-home/.commandcode
+    -e TERM="${TERM:-xterm-256color}"
+  )
+  DEFAULT_CMD=(cmd)
 else
   RUN_ARGS+=(
     -e TERM="${TERM:-xterm-256color}" -e PI_CODING_AGENT_DIR=/agent-home/.pi/agent
@@ -162,7 +189,7 @@ RUN_ARGS+=(
   -e CDP_HOST=192.168.64.1
 )
 
-if [ "$MODE" != dsh ]; then
+if [ "$MODE" = pi ] || [ "$MODE" = webui ]; then
   RUN_ARGS+=(
     -e TERM="${TERM:-xterm-256color}"
   )

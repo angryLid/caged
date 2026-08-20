@@ -6,6 +6,7 @@
 #   scripts/build-container.sh pi     # the pi agent image (./Containerfile)
 #   scripts/build-container.sh dsh    # the DeepSeek Harness image (./Containerfile.dsh)
 #   scripts/build-container.sh webui  # the pi-web-ui Web UI image (./Containerfile.webui)
+#   scripts/build-container.sh cmdc # the Command Code image (./Containerfile.commandcode)
 #
 # The image is a REQUIRED argument — there is no default, a build without
 # one (or with an unknown image) fails before doing anything.
@@ -20,6 +21,7 @@
 #   pi:    CAGED_IMAGE (caged:latest),      PI_VERSION (0.84.2)
 #   dsh:   DSH_IMAGE (dsh:latest),          DSH_VERSION (0.1.0-rc.6)
 #   webui: CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (0.26.0)
+#   cmdc: COMMANDCODE_IMAGE (commandcode:latest), COMMAND_CODE_VERSION (latest)
 # Shared: CAGED_BASE_IMAGE (caged-base:latest), CAGED_SKIP_BASE (0)
 
 set -euo pipefail
@@ -30,8 +32,8 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # --- Image selection: required argument, no default ----------------------
 if [ "$#" -ne 1 ]; then
-    echo "Error: no image specified — pass 'pi', 'dsh' or 'webui'." >&2
-    echo "Usage: $0 pi|dsh|webui" >&2
+    echo "Error: no image specified — pass 'pi', 'dsh', 'webui' or 'cmdc'." >&2
+    echo "Usage: $0 pi|dsh|webui|cmdc" >&2
     exit 2
 fi
 
@@ -54,9 +56,15 @@ webui)
     VERSION_ARG="PI_WEB_UI_VERSION"
     VERSION_VALUE="${PI_WEB_UI_VERSION:-0.26.0}"
     ;;
+cmdc)
+    CONTAINERFILE="Containerfile.commandcode"
+    IMAGE_TAG="${COMMANDCODE_IMAGE:-commandcode:latest}"
+    VERSION_ARG="COMMAND_CODE_VERSION"
+    VERSION_VALUE="${COMMAND_CODE_VERSION:-latest}"
+    ;;
 *)
-    echo "Error: unknown image '${1}' — expected 'pi', 'dsh' or 'webui'." >&2
-    echo "Usage: $0 pi|dsh|webui" >&2
+    echo "Error: unknown image '${1}' — expected 'pi', 'dsh', 'webui' or 'cmdc'." >&2
+    echo "Usage: $0 pi|dsh|webui|cmdc" >&2
     exit 2
     ;;
 esac
@@ -102,6 +110,9 @@ container build \
 
 echo "==> Build complete: ${IMAGE_TAG}"
 case "${1}" in
+cmdc)
+    echo "==> Start it with: ${SCRIPT_DIR}/start-container.sh cmdc"
+    ;;
 dsh)
     echo "==> Start it with: ${SCRIPT_DIR}/start-container.sh dsh"
     ;;

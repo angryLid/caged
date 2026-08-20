@@ -21,6 +21,10 @@ node_modules/
 # dsh session data (mounted from $WORKSPACE/.dsh/sessions)
 .dsh/sessions/
 
+# Command Code project taste profile and runtime state
+.commandcode/
+seed/.commandcode/
+
 # Runtime state pi writes back into the live $HOME bind mount
 seed/.pi/agent/auth.json
 seed/.pi/agent/sessions/
@@ -60,3 +64,4 @@ seed/.dsh/.env
 seed/.dsh/.anonymous-user-id
 seed/.dsh/sessions/
 seed/.dsh/storages/
+seed/.commandcode/

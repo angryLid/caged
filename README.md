@@ -11,11 +11,11 @@ gap: a minimal Linux container where the agent works as a **non-root user on
 a read-only filesystem**, with no capabilities and no extra privileges, so it
 can only ever touch the workspace you explicitly hand it.
 
-The same posture extends to a **sibling image for
+The same posture extends to **sibling images for
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
-(`@deepseek-ai/dsh`)** — a second agent with the same hardening and live-seed
+(`@deepseek-ai/dsh`) and [Command Code](https://commandcode.ai/) (`command-code`) — sibling agents with the same hardening and live-seed
 philosophy, running dsh's browser Web UI (or one-shot headless mode) instead
-of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness).
+of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Code](#command-code).
 
 > **What caged is**: a minimal, locked-down runtime for an AI coding agent that
 > can execute arbitrary bash commands. Non-root user, read-only rootfs,
@@ -49,6 +49,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness).
   separate additive image (`scripts/build-container.sh webui` +
   `scripts/start-container.sh webui`) — see
   [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
+* **Command Code image (optional)** — `cmdc`, a sibling container for [Command Code](https://commandcode.ai/), which requires Node.js 22+ and stores its login/state under `seed/.commandcode/`.
 * **DeepSeek Harness (`dsh`) image (optional)** — a sibling container for
   [`@deepseek-ai/dsh`](https://github.com/deepseek-ai/deepseek-harness): the
   same hardening for dsh's browser Web UI and one-shot headless mode — see
@@ -160,10 +161,11 @@ cd /path/to/your/repo
 /path/to/caged/scripts/start-container.sh              # pi TUI
 /path/to/caged/scripts/start-container.sh webui       # pi Web UI
 /path/to/caged/scripts/start-container.sh dsh         # dsh Web UI
+/path/to/caged/scripts/start-container.sh cmdc # Command Code CLI
 /path/to/caged/scripts/start-container.sh pi --continue # pass command args
 ```
 
-`start-container.sh` mounts the **directory you run it from** as `/workspace`. Its first argument selects the runtime (`pi`, `webui`, or `dsh`, defaulting to `pi`); remaining arguments replace the image's default command.
+`start-container.sh` mounts the **directory you run it from** as `/workspace`. Its first argument selects the runtime (`pi`, `webui`, `dsh`, or `cmdc`, defaulting to `pi`); remaining arguments replace the image's default command.
 
 > **Why scripts, not compose?** caged runs a *single* disposable container — the
 > container's only job is isolation, so a compose/multi-container stack would add

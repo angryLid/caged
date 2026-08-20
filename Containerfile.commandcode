@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+
+# caged — hardened container for Command Code.
+# Command Code requires Node.js 22 or newer; the shared base uses Node 24.
+# Authentication and Command Code state stay in the live seed mount at
+# /agent-home/.commandcode, while project files remain in /workspace.
+
+ARG CAGED_BASE_IMAGE=caged-base:latest
+
+FROM ${CAGED_BASE_IMAGE}
+
+ARG COMMAND_CODE_VERSION=latest
+RUN npm install -g command-code@${COMMAND_CODE_VERSION} && cmd --version
+
+RUN mkdir -p /agent-home/.commandcode /agent-home/cli-auth/glab /agent-home/cli-auth/acli \
+    && chown -R agent:agent /agent-home
+
+COPY scripts/commandcode-entrypoint.sh /usr/local/bin/commandcode-entrypoint
+RUN chmod +x /usr/local/bin/commandcode-entrypoint
+
+USER agent
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/local/bin/commandcode-entrypoint"]
+CMD ["cmd"]
