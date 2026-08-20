@@ -7,11 +7,9 @@
 # chrome-devtools MCP, the build-time skill vendor, the caged entrypoint)
 # and only adds what a web server needs on top:
 #
-#   * a node-gyp toolchain — pi-web-ui's terminal feature depends on
-#     node-pty@1.1.0, which ships NO Linux prebuilds (darwin/win32 only), so
-#     on Linux its install always runs `node-gyp rebuild` (python3 + a C++
-#     compiler). Same trade-off as the dsh image (Containerfile.dsh).
-#   * the pi-web-ui npm package, pinned.
+#   * the pi-web-ui npm package, pinned. The shared base provides the
+#     node-gyp toolchain needed by its node-pty dependency (which ships no
+#     Linux prebuilds).
 #   * a different CMD — the entrypoint (fail-fast seed validation + skills
 #     sync + tini) is inherited unchanged and just execs pi-web-ui.
 #
@@ -30,16 +28,6 @@ FROM ${CAGED_IMAGE}
 # package installation; apt needs to create /var/lib/apt/lists/partial and
 # npm must install the global package into the image's system prefix.
 USER root
-
-# C++ build toolchain, webui-specific: node-pty@1.1.0 ships no Linux
-# prebuilds (only darwin-*/win32-*), so its install script always falls back
-# to `node-gyp rebuild`, which needs Python (provided by the shared base) and
-# a C++ compiler. This layer is cached, so it does not churn on
-# PI_WEB_UI_VERSION bumps.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-    && rm -rf /var/lib/apt/lists/*
 
 # pi-web-ui (pinned) — web chat UI running the pi SDK in-process. Installed
 # INTO the image at build time (the runtime rootfs is read-only). The pi SDK

@@ -391,11 +391,10 @@ web toolchain:
 scripts/build-container.sh webui        # builds base -> pi -> webui (caged-webui:latest)
 ```
 
-`Containerfile.webui` is a thin layer `FROM caged:latest`: it adds only the
-node-pty C++ build toolchain (`build-essential`; `python3` is already in the
-shared base as a common scripting runtime — node-pty ships no Linux prebuilds,
-so it must `node-gyp rebuild` at install time) and the pinned `pi-web-ui`,
-then changes the CMD. The entrypoint, the build-time
+`Containerfile.webui` is a thin layer `FROM caged:latest`: it adds the pinned
+`pi-web-ui` package and changes the CMD. The shared base includes the node-pty
+C++ build toolchain (`build-essential` and `python3`); node-pty ships no Linux
+prebuilds, so it must run `node-gyp rebuild` at install time. The entrypoint, the build-time
 skill vendor and the chrome-devtools MCP are inherited unchanged. Rollback
 is trivial: stop using it, the pi TUI image is untouched.
 
@@ -675,9 +674,9 @@ of `seed/.dsh`, so:
 
 - **node-pty must compile on Linux.** dsh's terminal dep `node-pty@1.1.0`
   ships no Linux prebuilds (only darwin/win32), so on Linux its install always
-  runs `node-gyp rebuild`. The image therefore installs a C++ toolchain
-  (`python3` in the shared base and `build-essential` in the cached dsh
-  layer). First build is slow; subsequent ones are cached.
+  runs `node-gyp rebuild`. The shared base therefore installs the C++ toolchain
+  (`python3` and `build-essential`) for both dsh and webui. First build is
+  slow; subsequent builds reuse the cached base layer.
 
 - First build needs enough memory for npm's dependency resolution (the whole
   `@deepseek-ai/dsh` tree is large). On a memory-constrained builder, raise it

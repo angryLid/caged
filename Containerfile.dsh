@@ -32,18 +32,6 @@ ARG CAGED_BASE_IMAGE=caged-base:latest
 
 FROM ${CAGED_BASE_IMAGE}
 
-# C++ build toolchain, dsh-specific: dsh's terminal dep node-pty@1.1.0 ships
-# NO Linux prebuilds (only darwin-*/win32-*); on Linux its install always
-# does `node-gyp rebuild`, which needs Python (provided by the shared base)
-# and a C++ compiler. This layer is cached, so the compiler does not churn
-# on dsh version bumps.
-# (node-addon-require-builtin ships prebuilt linux-* binaries, so node-pty
-# is the only package that must compile.)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
 # dsh's `$DSH_HOME` dir on the persistent volume (the base only creates
 # /agent-home; the .dsh subdir is dsh-specific).
 RUN mkdir -p /agent-home/.dsh /agent-home/cli-auth/glab /agent-home/cli-auth/acli \
@@ -54,8 +42,8 @@ RUN mkdir -p /agent-home/.dsh /agent-home/cli-auth/glab /agent-home/cli-auth/acl
 # few below it), keeping the base/toolchain layers cached. The published npm
 # set is internally consistent at rc.6 (@deepseek-ai/dsh and all its
 # @deepseek-ai/dsh-* bundle deps are ^0.1.0-rc.6); its native deps (node-pty,
-# node-addon-require-builtin) ship prebuilt linux x64/arm64-gnu binaries, so
-# no build toolchain is required in the image.
+# node-addon-require-builtin) ship prebuilt linux x64/arm64-gnu binaries; the
+# shared base already provides the build toolchain for node-pty.
 ARG DSH_VERSION=0.1.0-rc.6
 RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
 
