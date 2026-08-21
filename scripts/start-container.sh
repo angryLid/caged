@@ -167,8 +167,6 @@ elif [ "$MODE" = webui ]; then
   DEFAULT_CMD=(pi-web-ui --no-browser)
 elif [ "$MODE" = cmdc ]; then
   RUN_ARGS+=(
-    -e COMMANDCODE_HOME=/agent-home/.commandcode
-    -e COMMAND_CODE_HOME=/agent-home/.commandcode
     -e TERM="${TERM:-xterm-256color}"
   )
   DEFAULT_CMD=(cmd)
