@@ -75,25 +75,29 @@ for dir in "$PI_HOME" "$PI_HOME/agent" /agent-home/cli-auth/glab /agent-home/cli
 done
 
 # --- 3. declarative skills install (best-effort) -------------------------
-#
-# pi scans ~/.pi/agent/skills/ for skills. The skill repos are cloned into the
-# IMAGE at build time (see Containerfile) under /opt/caged/skills/vendor; at
-# container start we only copy the enabled skills from there into the seed's
-# skills dir — no network, no git. The config (skills.json) lives in the seed
-# (seed/.pi/agent/skills.json), so it is managed with the rest of the config
-# and never depends on the mounted workspace. Non-fatal — if the config or
-# baked vendor is missing, we log a warning and still launch pi.
-if [ -f "$AGENT_DIR/skills.json" ] && [ -f /opt/caged/skills-sync.mjs ]; then
+# pi scans ~/.pi/agent/skills/ for skills. The skill repos are cloned into
+# the IMAGE at build time (see Containerfile.base) under
+# /opt/caged/skills/vendor; at container start we only copy the enabled
+# skills from there into the seed's skills dirs — no network, no git. The
+# config (seed/skills.json) lives at the seed root and is shared by every
+# agent image (pi, dsh, cmdc); each entrypoint runs the same --link-only
+# install, which copies each enabled skill into every configured target.
+# Non-fatal — if the config or baked vendor is missing, we log a warning and
+# still launch pi.
+if [ -f /agent-home/skills.json ] && [ -f /opt/caged/skills-sync.mjs ]; then
     echo "caged: installing skills (best-effort)..."
     if ! node /opt/caged/skills-sync.mjs \
-            --config "$AGENT_DIR/skills.json" \
-            --seed "$AGENT_DIR" \
+            --config /agent-home/skills.json \
+            --seed /agent-home \
             --vendor /opt/caged/skills/vendor \
+            --target pi \
             --link-only; then
         echo "caged: warning: skills install did not complete (exit $?) — continuing" >&2
     fi
+elif [ -f /opt/caged/skills-sync.mjs ]; then
+    echo "caged: warning: seed/skills.json missing — skipping skills install" >&2
 else
-    echo "caged: warning: skills.json or skills-sync.mjs missing — skipping skills install" >&2
+    echo "caged: warning: skills-sync.mjs missing from image — skipping skills install" >&2
 fi
 
 exec tini -s -- "$@"

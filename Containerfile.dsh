@@ -8,9 +8,10 @@
 # for dsh's browser Web UI instead of pi's TUI. Builds FROM the shared base
 # image ./Containerfile.base (built first by `scripts/build-container.sh dsh`
 # via scripts/build-caged-base.sh), which provides apt essentials, the
-# glab/acli CLIs and the non-root user — so dsh agents get the same CLI
-# tooling as pi for free. Only dsh-specific layers live here. Key
-# differences from pi:
+# glab/acli CLIs, the non-root user — and the build-time skill vendor
+# (/opt/caged/skills/vendor) shared by every agent image — so dsh agents get
+# the same CLI tooling and skills as pi for free. Only dsh-specific layers
+# live here. Key differences from pi:
 #
 #   * dsh is a server: `dsh web` defaults to binding 127.0.0.1:3080 and its
 #     CLI *rejects* `--host 0.0.0.0` ("would expose remote code execution to

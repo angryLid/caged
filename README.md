@@ -62,86 +62,101 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 ```
 caged/
 ├── Containerfile        # pi image (non-root, pinned pi version)
-├── Containerfile.base   # shared base for both images: apt essentials (including python3), glab, gh, acli, non-root user
+├── Containerfile.base   # shared base for all images: apt essentials (including python3), glab, gh, acli, non-root user, skill vendor
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
+├── Containerfile.commandcode # OPTIONAL: Command Code image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
 ├── seed/                # agent homes — LIVE bind-mount sources
 │   ├── .pi/agent/       # pi's ~/.pi: models.json (providers), settings.json,
-│   │                    #   mcp.json, AGENTS.md, skills.json, skills/, scripts/
-│   └── .dsh/            # dsh's $DSH_HOME: cordis.patch.yml + generated config
+│   │                    #   mcp.json, AGENTS.md, skills/, scripts/
+│   ├── .dsh/            # dsh's $DSH_HOME: cordis.patch.yml + generated config, skills/
+│   ├── .commandcode/    # Command Code's HOME state: settings.json (bypass), skills/
+│   ├── skills-src/      # git-tracked local skills (source of truth, shared by all agents)
+│   └── skills.json      # declarative skills config (shared by all agents)
 ├── scripts/
 │   ├── build-caged-base.sh  # shared base image build (Containerfile.base) — built automatically by the one below
-│   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh|webui  (arg required, no default)
-│   ├── start-container.sh   # Apple `container` run: pi|webui|dsh + command args
-│   ├── entrypoint.sh        # pi seed validation (fail-fast) + tini, runs as USER agent
-│   ├── dsh-entrypoint.sh    # dsh seed validation + tini
+│   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh|webui|cmdc  (arg required, no default)
+│   ├── start-container.sh   # Apple `container` run: pi|webui|dsh|cmdc + command args
+│   ├── entrypoint.sh        # pi seed validation (fail-fast) + skills sync + tini, runs as USER agent
+│   ├── dsh-entrypoint.sh    # dsh seed validation + skills sync + tini
+│   ├── commandcode-entrypoint.sh # cmdc: relocate sessions to /workspace + skills sync
 │   ├── dsh-ensure-workspace.mjs # dsh: register /workspace as Web default
 │   └── skills-sync.mjs      # declarative skills sync (see `## Skills (“skills-sync”)`)
 ├── README.md             # this file — docs for both images (pi by default, dsh as sibling)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
     ├── CLI-AUTH.md           # glab/gh/acli auth behavior, persistence & risks
-    └── APPLE-CONTAINER.md    # running via Apple's container tool
+    ├── APPLE-CONTAINER.md    # running via Apple's container tool
+    └── AGENT-INTEGRATION.md  # SOP for adding a new agent image to caged
 
-> `scripts/skills-sync.mjs` is also baked into the image (see `Containerfile`)
-> so the container start can install skills **without** the workspace mounted.
+> `scripts/skills-sync.mjs` is also baked into the base image (see
+> `Containerfile.base`) so every container start can install skills **without**
+> the workspace mounted.
 ```
 
 ## Skills (“skills-sync”)
 
 This project ships a small **declarative** mechanism for pulling in external
-agent skills and enabling a subset of them — see `seed/.pi/agent/skills.json`
-(managed in the seed, alongside the rest of the config). It is tool-agnostic
-(works with any agent that reads skills from a directory).
+agent skills and enabling a subset of them — see `seed/skills.json` (managed
+in the seed, alongside the rest of the config). It is shared by **all three
+agent images** (pi, dsh, Command Code): each enabled skill is installable into
+every directory listed in `linkTargets`. Each agent's entrypoint runs the
+same `--link-only --target <agent>` sync at container start, so a pi container
+start only refreshes pi's skills dir, a dsh start only dsh's, and so on.
+It works with any agent that reads the Agent Skills standard (a directory per
+skill with a `SKILL.md`).
 
 Skills come from two kinds of source, resolved serially in declaration order
 (later sources override earlier ones on basename collision):
 
 * **`type: "git"`** — clonable repos. These are cloned **at image build time**
-  (network) into a vendor dir baked into the image (`/opt/caged/skills/vendor`).
-  At **container start** the entrypoint only copies the enabled skills from
-  that baked set into the seed's skills dir — **no network, no git at start**.
+  (network) into a vendor dir baked into the base image
+  (`/opt/caged/skills/vendor`). At **container start** each entrypoint only
+  copies the enabled skills from that baked set into the seed's skills dirs —
+  **no network, no git at start**.
 * **`type: "local"`** — skills you maintain directly in this repo, in
-  `seed/.pi/agent/skills-src/` (git-tracked, the source of truth). They live in
-  the seed already, so they need **no image build step** — the entrypoint
-  copies enabled local skills straight from `skills-src/` into `skills/` at
-  container start, alongside the git ones.
+  `seed/skills-src/` (git-tracked, the source of truth). They live in the seed
+  already, so they need **no image build step** — the entrypoint copies
+  enabled local skills straight from `skills-src/` into each target `skills/`
+  dir at container start, alongside the git ones.
 
-Skills are installed into the seed (`seed/.pi/agent/skills/`), pi's live
-config home bind-mounted at `/agent-home/.pi/agent` at runtime. Each enabled
-skill is copied in as a real directory (not a symlink) and marked with a
-hidden `.caged-skill-managed` file, so the tool can later tell its own copies
-apart from unmanaged skills.
+Skills are installed into the seed, one directory per agent:
+`seed/.pi/agent/skills/` (pi), `seed/.dsh/skills/` (dsh), and
+`seed/.commandcode/skills/` (Command Code) — each is the live bind-mounted
+skills dir that the corresponding agent scans at runtime. Each enabled skill
+is copied in as a real directory (not a symlink) and marked with a hidden
+`.caged-skill-managed` file, so the tool can later tell its own copies apart
+from unmanaged skills.
 
 You can also run the sync by hand, e.g. after editing `skills.json` (local dev
 mode clones + installs in one step):
 
 ```bash
-node scripts/skills-sync.mjs            # clone/pull git sources, then install into seed/.pi/agent/skills
+node scripts/skills-sync.mjs            # clone/pull git sources, then install into all seed skills dirs
 node scripts/skills-sync.mjs --dry-run  # preview without changing anything
 node scripts/skills-sync.mjs --link-only     # install only, from an existing vendor + local sources (no git/network)
+node scripts/skills-sync.mjs --link-only --target pi    # install into one agent's dir only (what container start does)
 node scripts/skills-sync.mjs --clone-only    # clone/pull git sources only (image build step)
 ```
 
-- **`seed/.pi/agent/skills.json`** — the source of truth: a `sources[]` list.
-  Each git source has `type`, `url`, `skillsDir`, and an `enabled` list of
-  skill relative paths; each local source has `type`, `dir` (relative to the
-  seed), and an `enabled` list. Plus a `linkTargets[]` list of dirs, relative
-  to the seed, to install skills into (default `skills` →
-  `seed/.pi/agent/skills`).
+- **`seed/skills.json`** — the source of truth: a `sources[]` list. Each git
+  source has `type`, `url`, `skillsDir`, and an `enabled` list of skill
+  relative paths; each local source has `type`, `dir` (relative to the seed
+  root), and an `enabled` list. Plus a `linkTargets[]` list of dirs, relative
+  to the seed root, to install skills into — one entry per agent (default
+  `skills` → `seed/skills`).
 - The script **clones** each git source into the vendor dir (or `git pull`s
-  it), resolves local sources from `skills-src/`, then **copies** each enabled
-  skill into the target. Stale managed copies are removed, so dropping a skill
-  from `enabled` uninstalls it. Unmanaged skills (anything not carrying a
-  marker) are never clobbered.
-- The generated copies in `skills/` and the local-dev vendor are **gitignored**
-  and regenerated — edit **`skills-src/`** (your own skills) or `skills.json`
-  (declarations), then re-run the script (or rebuild + restart the container to
-  pick up newly-added git repos).
+  it), resolves local sources from `seed/skills-src/`, then **copies** each
+  enabled skill into every target. Stale managed copies are removed, so
+  dropping a skill from `enabled` uninstalls it. Unmanaged skills (anything
+  not carrying a marker) are never clobbered.
+- The generated copies in each `skills/` dir and the local-dev vendor are
+  **gitignored** and regenerated — edit **`seed/skills-src/`** (your own
+  skills) or `seed/skills.json` (declarations), then re-run the script (or
+  rebuild + restart the container to pick up newly-added git repos).
 
-> pi can also run this for you: ask it to “sync skills” (uses the `skills-sync` skill).
-
-> pi can also run this for you: ask it to “sync skills” (uses the `skills-sync` skill).
+> Any agent can run this for you: ask it to “sync skills” (uses the
+> `skills-sync` skill, installed into every agent's skills dir).
 
 ## Quickstart
 
@@ -233,8 +248,8 @@ keys' cached auth.
   env-configured base URL + key)
 * `.pi/agent/settings.json` — trust + `pi-mcp-adapter` extension
 * `.pi/agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
-* `.pi/agent/skills.json` — declarative skills config (see [`Skills`](#skills-skills-sync))
-* `.pi/agent/skills/` — hand-written skills (caged-persistence, create-post, bgm-metadata, markdown-link, mdx-notes); downloaded skills are copied in here at container start
+* `.pi/agent/skills/` — pi's installed skills (generated by skills-sync at
+  container start; sources of truth: `seed/skills.json` + `seed/skills-src/`)
 * `.pi/agent/AGENTS.md` — environment primer pi loads for the container
 * `.pi/agent/scripts/` — `start-chrome-devtools-mcp.sh`, `devtools-forward.js` (CDP helpers, referenced by `mcp.json`)
 

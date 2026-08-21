@@ -42,7 +42,31 @@ for dir in /agent-home/cli-auth/glab /agent-home/cli-auth/acli /tmp/.npm /tmp/.c
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done
 
-# --- 3. best-effort: default Web workspace -------------------------------
+# --- 3. declarative skills install (best-effort) --------------------------
+# dsh's local skill provider scans $DSH_HOME/skills (rank "user-dsh"). The
+# skill repos are cloned into the IMAGE at build time (see
+# Containerfile.base) under /opt/caged/skills/vendor; at container start we
+# only copy the enabled skills from there into the seed's skills dir — no
+# network, no git. The config (seed/skills.json) lives at the seed root.
+# Non-fatal — if the config or baked vendor is missing, we log a warning and
+# still launch.
+if [ -f /agent-home/skills.json ] && [ -f /opt/caged/skills-sync.mjs ]; then
+    echo "dsh: installing skills (best-effort)..."
+    if ! node /opt/caged/skills-sync.mjs \
+            --config /agent-home/skills.json \
+            --seed /agent-home \
+            --vendor /opt/caged/skills/vendor \
+            --target dsh \
+            --link-only; then
+        echo "dsh: warning: skills install did not complete (exit $?) — continuing" >&2
+    fi
+elif [ -f /opt/caged/skills-sync.mjs ]; then
+    echo "dsh: warning: seed/skills.json missing — skipping skills install" >&2
+else
+    echo "dsh: warning: skills-sync.mjs missing from image — skipping skills install" >&2
+fi
+
+# --- 4. best-effort: default Web workspace --------------------------------
 # dsh's Web UI has no env var for a default workspace; it derives the default
 # from the persisted workspace registry ($DSH_HOME/storages/workspace.json).
 # Seed a /workspace registration so the UI opens on the mounted code dir

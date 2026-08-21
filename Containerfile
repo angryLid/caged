@@ -40,21 +40,6 @@ RUN mkdir -p /agent-home/.pi/agent /agent-home/cli-auth/glab /agent-home/cli-aut
 ARG PI_VERSION=0.84.2
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
-# Declarative skills — clone the configured skill repos into the image at
-# BUILD time (network), so a container start only copies the enabled skills
-# into the seed — no network / git at start. skills.json lives in the seed
-# (seed/.pi/agent/skills.json) and is copied here to drive the build-time
-# clone; the resulting repos are baked under /opt/caged/skills/vendor.
-# Volatile layer: skills.json churns on seed edits, so it stays near the
-# bottom.
-COPY seed/.pi/agent/skills.json scripts/skills-sync.mjs  /opt/caged/
-
-RUN node /opt/caged/skills-sync.mjs \
-        --config /opt/caged/skills.json \
-        --vendor /opt/caged/skills/vendor \
-        --clone-only \
-    && rm -f /opt/caged/skills.json
-
 # The agent home is intentionally NOT copied into the image: at runtime
 # scripts/start-container.sh bind-mounts <caged>/seed over /agent-home (rw),
 # so .pi, .dsh, and shared CLI authentication are all live host state. The

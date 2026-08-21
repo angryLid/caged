@@ -76,6 +76,21 @@ RUN userdel -r node 2>/dev/null || true \
     && mkdir -p /workspace /agent-home \
     && chown -R agent:agent /workspace /agent-home
 
+# Declarative skills — the skill source repos are cloned into the image at
+# BUILD time (network) and baked under /opt/caged/skills/vendor, so a
+# container start only copies the enabled skills into the seed — no network,
+# no git at start. The config (seed/skills.json) is shared by every agent
+# image (pi, dsh, cmdc); the vendor lives in the base so all derived images
+# inherit it without re-cloning. The skills-sync script is baked alongside it
+# so each image's entrypoint can run the --link-only install at start.
+COPY seed/skills.json scripts/skills-sync.mjs /opt/caged/
+
+RUN node /opt/caged/skills-sync.mjs \
+        --config /opt/caged/skills.json \
+        --vendor /opt/caged/skills/vendor \
+        --clone-only \
+    && rm -f /opt/caged/skills.json
+
 # Persistent home and mounted workspace paths used by both derived images.
 ENV HOME=/agent-home WORKSPACE=/workspace
 

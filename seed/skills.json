@@ -50,7 +50,15 @@
   "linkTargets": [
     {
       "name": "pi",
-      "dir": "skills"
+      "dir": ".pi/agent/skills"
+    },
+    {
+      "name": "dsh",
+      "dir": ".dsh/skills"
+    },
+    {
+      "name": "cmdc",
+      "dir": ".commandcode/skills"
     }
   ]
 }

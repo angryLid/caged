@@ -7,17 +7,12 @@ docs/
 
 # One .dockerignore serves both image builds — pi (./Containerfile) and dsh
 # (./Containerfile.dsh) both build from the repo-root context. seed/ is
-# generally NOT needed in either build context: pi's config home (~/.pi) and
-# dsh's $DSH_HOME (seed/.dsh) are bind-mounted live at runtime, never
-# COPY'd into the image. EXCEPTION: the pi Containerfile COPYs
-# seed/.pi/agent/skills.json at BUILD time to drive the build-time skill
-# clone, so that one file must be let back through the ignore.
+# generally NOT needed in either build context: the agent homes (.pi, .dsh,
+# .commandcode) are bind-mounted live at runtime, never COPY'd into the
+# image. EXCEPTION: the shared base Containerfile COPYs seed/skills.json at
+# BUILD time to drive the build-time skill clone, so that one file must be
+# let back through the ignore (it is the only seed file the base image
+# carries; everything else in seed/ is live host state).
 
 seed/*
-!seed/.pi/
-
-seed/.pi/*
-!seed/.pi/agent/
-
-seed/.pi/agent/*
-!seed/.pi/agent/skills.json
+!seed/skills.json

@@ -2,12 +2,22 @@
 /**
  * skills-sync.mjs
  *
- * Declarative SKILLS sync for ./seed/.pi/agent/skills.json
+ * Declarative SKILLS sync for the caged seed — shared by every agent image
+ * (pi, dsh, cmdc). Config: <project>/seed/skills.json.
  *
- * The caged container runs @earendil-works/pi-coding-agent. pi scans
- * ~/.pi/agent/skills/ for skills, and ~/.pi is a live bind mount of the host
- * `seed/.pi` dir (scripts/start-container.sh). So skills must be installed INTO the seed —
- * `seed/.pi/agent/skills/` — NOT into a user's project working tree.
+ * The caged containers run three agents that all speak the Agent Skills open
+ * standard (a directory per skill, each with a SKILL.md carrying YAML
+ * frontmatter). Each scans its own home dir, and every home dir is a live
+ * bind mount of the host `seed` dir (scripts/start-container.sh):
+ *
+ *   pi    scans ~/.pi/agent/skills/            -> seed/.pi/agent/skills
+ *   dsh   scans $DSH_HOME/skills (rank "user") -> seed/.dsh/skills
+ *   cmdc  scans ~/.commandcode/skills/         -> seed/.commandcode/skills
+ *
+ * So skills must be installed INTO the seed — NOT into a user's project
+ * working tree. The script installs each enabled skill into every directory
+ * listed in the config's `linkTargets`, so one declaration set feeds all
+ * agents.
  *
  * Skills come from two kinds of source, resolved serially in declaration
  * order (later sources override earlier ones on basename collision):
@@ -17,14 +27,15 @@
  *     vendored set — no network, no git, at start.
  *   * type "local" — skills maintained directly in the repo, in a directory
  *     inside the seed (default `skills-src/`, resolved relative to the seed
- *     dir). These are git-tracked sources of truth; the installed copy in
- *     `skills/` is a generated artifact. Local sources are copied at container
- *     start like any other.
+ *     root — NOT inside any one agent's home, since the skills are shared).
+ *     These are git-tracked sources of truth; the installed copies in the
+ *     linkTargets are generated artifacts. Local sources are copied at
+ *     container start like any other.
  *
  * Network vs. link is deliberately split:
  *   * Git skill repos are cloned at **image build time** (network) into a
  *     vendor dir baked into the image. The container start only copies the
- *     enabled skills from that vendored set into the seed's skills dir — no
+ *     enabled skills from that vendored set into the seed's skills dirs — no
  *     network, no git, at start.
  *   * Running the script by hand (local dev) clones + installs in one step.
  *
@@ -33,26 +44,30 @@
  *   --clone-only             only clone/pull git sources into the vendor dir (build)
  *   --link-only              only install enabled skills from an existing
  *                            vendor dir + local seed sources into the seed
- *                            skills dir (container start) — no network / git
+ *                            skills dirs (container start) — no network / git
  *
- * Installation copies each enabled skill dir into the seed skills dir and
- * marks it with a dotfile so stale managed copies can be detected and removed
+ * Installation copies each enabled skill dir into each target dir and marks
+ * it with a dotfile so stale managed copies can be detected and removed
  * without ever touching unmanaged skills.
  *
  * Idempotent and self-healing: on a fresh clone it re-creates everything.
  *
  * Usage:
- *   node scripts/skills-sync.mjs [--dry-run] [--config seed/.pi/agent/skills.json]
- *                                [--seed <pi-agent-dir>] [--vendor <dir>]
- *                                [--clone-only] [--link-only]
+ *   node scripts/skills-sync.mjs [--dry-run] [--config seed/skills.json]
+ *                                [--seed <seed-root>] [--vendor <dir>]
+ *                                [--target <name>] [--clone-only] [--link-only]
  *
- *   --config   path to skills.json. Default <project>/seed/.pi/agent/skills.json.
- *   --seed     the pi agent config dir that owns the skills; the install
- *              destination. Defaults to <project>/seed/.pi/agent.
+ *   --config   path to skills.json. Default <project>/seed/skills.json.
+ *   --seed     the seed root dir; every linkTargets.dir is resolved relative
+ *              to it, and local sources default to <seed>/skills-src.
+ *              Defaults to <project>/seed.
  *   --vendor   where the git skill source repos live. Defaults to
  *              <seed>/skills-sync/vendor/skills (used by local-dev mode). At
  *              container start the entrypoint passes the image-baked dir,
  *              e.g. /opt/caged/skills/vendor.
+ *   --target   install only into the named linkTarget (container start — each
+ *              agent's entrypoint syncs just its own skills dir). Without it
+ *              (local dev) every target is synced.
  *
  * Exit codes:
  *   0  ok
@@ -60,7 +75,7 @@
  *   2  warnings only (e.g. skill missing, collision) — links still applied
  */
 import {
-  readFileSync, mkdirSync, readdirSync, rmSync, cpSync, writeFileSync,
+  readFileSync, mkdirSync, readdirSync, rmSync, writeFileSync,
   lstatSync, existsSync, readlinkSync,
 } from "node:fs";
 import { dirname, resolve, join, basename, sep } from "node:path";
@@ -77,15 +92,20 @@ const linkOnly = args.includes("--link-only");
 const configIdx = args.indexOf("--config");
 const configPath = configIdx >= 0
   ? resolve(PROJECT_ROOT, args[configIdx + 1])
-  : join(PROJECT_ROOT, "seed", ".pi", "agent", "skills.json");
+  : join(PROJECT_ROOT, "seed", "skills.json");
 const seedIdx = args.indexOf("--seed");
 const SEED_DIR = seedIdx >= 0
   ? resolve(args[seedIdx + 1])
-  : join(PROJECT_ROOT, "seed", ".pi", "agent");
+  : join(PROJECT_ROOT, "seed");
 const vendorIdx = args.indexOf("--vendor");
 const VENDOR_DIR = vendorIdx >= 0
   ? resolve(args[vendorIdx + 1])
   : join(SEED_DIR, "skills-sync", "vendor", "skills");
+const targetIdx = args.indexOf("--target");
+// Install only into the named linkTarget (used by container start — each
+// agent's entrypoint syncs just its own skills dir). Without it (local dev)
+// every target is synced.
+const TARGET_NAME = targetIdx >= 0 ? args[targetIdx + 1] : null;
 
 // Marker dropped into each installed skill dir so we can tell managed copies
 // apart from hand-written / committed skills when cleaning up.
@@ -97,7 +117,11 @@ const err = (msg) => { console.error(`[error] ${msg}`); exitCode = Math.max(exit
 
 function run(cmd, argsArr, opts = {}) {
   if (dryRun) { console.log(`[dry-run] $ ${cmd} ${argsArr.join(" ")}`); return; }
-  execFileSync(cmd, argsArr, { stdio: "inherit", ...opts });
+  // Inherit stderr (git clone/pull progress), but capture stdout: git prints
+  // clone/pull summaries to stdout that would otherwise pollute every
+  // container start log. `inherit` for stdout was fine when the sync ran
+  // during an image build, but at runtime it is noise.
+  execFileSync(cmd, argsArr, { stdio: ["inherit", "pipe", "inherit"], ...opts });
 }
 
 // Install a skill by copying its source dir into the target location.
@@ -146,7 +170,8 @@ function resolveSkills(cfg) {
   const seenBasename = new Map();
   for (const source of cfg.sources) {
     // git sources live in the (build-time cloned) vendor dir; local sources
-    // live directly in the seed, resolved relative to SEED_DIR.
+    // live in the shared seed, resolved relative to SEED_DIR (the seed root,
+    // not any one agent's home).
     const sourceRoot = source.type === "local"
       ? join(SEED_DIR, source.dir ?? "skills-src")
       : join(VENDOR_DIR, source.name, source.skillsDir);
@@ -181,8 +206,15 @@ function isManagedAt(p, st) {
 
 // --- 3. install enabled skills into each target dir ------------------------
 function linkTargets(cfg, manifest) {
-  for (const t of cfg.linkTargets) {
-    // linkTargets.dir is relative to SEED_DIR (e.g. "skills" -> <seed>/skills)
+  // Target dirs are relative to the seed ROOT, not to any one agent's home.
+  // --target <name> installs into that one linkTarget only (container start);
+  // by default every target is synced (local dev).
+  let targets = cfg.linkTargets?.length ? cfg.linkTargets : [{ name: "default", dir: "skills" }];
+  if (TARGET_NAME) {
+    targets = targets.filter((t) => t.name === TARGET_NAME);
+    if (!targets.length) throw new Error(`unknown linkTarget name '${TARGET_NAME}' (known: ${cfg.linkTargets?.map((t) => t.name).join(", ") || "none"})`);
+  }
+  for (const t of targets) {
     const linkDir = join(SEED_DIR, t.dir);
     mkdirSync(linkDir, { recursive: true });
 
@@ -199,8 +231,7 @@ function linkTargets(cfg, manifest) {
       let st;
       try { st = lstatSync(p); } catch { continue; }
       if (isManagedAt(p, st)) {
-        console.log(`[remove] ${t.name}: ${entry} (removed from config)`);
-        if (!dryRun) rmSync(p, { recursive: true, force: true });
+        rmSync(p, { recursive: true, force: true });
       }
     }
 
@@ -215,27 +246,23 @@ function linkTargets(cfg, manifest) {
         warn(`refusing to overwrite non-managed ${dest} — remove or rename it, or pick a different skill name`);
         continue;
       }
-      console.log(`[install] ${t.name}: ${m.base} <- ${m.src}`);
-      if (!dryRun) {
-        installSkill(m.src, dest, st);
-      }
+      installSkill(m.src, dest, st);
     }
-
-    console.log(`[ok] installed ${manifest.length} skills into ${t.dir} (${linkDir})`);
   }
 }
 
 // --- main ------------------------------------------------------------------
 try {
   const cfg = loadConfig();
-  console.log(`[seed] ${SEED_DIR}`);
-  console.log(`[vendor] ${VENDOR_DIR}`);
   if (!linkOnly) syncRepos(cfg);
   if (!cloneOnly) {
     const manifest = resolveSkills(cfg);
     linkTargets(cfg, manifest);
+    // One line naming every synced skill; the target(s) are obvious from the
+    // caller (entrypoint passes --target, local dev syncs all).
+    console.log(`[skills] ${manifest.map((m) => m.base).join(" ")}`);
   }
-  console.log(dryRun ? "[dry-run] done" : "[done] skills synced");
+  console.log(dryRun ? "[dry-run] done" : "[done]");
 } catch (e) {
   err(e.message);
   if (e.stack) console.error(e.stack);
