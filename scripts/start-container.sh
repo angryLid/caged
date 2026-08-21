@@ -136,7 +136,7 @@ RUN_ARGS=(
   -e PI_CODING_AGENT_SESSION_DIR="${PI_CODING_AGENT_SESSION_DIR:-/workspace/.pi/sessions}"
   -e GLAB_SEND_TELEMETRY=false
   -e GLAB_CONFIG_DIR=/agent-home/cli-auth/glab
-  -e ACLI_CONFIG_DIR=/agent-home/cli-auth/acli
+  -e ACLI_CONFIG_DIR=/agent-home/cli-auth
   -e GH_CONFIG_DIR=/agent-home/cli-auth/gh
   -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" -e GITLAB_HOST="${GITLAB_HOST:-}"
   -e GH_TOKEN="${GH_TOKEN:-}"
