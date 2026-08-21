@@ -1,8 +1,9 @@
 ui-onboarding:
   welcomeNoticeVersion: 2026-08-13.1
 agent-default-model:
-  provider: local-llm
-  model: Coding
+  provider: deepseek-official
+  model: deepseek-v4-flash
+  reasoningEffort: high
 llm-deepseek:
   baseURL: https://api.deepseek.com
 # Model providers: the pi agent's seed/.pi/agent/models.json, migrated (tracked).
