@@ -31,6 +31,25 @@ fail() {
     "config dir '$AGENT_DIR' not found — /agent-home must be the live seed bind containing .pi/agent." \
     "Run caged via 'scripts/start-container.sh' (mounts <caged>/seed at /agent-home), or mount it manually."
 
+# --- 1.5 declarative global-prompt install (best-effort) -------------------
+# The always-loaded environment primer (seed/prompt-src/global.md, tracked in
+# git) is installed into this agent's AGENTS.md before the fail-fast check
+# below, so a fresh clone passes. Non-fatal — a missing source/config still
+# falls through to the AGENTS.md check, which fails fast with its own message.
+if [ -f /agent-home/prompts.json ] && [ -f /opt/caged/prompt-sync.mjs ]; then
+    echo "caged: installing global prompt (best-effort)..."
+    if ! node /opt/caged/prompt-sync.mjs \
+            --config /agent-home/prompts.json \
+            --seed /agent-home \
+            --target pi; then
+        echo "caged: warning: global prompt install did not complete (exit $?) — continuing" >&2
+    fi
+elif [ -f /opt/caged/prompt-sync.mjs ]; then
+    echo "caged: warning: seed/prompts.json missing — skipping global prompt install" >&2
+else
+    echo "caged: warning: prompt-sync.mjs missing from image — skipping global prompt install" >&2
+fi
+
 for f in models.json settings.json AGENTS.md; do
     [ -f "$AGENT_DIR/$f" ] || fail \
         "required config file missing: '$AGENT_DIR/$f' — the live seed mount is incomplete" \

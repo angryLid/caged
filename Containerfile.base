@@ -91,6 +91,13 @@ RUN node /opt/caged/skills-sync.mjs \
         --clone-only \
     && rm -f /opt/caged/skills.json
 
+# Declarative global prompt — the sync script is baked alongside skills-sync
+# so whichever entrypoint installs the prompt (pi, cmdc) can run it at start.
+# Unlike skills there is no git vendor: the single source (prompt-src/global.md)
+# and config (prompts.json) come from the live seed mount, so only the script
+# needs to be in the image.
+COPY scripts/prompt-sync.mjs /opt/caged/prompt-sync.mjs
+
 # Persistent home and mounted workspace paths used by both derived images.
 ENV HOME=/agent-home WORKSPACE=/workspace
 

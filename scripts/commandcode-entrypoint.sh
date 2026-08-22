@@ -21,6 +21,26 @@ for dir in "$COMMANDCODE_HOME" /tmp/.npm /tmp/.cache /tmp/.config; do
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done
 
+# --- declarative global-prompt install (best-effort) ----------------------
+# Command Code reads ~/.commandcode/AGENTS.md as its user-level memory. The
+# shared source (seed/prompt-src/global.md, tracked in git) is installed here
+# at start from seed/prompts.json; same shape as skills install below.
+# Non-fatal — if the config or baked script is missing we log a warning and
+# still launch.
+if [ -f /agent-home/prompts.json ] && [ -f /opt/caged/prompt-sync.mjs ]; then
+    echo "command-code: installing global prompt (best-effort)..."
+    if ! node /opt/caged/prompt-sync.mjs \
+            --config /agent-home/prompts.json \
+            --seed /agent-home \
+            --target cmdc; then
+        echo "command-code: warning: global prompt install did not complete (exit $?) — continuing" >&2
+    fi
+elif [ -f /opt/caged/prompt-sync.mjs ]; then
+    echo "command-code: warning: seed/prompts.json missing — skipping global prompt install" >&2
+else
+    echo "command-code: warning: prompt-sync.mjs missing from image — skipping global prompt install" >&2
+fi
+
 # --- declarative skills install (best-effort) ------------------------------
 # Command Code scans ~/.commandcode/skills/ for skills. The skill repos are
 # cloned into the IMAGE at build time (see Containerfile.base) under

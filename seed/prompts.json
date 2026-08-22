@@ -1,0 +1,16 @@
+{
+  "source": {
+    "dir": "prompt-src",
+    "global": "global.md"
+  },
+  "linkTargets": [
+    {
+      "name": "pi",
+      "file": ".pi/agent/AGENTS.md"
+    },
+    {
+      "name": "cmdc",
+      "file": ".commandcode/AGENTS.md"
+    }
+  ]
+}
