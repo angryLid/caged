@@ -170,7 +170,7 @@ elif [ "$MODE" = cmdc ]; then
   RUN_ARGS+=(
     -e TERM="${TERM:-xterm-256color}"
   )
-  DEFAULT_CMD=(cmd)
+  DEFAULT_CMD=(cmd --yolo)
 else
   RUN_ARGS+=(
     -e TERM="${TERM:-xterm-256color}" -e PI_CODING_AGENT_DIR=/agent-home/.pi/agent
