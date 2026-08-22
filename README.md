@@ -571,17 +571,18 @@ works too.
 
 #### Models: pi provider set migrated (+ BYOK)
 
-The image ships the same four provider routes as the pi agent's
-`seed/.pi/agent/models.json`, tracked in the home settings document
+The image ships three of the pi agent's four provider routes from
+`seed/.pi/agent/models.json` (volcengine was dropped) plus a dsh-only Nube.sh
+gateway, tracked in the home settings document
 `seed/.dsh/settings.yaml` (the `llm-pi-ai` section; the file is un-ignored
 in `seed/.dsh/.gitignore`, and `$DSH_HOME` is the live bind of `seed/.dsh`):
 
 | route | key env / credential ref | protocol |
 |---|---|---|
 | `DeepSeek-API` | `MY_DEEPSEEK_API_KEY` | openai-completions (`api.deepseek.com`) |
-| `volcengine` | `VOLCENGINE_API_KEY` | anthropic-messages (Ark coding) |
 | `my-openrouter` | `MY_OPENROUTER_API_KEY` | openai-completions |
 | `local-llm` | `LOCAL_API_KEY` | openai-completions (host `192.168.64.1:8765`) |
+| `nube` | `NUBE_KEY` | openai-completions (`ai.nube.sh/api/v1`, model `DeepSeek-V4-Flash` 270k/16k) |
 
 **BYOK works out of the box**: dsh configs reference keys by name
 (`apiKeyEnv`, no value ever in config/settings). Users paste their own key in
@@ -764,6 +765,7 @@ listed.
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
 | `LOCAL_API_KEY` | *(unset)* | Local LLM provider key (passed into container) |
+| `NUBE_KEY` | *(unset)* | Nube.sh gateway provider key (`ai.nube.sh/api/v1`, dsh mode) |
 | `GITLAB_TOKEN` | *(unset)* | `glab` (GitLab CLI) API token (passed into container) |
 | `GITLAB_HOST` | *(unset)* | `glab` GitLab instance host (default `https://gitlab.com`) |
 | `GH_TOKEN` | *(unset)* | `gh` (GitHub CLI) API token (passed into container) |

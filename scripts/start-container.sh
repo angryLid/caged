@@ -63,10 +63,10 @@ case "$MODE" in
     DSH_DEEPSEEK_KEY="${DEEPSEEK_API_KEY:-${MY_DEEPSEEK_API_KEY:-}}"
     if [ -z "$DSH_DEEPSEEK_KEY" ] && [ -z "${OPENAI_API_KEY:-}" ] \
        && [ -z "${VOLCENGINE_API_KEY:-}" ] && [ -z "${MY_OPENROUTER_API_KEY:-}" ] \
-       && [ -z "${LOCAL_API_KEY:-}" ]; then
+       && [ -z "${LOCAL_API_KEY:-}" ] && [ -z "${NUBE_KEY:-}" ]; then
       echo "Error: no provider API key available for dsh." >&2
       echo "Set DEEPSEEK_API_KEY, OPENAI_API_KEY, VOLCENGINE_API_KEY," >&2
-      echo "MY_OPENROUTER_API_KEY, or LOCAL_API_KEY before starting." >&2
+      echo "MY_OPENROUTER_API_KEY, LOCAL_API_KEY, or NUBE_KEY before starting." >&2
       exit 1
     fi
     mkdir -p "$DSH_HOME_HOST"
@@ -154,6 +154,7 @@ if [ "$MODE" = dsh ]; then
     -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}"
     -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}"
     -e LOCAL_API_KEY="${LOCAL_API_KEY:-}" -e OPENAI_API_KEY="${OPENAI_API_KEY:-}"
+    -e NUBE_KEY="${NUBE_KEY:-}"
     -e DSH_PERMISSION_MODE="$DSH_PERMISSION_MODE"
   )
   DEFAULT_CMD=(dsh web)
@@ -184,6 +185,7 @@ fi
 RUN_ARGS+=(
   -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}" -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}"
   -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" -e LOCAL_API_KEY="${LOCAL_API_KEY:-}"
+  -e NUBE_KEY="${NUBE_KEY:-}"
   -e CDP_HOST=192.168.64.1
 )
 

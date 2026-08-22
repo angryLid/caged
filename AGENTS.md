@@ -33,10 +33,10 @@ agents. Don't conflate them:
 ## Secrets never live in the repo
 
 Provider keys (`$MY_DEEPSEEK_API_KEY`, `$VOLCENGINE_API_KEY`,
-`$MY_OPENROUTER_API_KEY`, `$LOCAL_API_KEY`) and `GITLAB_TOKEN` are passed as
-container env vars by the operator. They are referenced by name in
-`models.json` and expanded at runtime by `scripts/start-container.sh`. Never
-write a real key
+`$MY_OPENROUTER_API_KEY`, `$LOCAL_API_KEY`, `$NUBE_KEY`) and `GITLAB_TOKEN`
+are passed as container env vars by the operator. They are referenced by name
+in `models.json` / `seed/.dsh/settings.yaml` and expanded at runtime by
+`scripts/start-container.sh`. Never write a real key
 into `/workspace` — anything there is readable by the agent you're caging.
 If a key is missing, tell the user which env var to set; don't fabricate one.
 
