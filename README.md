@@ -507,7 +507,7 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 
 > dsh is a **developer preview** that is iterating rapidly, with
 > compatibility-breaking changes expected. The version is pinned in
-> `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.0-rc.6`) so a
+> `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.1-rc.2`) so a
 > release bump is explicit. dsh builds on the repo's shared base image
 > `Containerfile.base` (built automatically by the build script), which
 > provides apt essentials including `python3`, the glab/gh/acli CLIs and the

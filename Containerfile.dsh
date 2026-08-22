@@ -41,11 +41,11 @@ RUN mkdir -p /agent-home/.dsh /agent-home/cli-auth/glab /agent-home/cli-auth/acl
 # Install dsh (pinned) globally. Open network at build time (npm registry).
 # This is the volatile layer: a DSH_VERSION bump rebuilds only this (and the
 # few below it), keeping the base/toolchain layers cached. The published npm
-# set is internally consistent at rc.6 (@deepseek-ai/dsh and all its
-# @deepseek-ai/dsh-* bundle deps are ^0.1.0-rc.6); its native deps (node-pty,
+# set is internally consistent at rc.2 (@deepseek-ai/dsh and all its
+# @deepseek-ai/dsh-* bundle deps are ^0.1.1-rc.2); its native deps (node-pty,
 # node-addon-require-builtin) ship prebuilt linux x64/arm64-gnu binaries; the
 # shared base already provides the build toolchain for node-pty.
-ARG DSH_VERSION=0.1.0-rc.6
+ARG DSH_VERSION=0.1.1-rc.2
 RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
 
 # $DSH_HOME is intentionally NOT copied into the image: at runtime
