@@ -8,6 +8,6 @@
   "lastChangelogVersion": "0.84.2",
   "theme": "dark",
   "defaultProvider": "my-openrouter",
-  "defaultModel": "openai/gpt-5.6-luna",
+  "defaultModel": "stealth/ox-alpha",
   "defaultThinkingLevel": "medium"
 }
