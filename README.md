@@ -36,6 +36,11 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 * **Atlassian CLI (`acli` v1.3.22)** — official Atlassian CLI baked in:
   **Jira Cloud** work items, projects, admin APIs (also Confluence &
   Bitbucket). API-token login; state survives restarts.
+* **Python dependency tools** — `python`, `pip`, and `uv` are installed in the
+  shared base image for Python scripting, virtual environments, and dependency
+  management.
+* **Node.js package managers** — `pnpm` and `yarn` are installed globally and
+  available to every derived image.
 * **Chrome DevTools MCP extension** — pi can drive your host Chrome through
   the chrome-devtools MCP server (browse, search, screenshots, JS
   evaluation). Optional: needs host Chrome listening on `:9222`.
@@ -62,7 +67,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 ```
 caged/
 ├── Containerfile        # pi image (non-root, pinned pi version)
-├── Containerfile.base   # shared base for all images: apt essentials (including python3), glab, gh, acli, non-root user, skill vendor
+├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, acli, non-root user, skill vendor
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.commandcode # OPTIONAL: Command Code image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
@@ -754,6 +759,8 @@ listed.
 | `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |
 | `GH_VERSION` | `2.97.0` | gh version pin (build time, `build-caged-base.sh`) |
 | `ACLI_VERSION` | `1.3.22` | acli version pin (build time, `build-caged-base.sh`) |
+| `PNPM_VERSION` | `10.15.0` | pnpm version pin (build time, `build-caged-base.sh`) |
+| `YARN_VERSION` | `1.22.22` | yarn version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
 | `PI_WEB_UI_VERSION` | `0.26.0` | pi-web-ui version pin (build time, `build-container.sh webui`) |
 | `CAGED_SKIP_PI` | `0` | set to `1` to skip the pi image build when building `webui` (e.g. it is already current) |

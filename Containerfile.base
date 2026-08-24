@@ -7,11 +7,29 @@ ARG NODE_IMAGE=node:24-slim
 
 FROM ${NODE_IMAGE}
 
-# Runtime and native-build packages: git (version control), ca-certificates (TLS), curl (HTTP), python3 (scripting/node-gyp), jq (JSON), tini (PID 1), and build-essential (native npm modules).
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 jq tini build-essential && rm -rf /var/lib/apt/lists/*
+# Runtime and native-build packages: git (version control), ca-certificates (TLS), curl (HTTP), python3 and pip (scripting/dependencies/node-gyp), jq (JSON), tini (PID 1), and build-essential (native npm modules).
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl python3 python3-pip jq tini build-essential && rm -rf /var/lib/apt/lists/*
 
-# Keep the conventional `python` command available in all shells and scripts.
-RUN ln -s /usr/bin/python3 /usr/local/bin/python
+# Keep the conventional `python` and `pip` commands available in all shells and scripts.
+RUN ln -s /usr/bin/python3 /usr/local/bin/python \
+    && ln -s /usr/bin/pip3 /usr/local/bin/pip
+
+# Install uv globally so the non-root agent can manage Python environments and dependencies.
+RUN python3 -m pip install --no-cache-dir --break-system-packages uv \
+    && pip --version \
+    && uv --version
+
+# Install and enable the Node.js package managers used by project toolchains.
+# The Node image provides Corepack shims; Corepack manages the pinned versions without replacing them.
+ARG PNPM_VERSION=10.15.0
+ARG YARN_VERSION=1.22.22
+ENV COREPACK_HOME=/usr/local/share/corepack
+RUN mkdir -p "${COREPACK_HOME}" \
+    && corepack install --global "pnpm@${PNPM_VERSION}" \
+    && corepack install --global "yarn@${YARN_VERSION}" \
+    && corepack enable pnpm \
+    && pnpm --version \
+    && yarn --version
 
 # glab — official GitLab CLI, pinned and sha256-verified.
 ARG GLAB_VERSION=1.112.0

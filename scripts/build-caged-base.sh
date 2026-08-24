@@ -19,7 +19,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 CAGED_BASE_IMAGE="${CAGED_BASE_IMAGE:-caged-base:latest}"
 
 echo "==> Project Root: ${ROOT_DIR}"
-echo "==> Building base image: ${CAGED_BASE_IMAGE} (GLAB_VERSION=${GLAB_VERSION:-1.112.0}, GH_VERSION=${GH_VERSION:-2.97.0}, ACLI_VERSION=${ACLI_VERSION:-1.3.22})..."
+echo "==> Building base image: ${CAGED_BASE_IMAGE} (GLAB_VERSION=${GLAB_VERSION:-1.112.0}, GH_VERSION=${GH_VERSION:-2.97.0}, ACLI_VERSION=${ACLI_VERSION:-1.3.22}, PNPM_VERSION=${PNPM_VERSION:-10.15.0}, YARN_VERSION=${YARN_VERSION:-1.22.22})..."
 
 # Repo root as the build context (same .dockerignore as the derived builds).
 container build \
@@ -28,6 +28,8 @@ container build \
   --build-arg GLAB_VERSION="${GLAB_VERSION:-1.112.0}" \
   --build-arg GH_VERSION="${GH_VERSION:-2.97.0}" \
   --build-arg ACLI_VERSION="${ACLI_VERSION:-1.3.22}" \
+  --build-arg PNPM_VERSION="${PNPM_VERSION:-10.15.0}" \
+  --build-arg YARN_VERSION="${YARN_VERSION:-1.22.22}" \
   "${ROOT_DIR}"
 
 echo "==> Base image ready: ${CAGED_BASE_IMAGE}"
