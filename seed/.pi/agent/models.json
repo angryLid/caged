@@ -1,5 +1,20 @@
 {
   "providers": {
+    "justwoker": {
+      "baseUrl": "https://api.justwoker.icu/v1",
+      "api": "openai-completions",
+      "authHeader": true,
+      "apiKey": "$JUSTWOKER_API_KEY",
+      "models": [
+        {
+          "id": "claude-opus-5-thinking",
+          "name": "Claude Opus 5 Thinking (JustWoker)",
+          "reasoning": true,
+          "contextWindow": 270000,
+          "maxTokens": 16384
+        }
+      ]
+    },
     "DeepSeek-API": {
       "baseUrl": "https://api.deepseek.com",
       "api": "openai-completions",

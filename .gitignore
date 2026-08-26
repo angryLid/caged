@@ -45,6 +45,8 @@ seed/.pi/agent/missions/
 seed/.pi/agent/run-history.jsonl
 # gh runtime state written into the live seed
 seed/.local/
+# MCP server runtime caches written into the live seed HOME
+seed/.cache/
 # Shared CLI authentication state. `acli jira auth login`, `glab auth` and
 # `gh auth` login persist credentials here for all agent modes, but these
 # files must never be committed (see docs/CLI-AUTH.md).
