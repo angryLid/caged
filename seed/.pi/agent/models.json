@@ -54,29 +54,28 @@
       "models": [
         {
           "id": "Coding",
-          "name": "Coding (Local)",
+          "name": "Coding — DeepSeek V4 Flash (Local)",
           "reasoning": true,
+          "input": ["text"],
           "contextWindow": 270000,
-          "maxTokens": 16384
+          "maxTokens": 16384,
+          "cost": { "input": 0.75, "output": 0.75, "cacheRead": 0.75, "cacheWrite": 0.75 }
         },
         {
-          "id": "Coding2",
-          "name": "Coding2 (Local)",
-          "reasoning": true,
+          "id": "GLM-5.3-Flash",
+          "name": "GLM-5.3 Flash (Local)",
+          "input": ["text"],
           "contextWindow": 270000,
-          "maxTokens": 16384
+          "maxTokens": 16384,
+          "cost": { "input": 0.75, "output": 0.75, "cacheRead": 0.75, "cacheWrite": 0.75 }
         },
         {
-          "id": "gemma-4-31B",
-          "name": "Gemma 4 31B (Local)",
+          "id": "Qwen3.8-flash-next",
+          "name": "Qwen3.8 Flash Next (Local)",
+          "input": ["text", "image"],
           "contextWindow": 270000,
-          "maxTokens": 16384
-        },
-        {
-          "id": "qwen3.8-27b",
-          "name": "Qwen3.8 27B (Local)",
-          "contextWindow": 270000,
-          "maxTokens": 16384
+          "maxTokens": 16384,
+          "cost": { "input": 0.75, "output": 0.75, "cacheRead": 0.75, "cacheWrite": 0.75 }
         }
       ]
     }

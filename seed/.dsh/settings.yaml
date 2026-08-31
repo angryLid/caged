@@ -43,7 +43,10 @@ llm-pi-ai:
       models:
         - id: openai/gpt-5.6-luna
           name: GPT-5.6 Luna (OpenRouter)
-    # 1:1 with models.json "local-llm".
+    # 1:1 with models.json "local-llm". Vision only on Qwen3.8-flash-next;
+    # GLM-5.3-Flash has vision and prefill cache disabled to free VRAM for the
+    # KV cache (poor fit for RAG). contextWindow/maxTokens stay at the caged
+    # 270k/16k values, below each model's advertised window.
     local-llm:
       displayName: Local LLM
       apiKeyEnv: LOCAL_API_KEY
@@ -51,19 +54,15 @@ llm-pi-ai:
       baseURL: http://192.168.64.1:8765/v1
       models:
         - id: Coding
-          name: Coding (Local)
+          name: Coding — DeepSeek V4 Flash (Local)
           contextWindow: 270000
           maxTokens: 16384
-        - id: Coding2
-          name: Coding2 (Local)
+        - id: GLM-5.3-Flash
+          name: GLM-5.3 Flash (Local)
           contextWindow: 270000
           maxTokens: 16384
-        - id: gemma-4-31B
-          name: Gemma 4 31B (Local)
-          contextWindow: 270000
-          maxTokens: 16384
-        - id: qwen3.8-27b
-          name: Qwen3.8 27B (Local)
+        - id: Qwen3.8-flash-next
+          name: Qwen3.8 Flash Next (Local)
           contextWindow: 270000
           maxTokens: 16384
     # Nube.sh OpenAI-compatible gateway (dsh-only; not in pi's models.json).
