@@ -37,7 +37,7 @@ RUN mkdir -p /agent-home/.pi/agent /agent-home/cli-auth/glab /agent-home/cli-aut
 # Install pi (pinned) globally. Open network at build time (npm registry).
 # Volatile layer: sits after the cached base layers above so a PI_VERSION
 # bump only rebuilds this layer (and the few below it).
-ARG PI_VERSION=0.84.2
+ARG PI_VERSION=0.84.4
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
 # The agent home is intentionally NOT copied into the image: at runtime

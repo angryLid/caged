@@ -491,7 +491,7 @@ Caveats:
   `pi-web-ui server install` (systemd/launchd) don't apply inside caged —
   run the foreground server only (which is what the script does).
 * The web server bundles its own pi SDK copy (`^0.83`), which can lag the
-  pinned global pi (`0.84.2`). The seed config format is compatible and the
+  pinned global pi (`0.84.4`). The seed config format is compatible and the
   two don't interfere.
 * One caged container at a time per seed: don't run the TUI (`caged-pi`)
   and the Web UI (`caged-pi-webui`) simultaneously against the same
@@ -827,7 +827,7 @@ These are known rough edges we've consciously chosen **not** to fix yet.
   bothers you: drop `pi-mcp-adapter`/`pi-web-access` from `packages` in
   `seed/.pi/agent/settings.json` (`"packages": []`), or accept the delay
   per container start.
-* The pi version is pinned via `ARG PI_VERSION` (default `0.84.2`). Rebuild a
+* The pi version is pinned via `ARG PI_VERSION` (default `0.84.4`). Rebuild a
   specific version with `PI_VERSION=x.y.z scripts/build-container.sh pi`. (We
   deliberately don't quote a number here — the project is still iterating.)
 * The web mode (`caged-webui`) bundles its own pi SDK copy (`^0.83`), which

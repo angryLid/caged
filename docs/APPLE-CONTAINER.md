@@ -57,7 +57,7 @@ path.
   image is a required argument (`pi` → `./Containerfile`, `dsh` →
   `./Containerfile.dsh`, `webui` → `./Containerfile.webui`); a build without
   one fails. Per-image build args:
-  `PI_VERSION` (default `0.84.2`) for pi, `DSH_VERSION` (default
+  `PI_VERSION` (default `0.84.4`) for pi, `DSH_VERSION` (default
   `0.1.1-rc.2`) for dsh, `PI_WEB_UI_VERSION` (default `0.26.0`) for webui.
   The `webui` target builds the pi image first (`Containerfile.webui` is
   `FROM caged:latest`); skip with `CAGED_SKIP_PI=1`.

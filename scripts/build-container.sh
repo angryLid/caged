@@ -18,7 +18,7 @@
 # (skip the pi step with CAGED_SKIP_PI=1 when it's already current).
 #
 # Per-image knobs (env vars, defaults listed):
-#   pi:    CAGED_IMAGE (caged:latest),      PI_VERSION (0.84.2)
+#   pi:    CAGED_IMAGE (caged:latest),      PI_VERSION (0.84.4)
 #   dsh:   DSH_IMAGE (dsh:latest),          DSH_VERSION (0.1.1-rc.2)
 #   webui: CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (0.26.0)
 #   cmdc: COMMANDCODE_IMAGE (commandcode:latest), COMMAND_CODE_VERSION (latest)
@@ -42,7 +42,7 @@ pi)
     CONTAINERFILE="Containerfile"
     IMAGE_TAG="${CAGED_IMAGE:-caged:latest}"
     VERSION_ARG="PI_VERSION"
-    VERSION_VALUE="${PI_VERSION:-0.84.2}"
+    VERSION_VALUE="${PI_VERSION:-0.84.4}"
     ;;
 dsh)
     CONTAINERFILE="Containerfile.dsh"
@@ -93,7 +93,7 @@ fi
 if [ "${1}" = "webui" ] && [ "${CAGED_SKIP_PI:-0}" != "1" ]; then
     echo "==> webui needs the pi image (Containerfile.webui is FROM caged:latest) — building it first..."
     CAGED_IMAGE="${CAGED_IMAGE:-caged:latest}" \
-    PI_VERSION="${PI_VERSION:-0.84.2}" \
+    PI_VERSION="${PI_VERSION:-0.84.4}" \
     CAGED_SKIP_BASE=1 \
     bash "${SCRIPT_DIR}/build-container.sh" pi
 fi
