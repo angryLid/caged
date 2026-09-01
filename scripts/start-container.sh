@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run one of caged's agent images with the native Apple container tool.
-# Usage: start-container.sh [pi|webui|dsh|cmdc] [command arguments...]
+# Invoked by the unified launcher: `cg <agent> start`.
+# Usage: cg pi|webui|dsh|cmdc start [command arguments...]
 
 set -euo pipefail
 
@@ -10,20 +11,20 @@ case "$MODE" in
   pi|webui|dsh|cmdc) ;;
   --help|-h)
     cat >&2 <<'EOF'
-Usage: start-container.sh [pi|webui|dsh|cmdc] [command arguments...]
+Usage: cg pi|webui|dsh|cmdc start [command arguments...]
 
-Modes:
+Agents:
   pi         Interactive pi TUI (default)
   webui      pi-web-ui on http://127.0.0.1:${PI_WEBUI_HOST_PORT:-8787}
   dsh        DeepSeek Harness on http://127.0.0.1:${DSH_HOST_PORT:-3080}
   cmdc       Interactive Command Code CLI
 
 The remaining arguments replace the image's default command. Examples:
-  start-container.sh
-  start-container.sh webui
-  start-container.sh dsh
-  start-container.sh cmdc
-  start-container.sh pi --continue
+  cg pi start
+  cg webui start
+  cg dsh start
+  cg cmdc start
+  cg pi start --continue
 EOF
     exit 0
     ;;

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # scripts/build-container.sh — build a caged image with the native Apple
-# `container` tool.
+# `container` tool. Invoked by the unified launcher: `cg <agent> build`.
 #
 # Usage:
-#   scripts/build-container.sh pi     # the pi agent image (./Containerfile)
-#   scripts/build-container.sh dsh    # the DeepSeek Harness image (./Containerfile.dsh)
-#   scripts/build-container.sh webui  # the pi-web-ui Web UI image (./Containerfile.webui)
-#   scripts/build-container.sh cmdc # the Command Code image (./Containerfile.commandcode)
+#   cg pi build            # the pi agent image (./Containerfile)
+#   cg dsh build           # the DeepSeek Harness image (./Containerfile.dsh)
+#   cg webui build         # the pi-web-ui Web UI image (./Containerfile.webui)
+#   cg cmdc build          # the Command Code image (./Containerfile.commandcode)
+#   scripts/build-container.sh pi  # equivalent direct call
 #
 # The image is a REQUIRED argument — there is no default, a build without
 # one (or with an unknown image) fails before doing anything.
@@ -111,12 +112,12 @@ container build \
 echo "==> Build complete: ${IMAGE_TAG}"
 case "${1}" in
 cmdc)
-    echo "==> Start it with: ${SCRIPT_DIR}/start-container.sh cmdc"
+    echo "==> Start it with: cg cmdc start"
     ;;
 dsh)
-    echo "==> Start it with: ${SCRIPT_DIR}/start-container.sh dsh"
+    echo "==> Start it with: cg dsh start"
     ;;
 webui)
-    echo "==> Start it with: ${SCRIPT_DIR}/start-container.sh webui"
+    echo "==> Start it with: cg webui start"
     ;;
 esac

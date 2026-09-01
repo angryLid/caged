@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# cg — unified caged launcher: build and start agent containers.
+#
+# Usage:
+#   cg <agent> build    # build the image for <agent> (pi|dsh|webui|cmdc)
+#   cg <agent> start    # run the container for <agent> (pi|dsh|webui|cmdc)
+#   cg <agent> start -b # rebuild the image first, then start
+#
+# Examples:
+#   cg pi build          # build the pi agent image
+#   cg pi start          # start the pi TUI
+#   cg dsh build         # build the DeepSeek Harness image
+#   cg dsh start         # start dsh on http://127.0.0.1:3080
+#   cg webui start       # start pi-web-ui on http://127.0.0.1:8787
+#   cg cmdc build        # build the Command Code image
+#   cg cmdc start        # start the Command Code CLI
+#
+# This replaces the old root-level build.sh / start.sh wrappers; all
+# environment overrides (CAGED_IMAGE, PI_VERSION, CAGED_WORKSPACE, ...) and
+# the per-image behavior live in scripts/build-container.sh and
+# scripts/start-container.sh and keep working unchanged.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+    cat >&2 <<'EOF'
+Usage: cg <agent> <start|build>
+
+Agents:
+  pi      pi agent TUI (default)
+  webui   pi-web-ui on http://127.0.0.1:${PI_WEBUI_HOST_PORT:-8787}
+  dsh     DeepSeek Harness on http://127.0.0.1:${DSH_HOST_PORT:-3080}
+  cmdc    Command Code CLI
+
+Commands:
+  build   build the image (scripts/build-container.sh)
+  start   run the container (scripts/start-container.sh)
+  start -b  rebuild the image first, then start
+
+Examples:
+  cg pi build
+  cg pi start
+  cg pi start -b
+  cg dsh build
+  cg dsh start
+  cg cmdc build
+  cg cmdc start
+EOF
+}
+
+if [ "$#" -lt 2 ]; then
+    echo "Error: cg needs an agent and a command (start or build)." >&2
+    usage
+    exit 2
+fi
+
+AGENT="$1"
+COMMAND="$2"
+shift 2
+
+case "$AGENT" in
+    pi|webui|dsh|cmdc) ;;
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    *)
+        echo "Error: unknown agent '$AGENT' — expected 'pi', 'webui', 'dsh' or 'cmdc'." >&2
+        usage
+        exit 2
+        ;;
+esac
+
+case "$COMMAND" in
+    build)
+        exec "$SCRIPT_DIR/scripts/build-container.sh" "$AGENT" "$@"
+        ;;
+    start)
+        if [ "${1:-}" = "-b" ]; then
+            shift
+            "$SCRIPT_DIR/scripts/build-container.sh" "$AGENT"
+        fi
+        exec "$SCRIPT_DIR/scripts/start-container.sh" "$AGENT" "$@"
+        ;;
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    *)
+        echo "Error: unknown command '$COMMAND' — expected 'start' or 'build'." >&2
+        usage
+        exit 2
+        ;;
+esac

@@ -51,8 +51,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
   mount of `/agent-home` for all modes; pi uses `.pi`, dsh uses `.dsh`, and
   shared CLI auth lives under `cli-auth/`.
 * **pi-web-ui Web UI (optional)** — a browser chat frontend for pi, in a
-  separate additive image (`scripts/build-container.sh webui` +
-  `scripts/start-container.sh webui`) — see
+  separate additive image (`cg webui build` + `cg webui start`) — see
   [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
 * **Command Code image (optional)** — `cmdc`, a sibling container for [Command Code](https://commandcode.ai/), which requires Node.js 22+ and stores its login/state under `seed/.commandcode/`.
 * **DeepSeek Harness (`dsh`) image (optional)** — a sibling container for
@@ -66,6 +65,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 
 ```
 caged/
+├── cg                     # unified launcher: cg <agent> <start|build> (replaces build.sh / start.sh)
 ├── Containerfile        # pi image (non-root, pinned pi version)
 ├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, acli, non-root user, skill vendor
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
@@ -205,33 +205,33 @@ tool on Apple silicon (Linux containers as lightweight VMs).
 # 1. build (only needed the first time, or when the images change). The
 #    shared base image (Containerfile.base: apt essentials including python3,
 #    glab, gh, acli, non-root user) is built automatically first. Optionally pick a pi
-#    version:   PI_VERSION=x.y.z scripts/build-container.sh pi
-scripts/build-container.sh pi
+#    version:   PI_VERSION=x.y.z cg pi build
+cg pi build
 
 # 2. run from the repo you want as the workspace. The unified launcher accepts
-#    a mode (pi, webui, or dsh); pi is the default.
+#    an agent (pi, webui, dsh, or cmdc) and a command (start); pi is the default agent.
 cd /path/to/your/repo
-/path/to/caged/scripts/start-container.sh              # pi TUI
-/path/to/caged/scripts/start-container.sh webui       # pi Web UI
-/path/to/caged/scripts/start-container.sh dsh         # dsh Web UI
-/path/to/caged/scripts/start-container.sh cmdc # Command Code CLI
-/path/to/caged/scripts/start-container.sh pi --continue # pass command args
+/path/to/caged/cg pi start              # pi TUI
+/path/to/caged/cg webui start           # pi Web UI
+/path/to/caged/cg dsh start             # dsh Web UI
+/path/to/caged/cg cmdc start            # Command Code CLI
+/path/to/caged/cg pi start --continue   # pass command args
 ```
 
-`start-container.sh` mounts the **directory you run it from** as `/workspace`. Its first argument selects the runtime (`pi`, `webui`, `dsh`, or `cmdc`, defaulting to `pi`); remaining arguments replace the image's default command.
+`cg` mounts the **directory you run it from** as `/workspace`. Its first argument selects the agent (`pi`, `webui`, `dsh`, or `cmdc`), the second the command (`build` or `start`); remaining arguments are passed through — for `start`, they replace the image's default command. `cg` replaces the old root-level `build.sh` and `start.sh` wrappers and forwards to `scripts/build-container.sh` and `scripts/start-container.sh`, so all environment overrides keep working unchanged.
 
 > **Why scripts, not compose?** caged runs a *single* disposable container — the
 > container's only job is isolation, so a compose/multi-container stack would add
 > nothing. And Apple's `container` tool doesn't support compose orchestration
-> anyway, which fits perfectly. Build/run via `scripts/build-container.sh pi` +
-> `scripts/start-container.sh`; full detail in
+> anyway, which fits perfectly. Build/run via `cg pi build` +
+> `cg pi start`; full detail in
 > [docs/APPLE-CONTAINER.md](docs/APPLE-CONTAINER.md).
 
 ## What gets mounted
 
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
-| `/workspace`   | the dir you ran `start-container.sh` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** (also backs pi's per-project session data, see below) |
+| `/workspace`   | the dir you ran `cg pi start` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** (also backs pi's per-project session data, see below) |
 | `/agent-home` (`$HOME`) | `<caged>/seed` (`$CAGED_AGENT_HOME`) | rw | **shared live agent home** — contains `.pi`, `.dsh`, and shared CLI auth; all agent modes use the same mount |
 | `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
 
@@ -317,7 +317,7 @@ never in this repo). Export the keys in your shell before starting:
 
 ```sh
 MY_DEEPSEEK_API_KEY=sk-... VOLCENGINE_API_KEY=ark-... \
-  LOCAL_API_KEY=... scripts/start-container.sh
+  LOCAL_API_KEY=... cg pi start
 ```
 
 For interactive TUI auth flows that don't use `models.json`, pi stores
@@ -325,7 +325,7 @@ credentials in `auth.json` inside the agent dir
 (`/agent-home/.pi/agent/auth.json` on the volume):
 
 ```sh
-scripts/start-container.sh     # then run  pi auth  inside the TUI
+cg pi start     # then run  pi auth  inside the TUI
 ```
 
 Never put API keys in `/workspace` — anything there is readable by pi.
@@ -360,7 +360,7 @@ Two ways to authenticate:
   disk:
 
   ```sh
-  GITLAB_TOKEN=glpat-... scripts/start-container.sh
+  GITLAB_TOKEN=glpat-... cg pi start
   # then run  glab issue list  inside the pi TUI
   ```
 
@@ -370,7 +370,7 @@ Two ways to authenticate:
   `acli` and `auth.json`):
 
   ```sh
-  echo "$GITLAB_TOKEN" | scripts/start-container.sh
+  echo "$GITLAB_TOKEN" | cg pi start
   # then pipe the same token into  glab auth login ...  inside the TUI
   ```
 
@@ -394,7 +394,7 @@ Two ways to authenticate (mirroring `glab`):
   stored credentials and never touches disk:
 
   ```sh
-  GH_TOKEN=github_pat_... scripts/start-container.sh
+  GH_TOKEN=github_pat_... cg pi start
   # then run  gh pr list  inside the pi TUI
   ```
 
@@ -404,7 +404,7 @@ Two ways to authenticate (mirroring `glab`):
   `glab`/`acli` and `auth.json`):
 
   ```sh
-  GH_TOKEN=github_pat_... scripts/start-container.sh
+  GH_TOKEN=github_pat_... cg pi start
   # then run  gh auth login --with-token  inside the TUI
   ```
 
@@ -425,7 +425,7 @@ Authenticate with an API token (created at
 `id.atlassian.com/manage-profile/security/api-tokens`) read from stdin:
 
 ```sh
-JIRA_API_TOKEN=... scripts/start-container.sh
+JIRA_API_TOKEN=... cg pi start
 # then run  acli jira auth login --site "mysite.atlassian.net" \
 #     --email you@example.com --token   inside the TUI
 ```
@@ -451,7 +451,7 @@ sibling.
 web toolchain:
 
 ```sh
-scripts/build-container.sh webui        # builds base -> pi -> webui (caged-webui:latest)
+cg webui build        # builds base -> pi -> webui (caged-webui:latest)
 ```
 
 `Containerfile.webui` is a thin layer `FROM caged:latest`: it adds the pinned
@@ -465,7 +465,7 @@ is trivial: stop using it, the pi TUI image is untouched.
 
 ```sh
 cd /path/to/your/repo
-/path/to/caged/scripts/start-container.sh webui # UI on http://127.0.0.1:8787
+/path/to/caged/cg webui start # UI on http://127.0.0.1:8787
 ```
 
 The web container gets the same hardening (`--read-only`, `--cap-drop ALL`,
@@ -550,14 +550,14 @@ top of this file). The dsh-specific pieces:
 
 Like caged, dsh is a single disposable container whose only job is isolation,
 so there's no orchestration — and Apple's `container` tool (the runtime) has
-no compose support anyway. Build and run with the scripts:
+no compose support anyway. Build and run with `cg`:
 
 ```sh
 # build (context repo root: builds the shared Containerfile.base first,
 # then the dsh image with build-arg DSH_VERSION)
-scripts/build-container.sh dsh
+cg dsh build
 # run the web UI; opens on the host loopback
-scripts/start-container.sh dsh
+cg dsh start
 open http://127.0.0.1:3080
 ```
 
@@ -599,7 +599,7 @@ in `seed/.dsh/.gitignore`, and `$DSH_HOME` is the live bind of `seed/.dsh`):
 the Web UI (Settings → Models → card → key field); dsh stores it in
 `seed/.dsh/.credentials.yaml` and resolves it per request — no restart, no
 operator env needed. An operator-injected env var of the same name (e.g. via
-`scripts/start-container.sh dsh`) shadows the stored value and renders the
+`cg dsh start`) shadows the stored value and renders the
 field read-only. The `llm-pi-ai` adapter is dormant-capable: removing the
 section empties the route set while the full pi-ai catalog stays configurable
 from the Models page.
@@ -621,7 +621,7 @@ mode via the purpose-built env knob:
 DSH_PERMISSION_MODE=danger-full-access   # default here
 ```
 
-Set by `scripts/start-container.sh dsh`; it makes the base bundle set
+Set by `cg dsh start`; it makes the base bundle set
 `sandbox/mode: danger-full-access` (bash/fs operations run as uid 1000 with no
 dsh-level file confinement) and `approval/policy: never` (no interactive
 approval prompts). The agent effectively has the full rights of the `pi` user
@@ -630,7 +630,7 @@ you want dsh's own sandbox + approval back.
 
 #### One-shot headless (no server, prints the answer and exits)
 
-Run with the `container` tool directly, mirroring `scripts/start-container.sh dsh` but
+Run with the `container` tool directly, mirroring `cg dsh start` but
 adding `dsh --profile headless "…"` as the command:
 
 ```sh
@@ -647,7 +647,7 @@ container run --rm \
   dsh:latest dsh --profile headless "explain this repo and exit"
 ```
 
-`scripts/start-container.sh dsh` starts the Web UI. It publishes
+`cg dsh start` starts the Web UI. It publishes
 `127.0.0.1:${DSH_HOST_PORT} -> 3080` via `container run -p` (host
 **loopback**, not the LAN), reaching the webserver (which binds `0.0.0.0:3080`
 inside the container via `cordis.patch.yml`). The container port is a stable
@@ -677,7 +677,7 @@ host browser :${DSH_HOST_PORT}  (host loopback)  --publish-->  container 0.0.0.0
 | `DSH_HOST_PORT` | `3080` | the host-loopback port you open in the browser (only this varies) |
 | container port | `3080` | fixed; pinned in `seed/.dsh/cordis.patch.yml` and dsh's default |
 
-Override only the host side, e.g. `DSH_HOST_PORT=8080 scripts/start-container.sh dsh`.
+Override only the host side, e.g. `DSH_HOST_PORT=8080 cg dsh start`.
 No `--host 0.0.0.0` flag is passed anywhere — the CLI's RCE guard is preserved;
 we only set the runtime config to bind inside the container, and the host publish
 stays loopback-only.
@@ -725,7 +725,7 @@ of `seed/.dsh`, so:
 ### Known gotchas / untested on this host
 
 - **Ctrl+C needs a TTY to stop cleanly (upstream signal-forwarding bug).**
-  `scripts/start-container.sh dsh` passes `-it` not because dsh is a TUI but
+  `cg dsh start` passes `-it` not because dsh is a TUI but
   as a workaround: without a TTY, Apple `container`'s foreground CLI forwards
   Ctrl+C (SIGINT) to the guest via XPC in a form its own API service can't
   decode — every press prints `failed to send signal: ... "missing signal in
@@ -752,8 +752,9 @@ of `seed/.dsh`, so:
 
 ## Environment knobs
 
-`scripts/start-container.sh` (and `scripts/build-container.sh pi|dsh|webui` /
-`scripts/build-caged-base.sh`) read these from the calling shell; defaults
+`cg` (forwarding to `scripts/start-container.sh` and
+`scripts/build-container.sh pi|dsh|webui` /
+`scripts/build-caged-base.sh`) reads these from the calling shell; defaults
 listed.
 
 | Env var | Default | Meaning |
@@ -767,7 +768,7 @@ listed.
 | `PNPM_VERSION` | `10.15.0` | pnpm version pin (build time, `build-caged-base.sh`) |
 | `YARN_VERSION` | `1.22.22` | yarn version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
-| `PI_WEB_UI_VERSION` | `0.26.0` | pi-web-ui version pin (build time, `build-container.sh webui`) |
+| `PI_WEB_UI_VERSION` | `0.26.0` | pi-web-ui version pin (build time, `cg webui build`) |
 | `CAGED_SKIP_PI` | `0` | set to `1` to skip the pi image build when building `webui` (e.g. it is already current) |
 | `PI_WEBUI_HOST_PORT` | `8787` | host-loopback port of the Web UI (`http://127.0.0.1:8787`) |
 | `PI_WEBUI_MEMORY` | `4g` | RAM for the web-mode container VM (`CAGED_MEMORY` for the TUI) |
@@ -788,7 +789,7 @@ listed.
 > `DSH_MEMORY`, `DSH_PERMISSION_MODE` — are documented in the
 > [dsh (DeepSeek Harness)](#dsh-deepseek-harness) section.
 
-## Runtime hardening (applied by scripts/start-container.sh)
+## Runtime hardening (applied by `cg start` → scripts/start-container.sh)
 
 * `--read-only` — root filesystem immutable (only `/workspace`, the shared `/agent-home`, and `/tmp` writable)
 * `--tmpfs /tmp` — scratch, `noexec,nosuid`
@@ -832,7 +833,7 @@ These are known rough edges we've consciously chosen **not** to fix yet.
   `seed/.pi/agent/settings.json` (`"packages": []`), or accept the delay
   per container start.
 * The pi version is pinned via `ARG PI_VERSION` (default `0.84.4`). Rebuild a
-  specific version with `PI_VERSION=x.y.z scripts/build-container.sh pi`. (We
+  specific version with `PI_VERSION=x.y.z cg pi build`. (We
   deliberately don't quote a number here — the project is still iterating.)
 * The web mode (`caged-webui`) bundles its own pi SDK copy (`^0.83`), which
   can lag the pinned global pi — config format is compatible, they don't
