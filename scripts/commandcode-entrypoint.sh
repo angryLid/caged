@@ -42,19 +42,19 @@ else
 fi
 
 # --- declarative skills install (best-effort) ------------------------------
-# Command Code scans ~/.commandcode/skills/ for skills. The skill repos are
-# cloned into the IMAGE at build time (see Containerfile.base) under
-# /opt/caged/skills/vendor; at container start we only copy the enabled
-# skills from there into the seed's skills dir — no network, no git. The
-# config (seed/skills.json) lives at the seed root, so it is managed with
-# the rest of the config. Non-fatal — if the config or baked vendor is
-# missing, we log a warning and still launch.
+# Command Code scans ~/.commandcode/skills/ for skills. The git skill source
+# repos are cloned on the HOST into the seed (seed/skills-sync/vendor/skills)
+# by scripts/build-caged-base.sh, and the seed is mounted at /agent-home — so
+# this step only copies the enabled skills from there into the seed's skills
+# dir: no network, no git at start. The vendor dir is derived from --seed, so
+# it needs no flag. The config (seed/skills.json) lives at the seed root, so
+# it is managed with the rest of the config. Non-fatal — if the config or the
+# vendor is missing, we log a warning and still launch.
 if [ -f /agent-home/skills.json ] && [ -f /opt/caged/skills-sync.mjs ]; then
     echo "command-code: installing skills (best-effort)..."
     if ! node /opt/caged/skills-sync.mjs \
             --config /agent-home/skills.json \
             --seed /agent-home \
-            --vendor /opt/caged/skills/vendor \
             --target cmdc \
             --link-only; then
         echo "command-code: warning: skills install did not complete (exit $?) — continuing" >&2

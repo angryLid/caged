@@ -57,9 +57,10 @@ seed/cli-auth/gh/*
 !seed/cli-auth/acli/.gitkeep
 !seed/cli-auth/gh/.gitkeep
 
-# skills-sync: local-dev clones of external skill repos (only used when running
-# skills-sync.mjs by hand; at container start the repos come from the image-
-# baked /opt/caged/skills/vendor, not from here)
+# skills-sync: clones of the external skill repos, refreshed by
+# scripts/build-caged-base.sh (and by running skills-sync.mjs by hand). They
+# live in the seed so every container reaches them through the seed mount;
+# they are third-party checkouts, so they stay out of this repo's history.
 seed/skills-sync/vendor/
 # skills-sync: generated skill copies in each agent's seed skills dir
 # (installed at container start). Sources of truth live in seed/skills-src/

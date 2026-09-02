@@ -4,9 +4,7 @@ caged runs a **single disposable container whose only job is isolation**, so
 container orchestration is unnecessary — and Apple's own native
 [`container`](https://github.com/apple/container) tool (Linux containers as
 lightweight VMs, optimized for Apple silicon) has **no compose support**
-anyway, which fits. The runtime is therefore three scripts plus an adjusted
-`.dockerignore` (its build-context indexing mishandles the classic
-deep-negation `.dockerignore` form):
+anyway, which fits. The runtime is therefore three scripts (build, base, run).
 
 | What | Command |
 |---|---|
@@ -23,24 +21,27 @@ The scripts honor the env knobs `CAGED_IMAGE`, `CAGED_WORKSPACE` and
 provider/CLI keys from the caller's environment. The complete `seed` is
 mounted at `/agent-home` for all modes, including shared CLI auth.
 
-## `.dockerignore`: per-level negation
+## `.dockerignore`: keep `seed/` out entirely
 
-`seed/` must stay out of the build context except one file: the Containerfile
-COPYs `seed/.pi/agent/skills.json` at build time to drive the build-time
-skill clone. The obvious way to write that is the collapsed deep-negation
-form:
+The build context excludes `seed/` wholesale — no Containerfile COPYs anything
+out of the seed. The git skill sources are cloned on the **host** into
+`seed/skills-sync/vendor/` by `scripts/build-caged-base.sh`, and every other
+seed file (agent homes, `skills.json`, `prompts.json`, `skills-src/`,
+`prompt-src/`) reaches a container through the live bind mount at
+`/agent-home`.
+
+Keep it that way. If you ever do need one seed file inside an image, note that
+`container build`'s context indexer does **not** honor the collapsed
+deep-negation form — the `!` entries never re-include the file:
 
 ```dockerignore
 seed/
 !seed/.pi/
 !seed/.pi/agent/
-!seed/.pi/agent/skills.json
+!seed/.pi/agent/some.json
 ```
 
-`container build`'s context indexer doesn't honor it — the `!` entries never
-re-include the file, so `skills.json` never reaches the build and the
-build-time clone breaks. The per-level ignore/re-include form works on both
-engines and is what the repo ships:
+Only the verbose per-level ignore/re-include form works on both engines:
 
 ```dockerignore
 seed/*
@@ -48,11 +49,13 @@ seed/*
 seed/.pi/*
 !seed/.pi/agent/
 seed/.pi/agent/*
-!seed/.pi/agent/skills.json
+!seed/.pi/agent/some.json
 ```
 
-Don't "simplify" it back to the collapsed form — it regresses the Apple
-path.
+The repo previously shipped exactly that to smuggle `skills.json` into the
+build; moving the clone to the host removed the need, which is the simpler
+end state — don't reintroduce a seed `COPY` without also reintroducing the
+verbose form.
 
 ## The scripts
 
@@ -69,6 +72,10 @@ path.
   glab, gh, acli, non-root user; tag `caged-base:latest`) — so the pi and dsh
   image builds share one cached base. Skip that with `CAGED_SKIP_BASE=1`,
   or point both at a custom `CAGED_BASE_IMAGE`.
+- **`scripts/build-caged-base.sh`** — builds that base, and first clones/pulls
+  the git skill sources on the host into `seed/skills-sync/vendor/` (needs
+  host Node.js; skip with `CAGED_SKIP_SKILLS_SYNC=1`). The repos deliberately
+  never enter an image — the seed mount carries them into every container.
 - **`scripts/start-container.sh`** (invoked by `cg <agent> start`) — `container run` wiring the two mounts
   (`/workspace`, the live seed `~/.pi`), the
   environment, and the hardening flags the tool supports (`--read-only`,

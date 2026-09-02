@@ -67,7 +67,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 caged/
 ├── cg                     # unified launcher: cg <agent> <start|build> (replaces build.sh / start.sh)
 ├── Containerfile        # pi image (non-root, pinned pi version)
-├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, acli, non-root user, skill vendor
+├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, acli, non-root user, sync scripts
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.commandcode # OPTIONAL: Command Code image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
@@ -77,6 +77,7 @@ caged/
 │   ├── .dsh/            # dsh's $DSH_HOME: cordis.patch.yml + generated config, skills/
 │   ├── .commandcode/    # Command Code's HOME state: settings.json (bypass), skills/
 │   ├── skills-src/      # git-tracked local skills (source of truth, shared by all agents)
+│   ├── skills-sync/     # gitignored: host clones of the external skill repos (vendor/)
 │   └── skills.json      # declarative skills config (shared by all agents)
 ├── scripts/
 │   ├── build-caged-base.sh  # shared base image build (Containerfile.base) — built automatically by the one below
@@ -96,7 +97,8 @@ caged/
 
 > `scripts/skills-sync.mjs` is also baked into the base image (see
 > `Containerfile.base`) so every container start can install skills **without**
-> the workspace mounted.
+> the workspace mounted. Only the script is — the skill repos themselves are
+> not in the image; they live in the seed.
 ```
 
 ## Skills (“skills-sync”)
@@ -114,11 +116,14 @@ skill with a `SKILL.md`).
 Skills come from two kinds of source, resolved serially in declaration order
 (later sources override earlier ones on basename collision):
 
-* **`type: "git"`** — clonable repos. These are cloned **at image build time**
-  (network) into a vendor dir baked into the base image
-  (`/opt/caged/skills/vendor`). At **container start** each entrypoint only
-  copies the enabled skills from that baked set into the seed's skills dirs —
-  **no network, no git at start**.
+* **`type: "git"`** — clonable repos. These are cloned **on the host, at build
+  time** (`scripts/build-caged-base.sh`, i.e. any `cg <agent> build`) into a
+  vendor dir inside the seed (`seed/skills-sync/vendor/skills/`). The repos are
+  **not** baked into the image — the seed is bind-mounted into every container
+  anyway, so at **container start** each entrypoint just copies the enabled
+  skills out of that vendor into the seed's skills dirs — **no network, no git
+  at start**. Skip the clone step with `CAGED_SKIP_SKILLS_SYNC=1` (offline
+  rebuilds reuse whatever is already vendored).
 * **`type: "local"`** — skills you maintain directly in this repo, in
   `seed/skills-src/` (git-tracked, the source of truth). They live in the seed
   already, so they need **no image build step** — the entrypoint copies
@@ -141,7 +146,7 @@ node scripts/skills-sync.mjs            # clone/pull git sources, then install i
 node scripts/skills-sync.mjs --dry-run  # preview without changing anything
 node scripts/skills-sync.mjs --link-only     # install only, from an existing vendor + local sources (no git/network)
 node scripts/skills-sync.mjs --link-only --target pi    # install into one agent's dir only (what container start does)
-node scripts/skills-sync.mjs --clone-only    # clone/pull git sources only (image build step)
+node scripts/skills-sync.mjs --clone-only    # clone/pull git sources only (what the build script runs)
 ```
 
 - **`seed/skills.json`** — the source of truth: a `sources[]` list. Each git
@@ -155,10 +160,11 @@ node scripts/skills-sync.mjs --clone-only    # clone/pull git sources only (imag
   enabled skill into every target. Stale managed copies are removed, so
   dropping a skill from `enabled` uninstalls it. Unmanaged skills (anything
   not carrying a marker) are never clobbered.
-- The generated copies in each `skills/` dir and the local-dev vendor are
+- The generated copies in each `skills/` dir and the vendor clones are
   **gitignored** and regenerated — edit **`seed/skills-src/`** (your own
-  skills) or `seed/skills.json` (declarations), then re-run the script (or
-  rebuild + restart the container to pick up newly-added git repos).
+  skills) or `seed/skills.json` (declarations), then re-run the script. Adding
+  a whole new git source needs no image rebuild either, just a re-run (or any
+  `cg <agent> build`, which clones as part of the base step).
 
 > Any agent can run this for you: ask it to “sync skills” (uses the
 > `skills-sync` skill, installed into every agent's skills dir).
@@ -199,13 +205,16 @@ into that agent's entrypoint.
 ## Quickstart
 
 Requirements: Apple's native [`container`](https://github.com/apple/container)
-tool on Apple silicon (Linux containers as lightweight VMs).
+tool on Apple silicon (Linux containers as lightweight VMs), plus **Node.js on
+the host** — the build clones the git skill sources into the seed with
+`scripts/skills-sync.mjs` (skip that step with `CAGED_SKIP_SKILLS_SYNC=1`).
 
 ```sh
 # 1. build (only needed the first time, or when the images change). The
 #    shared base image (Containerfile.base: apt essentials including python3,
-#    glab, gh, acli, non-root user) is built automatically first. Optionally pick a pi
-#    version:   PI_VERSION=x.y.z cg pi build
+#    glab, gh, acli, non-root user) is built automatically first, and the git
+#    skill repos are cloned into seed/skills-sync/vendor/ on the host.
+#    Optionally pick a pi version:   PI_VERSION=x.y.z cg pi build
 cg pi build
 
 # 2. run from the repo you want as the workspace. The unified launcher accepts
@@ -457,8 +466,8 @@ cg webui build        # builds base -> pi -> webui (caged-webui:latest)
 `Containerfile.webui` is a thin layer `FROM caged:latest`: it adds the pinned
 `pi-web-ui` package and changes the CMD. The shared base includes the node-pty
 C++ build toolchain (`build-essential` and `python3`); node-pty ships no Linux
-prebuilds, so it must run `node-gyp rebuild` at install time. The entrypoint, the build-time
-skill vendor and the chrome-devtools MCP are inherited unchanged. Rollback
+prebuilds, so it must run `node-gyp rebuild` at install time. The entrypoint, the
+skills-sync script and the chrome-devtools MCP are inherited unchanged. Rollback
 is trivial: stop using it, the pi TUI image is untouched.
 
 **Run** — same workflow as the TUI, from the repo you want as the workspace:

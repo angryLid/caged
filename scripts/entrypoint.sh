@@ -94,21 +94,21 @@ for dir in "$PI_HOME" "$PI_HOME/agent" /agent-home/cli-auth/glab /agent-home/cli
 done
 
 # --- 3. declarative skills install (best-effort) -------------------------
-# pi scans ~/.pi/agent/skills/ for skills. The skill repos are cloned into
-# the IMAGE at build time (see Containerfile.base) under
-# /opt/caged/skills/vendor; at container start we only copy the enabled
-# skills from there into the seed's skills dirs — no network, no git. The
-# config (seed/skills.json) lives at the seed root and is shared by every
-# agent image (pi, dsh, cmdc); each entrypoint runs the same --link-only
-# install, which copies each enabled skill into every configured target.
-# Non-fatal — if the config or baked vendor is missing, we log a warning and
-# still launch pi.
+# pi scans ~/.pi/agent/skills/ for skills. The git skill source repos are
+# cloned on the HOST into the seed (seed/skills-sync/vendor/skills) by
+# scripts/build-caged-base.sh, and the seed is mounted at /agent-home — so
+# this step only copies the enabled skills from there into the seed's skills
+# dirs: no network, no git at start. The vendor dir is derived from --seed,
+# so it needs no flag. The config (seed/skills.json) lives at the seed root
+# and is shared by every agent image (pi, dsh, cmdc); each entrypoint runs
+# the same --link-only install, which copies each enabled skill into every
+# configured target. Non-fatal — if the config or the vendor is missing, we
+# log a warning and still launch pi.
 if [ -f /agent-home/skills.json ] && [ -f /opt/caged/skills-sync.mjs ]; then
     echo "caged: installing skills (best-effort)..."
     if ! node /opt/caged/skills-sync.mjs \
             --config /agent-home/skills.json \
             --seed /agent-home \
-            --vendor /opt/caged/skills/vendor \
             --target pi \
             --link-only; then
         echo "caged: warning: skills install did not complete (exit $?) — continuing" >&2

@@ -25,27 +25,28 @@ What is durable automatically:
 **install destination** of the skills-sync tool (`skills-sync.mjs`), which
 regenerates it from sources. This matters a lot for where you edit a skill:
 
-* **Managed skills** — declared in `seed/.pi/agent/skills.json` under
-  `sources[].enabled`, coming from either a **git** repo (cloned at build
-  time) or the **local** source (`skills-src/`, git-tracked). Their installed
-  copies in `skills/` carry a hidden `.caged-skill-managed` marker and are
-  **gitignored + overwritten** on every sync / container start. The source of
-  truth is the *source* (git repo or `skills-src/`), NOT `skills/`.
+* **Managed skills** — declared in `seed/skills.json` under
+  `sources[].enabled`, coming from either a **git** repo (cloned on the host at
+  build time into `seed/skills-sync/vendor/`) or the **local** source
+  (`seed/skills-src/`, git-tracked). Their installed copies in `skills/` carry
+  a hidden `.caged-skill-managed` marker and are **gitignored + overwritten**
+  on every sync / container start. The source of truth is the *source* (git
+  repo or `skills-src/`), NOT `skills/`.
 
   > **Edit the source, then re-run sync.**
-  > For a local skill: edit `seed/.pi/agent/skills-src/<name>/SKILL.md`, then
-  > run `node /opt/caged/skills-sync.mjs --config ... --seed ... --vendor ...
-  > --link-only` (or let the container restart re-sync). Editing `skills/`
-  > directly is pointless — it will be overwritten.
+  > For a local skill: edit `seed/skills-src/<name>/SKILL.md`, then run
+  > `node /opt/caged/skills-sync.mjs --config /agent-home/skills.json --seed
+  > /agent-home --link-only` (or let the container restart re-sync). Editing
+  > `skills/` directly is pointless — it will be overwritten.
 
-* **Free-standing skills** — hand-created skills you drop straight into
-  `seed/.pi/agent/skills/<name>/` and do **not** declare in `skills.json`.
+* **Free-standing skills** — hand-created skills you drop straight into an
+  agent's `skills/<name>/` dir and do **not** declare in `skills.json`.
   They are unmanaged (no `.caged-skill-managed` marker) and persist as-is.
 
-**How to tell them apart:** if a skill is listed in
-`seed/.pi/agent/skills.json` → `enabled`, it is managed — edit the source, not
-`skills/`. If it is not in the config, it is free-standing and `skills/` is
-fine. The `skills-sync` skill has the full picture.
+**How to tell them apart:** if a skill is listed in `seed/skills.json` →
+`enabled`, it is managed — edit the source, not `skills/`. If it is not in the
+config, it is free-standing and `skills/` is fine. The `skills-sync` skill has
+the full picture.
 
 Runtime state that must **not** be committed to git:
 

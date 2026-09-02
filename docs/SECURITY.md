@@ -48,6 +48,18 @@ the host filesystem beyond the mount, or persist on the host.
    risk analysis. `glab` and `gh` still prefer `GITLAB_TOKEN` / `GH_TOKEN`
    from the env when set; acli has no env path.
 
+5. **Skill sources sit in the read-write seed.** The external skill repos are
+   cloned on the host into `seed/skills-sync/vendor/` and reached through the
+   rw `/agent-home` bind, so an agent can edit a skill and every agent picks
+   that up on the next start. This is not a new capability — the *installed*
+   skill copies (and `skills-src/`) already lived in the same rw mount, and an
+   agent that can write its own skills dir can already alter its own
+   instructions. Keeping the vendor out of the image trades a read-only copy
+   of third-party content for a smaller image and no stale baked-in repos.
+   → Review `git status` in the seed after untrusted runs; the installed copies
+   are gitignored, but `skills-src/` and `skills.json` are tracked, so tampering
+   with a source of truth shows up in a diff.
+
 ## pi-web-ui (Web UI) mode
 
 `scripts/start-container.sh webui` serves the same agent through a browser

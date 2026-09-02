@@ -36,11 +36,13 @@ it can remove stale ones without ever touching skills it doesn't own.
 
 ### Sources
 
-* **Git sources** are cloned at **image build time** (see `Containerfile.base`)
-  into `/opt/caged/skills/vendor`, baked into the shared base image that every
-  agent image inherits. At **container start** each agent's entrypoint only
-  copies the enabled skills from that baked set into the seed — no network, no
-  git at start.
+* **Git sources** are cloned **on the host at build time**
+  (`scripts/build-caged-base.sh`, which any `cg <agent> build` runs) into
+  `seed/skills-sync/vendor/skills/`. They are **not** baked into any image —
+  the seed is bind-mounted into every container, so the vendor is reachable at
+  `/agent-home/skills-sync/vendor/skills/` inside one. At **container start**
+  each agent's entrypoint only copies the enabled skills from that vendor into
+  the seed — no network, no git at start.
 * **Local sources** live directly in the seed at `seed/skills-src/`
   (git-tracked — the source of truth). They do **not** go through the
   image/vendor; at container start the entrypoint copies enabled local skills
@@ -57,7 +59,7 @@ node scripts/skills-sync.mjs              # local dev: clone/pull git sources + 
 node scripts/skills-sync.mjs --dry-run    # preview without changing anything
 node scripts/skills-sync.mjs --link-only  # install only, from an existing vendor + local sources (no git/network)
 node scripts/skills-sync.mjs --link-only --target pi    # one agent's dir only (what container start does)
-node scripts/skills-sync.mjs --clone-only # clone/pull git sources only (image build step)
+node scripts/skills-sync.mjs --clone-only # clone/pull git sources only (what the build script runs)
 node scripts/skills-sync.mjs --seed /agent-home   # explicit seed dir (default: <project>/seed)
 ```
 
@@ -69,14 +71,14 @@ Exit codes: `0` ok, `1` fatal, `2` warnings only (missing skill / collision) —
 
 ## When the user edits `skills.json`
 
-- Adding a skill to an existing git source's `enabled` → re-run the script (or
-  rebuild + restart if the repo isn't already in the image vendor).
+- Adding a skill to an existing git source's `enabled` → re-run the script.
 - Adding a skill to the **local** source's `enabled` → just re-run the script;
-  local skills live in the seed and need no rebuild.
-- Adding a whole new **git repo** source → it must be cloned, so **rebuild the
-  image** (the build-time `--clone-only` step pulls it); then restart.
+  local skills live in the seed and need no clone at all.
+- Adding a whole new **git repo** source → it must be cloned, so run the script
+  (default mode, or `--clone-only`) before the next container start. **No image
+  rebuild is needed** — the repos live in the seed, not in the image.
 - Adding a **local directory** source → point `dir` at a git-tracked folder in
-  the seed and re-run; no rebuild needed.
+  the seed and re-run.
 - Removing a skill → the script removes its managed copies on the next run.
 
 ## Notes / gotchas
@@ -88,9 +90,10 @@ Exit codes: `0` ok, `1` fatal, `2` warnings only (missing skill / collision) —
 - **Collisions resolve serially, last wins**: later sources override earlier
   ones on basename collision. By default the local source is declared last, so
   your own skill with the same name as an upstream one wins.
-- **New git repo sources require a rebuild.** Only skills whose repos are
-  already baked into the image can be enabled at container start; adding a new
-  repo means a `scripts/build-container.sh` rebuild (the build-time
-  `--clone-only` step pulls it). Local sources never require a rebuild.
-- Git repos are plain clones (not submodules) — `seed/skills.json` is the
-  source of truth, and a fresh image self-heals by re-cloning at build time.
+- **New git repo sources need a clone, not a rebuild.** Only skills whose repos
+  are already in `seed/skills-sync/vendor/` can be enabled at container start
+  (the start is offline by design), so run the sync once after adding a source.
+  Local sources never need even that.
+- Git repos are plain clones (not submodules) and gitignored — `seed/skills.json`
+  is the source of truth, and a missing vendor self-heals on the next
+  `--clone-only` run.

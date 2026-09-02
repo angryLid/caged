@@ -22,9 +22,12 @@
  * Skills come from two kinds of source, resolved serially in declaration
  * order (later sources override earlier ones on basename collision):
  *   * type "git"   — clonable repos (e.g. gitlab-ai-skills, mattpocock-skills).
- *     Cloned at **image build time** (network) into a vendor dir baked into
- *     the image; the container start only copies the enabled skills from that
- *     vendored set — no network, no git, at start.
+ *     Cloned on the **host** into a vendor dir inside the seed
+ *     (<seed>/skills-sync/vendor/skills) by scripts/build-caged-base.sh, i.e.
+ *     when you build. The repos are NOT baked into the image: the seed is
+ *     bind-mounted into every container anyway, so a container start just
+ *     copies the enabled skills out of the vendor — still no network and no
+ *     git at start.
  *   * type "local" — skills maintained directly in the repo, in a directory
  *     inside the seed (default `skills-src/`, resolved relative to the seed
  *     root — NOT inside any one agent's home, since the skills are shared).
@@ -33,15 +36,16 @@
  *     container start like any other.
  *
  * Network vs. link is deliberately split:
- *   * Git skill repos are cloned at **image build time** (network) into a
- *     vendor dir baked into the image. The container start only copies the
- *     enabled skills from that vendored set into the seed's skills dirs — no
- *     network, no git, at start.
+ *   * Git skill repos are cloned at **build time on the host** (network) into
+ *     the seed's vendor dir. The container start only copies the enabled
+ *     skills from that vendored set into the seed's skills dirs — no network,
+ *     no git, at start.
  *   * Running the script by hand (local dev) clones + installs in one step.
  *
  * Modes:
  *   default / no mode flag   clone/pull git sources, then install enabled skills
- *   --clone-only             only clone/pull git sources into the vendor dir (build)
+ *   --clone-only             only clone/pull git sources into the vendor dir
+ *                            (build time, on the host)
  *   --link-only              only install enabled skills from an existing
  *                            vendor dir + local seed sources into the seed
  *                            skills dirs (container start) — no network / git
@@ -62,9 +66,10 @@
  *              to it, and local sources default to <seed>/skills-src.
  *              Defaults to <project>/seed.
  *   --vendor   where the git skill source repos live. Defaults to
- *              <seed>/skills-sync/vendor/skills (used by local-dev mode). At
- *              container start the entrypoint passes the image-baked dir,
- *              e.g. /opt/caged/skills/vendor.
+ *              <seed>/skills-sync/vendor/skills — inside the seed, so the
+ *              same dir is reached from the host (<project>/seed/...) and from
+ *              a container (/agent-home/...) through the seed bind mount.
+ *              Only needed to point at a vendor outside the seed.
  *   --target   install only into the named linkTarget (container start — each
  *              agent's entrypoint syncs just its own skills dir). Without it
  *              (local dev) every target is synced.
@@ -119,10 +124,32 @@ function run(cmd, argsArr, opts = {}) {
   if (dryRun) { console.log(`[dry-run] $ ${cmd} ${argsArr.join(" ")}`); return; }
   // Inherit stderr (git clone/pull progress), but capture stdout: git prints
   // clone/pull summaries to stdout that would otherwise pollute every
-  // container start log. `inherit` for stdout was fine when the sync ran
-  // during an image build, but at runtime it is noise.
+  // container start log — at runtime that is noise, while a host-side clone
+  // is driven by the build script and does not need the summary either.
   execFileSync(cmd, argsArr, { stdio: ["inherit", "pipe", "inherit"], ...opts });
 }
+
+// Environment for the git child processes.
+//
+// http.version=HTTP/1.1: over HTTP/2, some egress paths (transparent proxies
+// that resolve github.com to a local address) make GitHub answer git's
+// anonymous upload-pack POST with 401 + `WWW-Authenticate: Basic`. git then
+// tries to prompt for a username and dies with a misleading "could not read
+// Username". The same requests succeed over HTTP/1.1, so pin it — it costs
+// nothing for a handful of clones. GIT_CONFIG_* is used instead of writing to
+// a config file so nothing outside this process is affected.
+//
+// GIT_TERMINAL_PROMPT=0: never wait on a tty we may not have (build script,
+// container start). A genuinely private repo then fails with a clear error
+// instead of hanging or blaming a missing username.
+const GIT_ENV = {
+  ...process.env,
+  GIT_TERMINAL_PROMPT: "0",
+  GIT_CONFIG_COUNT: "1",
+  GIT_CONFIG_KEY_0: "http.version",
+  GIT_CONFIG_VALUE_0: "HTTP/1.1",
+};
+const git = (argsArr) => run("git", argsArr, { env: GIT_ENV });
 
 // Install a skill by copying its source dir into the target location.
 //
@@ -133,11 +160,14 @@ function run(cmd, argsArr, opts = {}) {
 function installSkill(src, dest, st) {
   // Unlink a pre-existing symlink (legacy managed link / broken link) so the
   // recursive `cp -r` never follows it into the vendor dir; real managed dirs
-  // are removed recursively.
-  if (st && st.isSymbolicLink()) rmSync(dest);
-  else rmSync(dest, { recursive: true, force: true });
+  // are removed recursively. Skipped under --dry-run, which must not touch a
+  // single file — the marker write below is skipped for the same reason.
+  if (!dryRun) {
+    if (st && st.isSymbolicLink()) rmSync(dest);
+    else rmSync(dest, { recursive: true, force: true });
+  }
   run("cp", ["-r", "--", src + "/", dest]);
-  writeFileSync(join(dest, MARKER), "managed by caged skills-sync\n");
+  if (!dryRun) writeFileSync(join(dest, MARKER), "managed by caged skills-sync\n");
 }
 
 function loadConfig() {
@@ -145,19 +175,19 @@ function loadConfig() {
   return JSON.parse(readFileSync(configPath, "utf8"));
 }
 
-// --- 1. clone / pull git sources (build time / local dev only). ------------
+// --- 1. clone / pull git sources (build time on the host / local dev). -----
 // Local sources are not cloned — they live directly in the seed (SEED_DIR).
 function syncRepos(cfg) {
-  mkdirSync(VENDOR_DIR, { recursive: true });
+  if (!dryRun) mkdirSync(VENDOR_DIR, { recursive: true });
   for (const src of cfg.sources) {
     if (src.type === "local") continue;
     const dest = join(VENDOR_DIR, src.name);
     if (existsSync(join(dest, ".git"))) {
       console.log(`[pull] ${src.name}`);
-      run("git", ["-C", dest, "pull", "--ff-only", "--quiet"]);
+      git(["-C", dest, "pull", "--ff-only", "--quiet"]);
     } else {
       console.log(`[clone] ${src.name} <- ${src.url}`);
-      run("git", ["clone", "--quiet", src.url, dest]);
+      git(["clone", "--quiet", src.url, dest]);
     }
   }
 }
@@ -169,9 +199,9 @@ function resolveSkills(cfg) {
   const manifest = [];
   const seenBasename = new Map();
   for (const source of cfg.sources) {
-    // git sources live in the (build-time cloned) vendor dir; local sources
-    // live in the shared seed, resolved relative to SEED_DIR (the seed root,
-    // not any one agent's home).
+    // git sources live in the (host-cloned) vendor dir inside the seed; local
+    // sources live in the shared seed, resolved relative to SEED_DIR (the seed
+    // root, not any one agent's home).
     const sourceRoot = source.type === "local"
       ? join(SEED_DIR, source.dir ?? "skills-src")
       : join(VENDOR_DIR, source.name, source.skillsDir);
@@ -216,7 +246,17 @@ function linkTargets(cfg, manifest) {
   }
   for (const t of targets) {
     const linkDir = join(SEED_DIR, t.dir);
-    mkdirSync(linkDir, { recursive: true });
+    if (dryRun) {
+      // A dry run creates nothing, so a not-yet-existing target dir has no
+      // contents to reconcile — report the mkdir and the installs, then move on.
+      if (!existsSync(linkDir)) {
+        console.log(`[dry-run] $ mkdir -p ${linkDir}`);
+        for (const m of manifest) run("cp", ["-r", "--", m.src + "/", join(linkDir, m.base)]);
+        continue;
+      }
+    } else {
+      mkdirSync(linkDir, { recursive: true });
+    }
 
     const wanted = new Set(manifest.map((m) => m.base));
 
@@ -231,7 +271,8 @@ function linkTargets(cfg, manifest) {
       let st;
       try { st = lstatSync(p); } catch { continue; }
       if (isManagedAt(p, st)) {
-        rmSync(p, { recursive: true, force: true });
+        if (dryRun) console.log(`[dry-run] remove stale ${p}`);
+        else rmSync(p, { recursive: true, force: true });
       }
     }
 
