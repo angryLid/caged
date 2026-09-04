@@ -102,7 +102,7 @@ caged/
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
     ├── CLI-AUTH.md           # glab/gh/jira-cli/cfl auth behavior, persistence & risks
-    ├── APPLE-CONTAINER.md    # running via Apple's container tool
+    ├── APPLE-CONTAINER.md    # where Apple's container tool diverges from docker
     └── AGENT-INTEGRATION.md  # SOP for adding a new agent image to caged
 
 > `scripts/skills-sync.mjs` is also baked into the base image (see
@@ -243,8 +243,8 @@ cd /path/to/your/repo
 > container's only job is isolation, so a compose/multi-container stack would add
 > nothing. And Apple's `container` tool doesn't support compose orchestration
 > anyway, which fits perfectly. Build/run via `cg pi build` +
-> `cg pi start`; full detail in
-> [docs/APPLE-CONTAINER.md](docs/APPLE-CONTAINER.md).
+> `cg pi start`; see [docs/APPLE-CONTAINER.md](docs/APPLE-CONTAINER.md) for
+> where the tool diverges from docker.
 
 ## What gets mounted
 
@@ -909,4 +909,4 @@ These are known rough edges we've consciously chosen **not** to fix yet.
 Internal project. Built with Apple's `container` tool on Apple silicon macOS.
 The image itself remains a plain OCI image, so it can also be run directly
 under podman/docker (with equivalent hardening flags) if you're not on Apple
-silicon — see docs/APPLE-CONTAINER.md.
+silicon.

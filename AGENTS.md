@@ -70,7 +70,8 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   single disposable container.
 - **Apple `container` is the runtime**, and it doesn't support orchestration
   anyway, which fits. Build/run via `scripts/build-container.sh pi` +
-  `scripts/start-container.sh`; full detail in `docs/APPLE-CONTAINER.md`.
+  `scripts/start-container.sh`; `docs/APPLE-CONTAINER.md` records only where
+  the tool diverges from docker.
 - **dsh lives flat at the repo root** — `Containerfile.dsh`, the dsh docs in
   `README.md`, `scripts/dsh-*`, `seed/.dsh/`. It's a second agent image
   (DeepSeek Harness), sibling to pi: keep it flat, don't re-nest it under a
