@@ -39,6 +39,12 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
   (replaces the Atlassian-maintained `acli`). Env-token auth
   (`JIRA_API_TOKEN`), no token stored on disk; scripting-friendly output
   (`--plain`/`--raw` JSON/`--csv`).
+* **Confluence CLI (`cfl` v1.3.96)** — MIT-licensed
+  [atlassian-cli](https://github.com/open-cli-collective/atlassian-cli)
+  Confluence Cloud CLI baked in: read/search/create/edit pages, spaces,
+  attachments; `page view` renders **Markdown** by default — made for agents.
+  Env-token auth (`CFL_URL`/`CFL_EMAIL`/`CFL_API_TOKEN`, same Atlassian API
+  token as `JIRA_API_TOKEN`), no token at rest.
 * **Python dependency tools** — `python`, `pip`, and `uv` are installed in the
   shared base image for Python scripting, virtual environments, and dependency
   management.
@@ -71,7 +77,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 caged/
 ├── cg                     # unified launcher: cg <agent> <start|build> (replaces build.sh / start.sh)
 ├── Containerfile        # pi image (non-root, pinned pi version)
-├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, jira-cli, non-root user, sync scripts
+├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, jira-cli, cfl, non-root user, sync scripts
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.commandcode # OPTIONAL: Command Code image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
@@ -95,7 +101,7 @@ caged/
 ├── README.md             # this file — docs for both images (pi by default, dsh as sibling)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
-    ├── CLI-AUTH.md           # glab/gh/jira-cli auth behavior, persistence & risks
+    ├── CLI-AUTH.md           # glab/gh/jira-cli/cfl auth behavior, persistence & risks
     ├── APPLE-CONTAINER.md    # running via Apple's container tool
     └── AGENT-INTEGRATION.md  # SOP for adding a new agent image to caged
 
@@ -216,7 +222,7 @@ the host** — the build clones the git skill sources into the seed with
 ```sh
 # 1. build (only needed the first time, or when the images change). The
 #    shared base image (Containerfile.base: apt essentials including python3,
-#    glab, gh, jira-cli, non-root user) is built automatically first, and the git
+#    glab, gh, jira-cli, cfl, non-root user) is built automatically first, and the git
 #    skill repos are cloned into seed/skills-sync/vendor/ on the host.
 #    Optionally pick a pi version:   PI_VERSION=x.y.z cg pi build
 cg pi build
@@ -430,7 +436,51 @@ which resolves to the seed (`XDG_CONFIG_HOME` → gitignored `seed/.config/`),
 so it survives restarts without caged managing it. Unlike `glab` there is no
 persisted token to renew: the token always comes from `JIRA_API_TOKEN`, so
 re-auth happens only when the token rotates. Auth behavior and pitfalls for
-all three CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
+all four CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
+
+## cfl (Confluence)
+
+[`cfl`](https://github.com/open-cli-collective/atlassian-cli) (binary `cfl`) —
+the Confluence Cloud CLI from the MIT-licensed `open-cli-collective/atlassian-cli`
+monorepo — is baked into the shared base image (v1.3.96, pinned `ARG CFL_VERSION`
+in `Containerfile.base`); both the pi and the dsh image inherit it. It fills
+the gap jira-cli leaves: **Confluence pages** (read/search/create/edit/copy),
+spaces, attachments, comments and labels, via the Confluence v2 REST API.
+Cloud only — [mcp-atlassian](https://github.com/sooperset/mcp-atlassian) is the
+alternative if you ever need Server/Data Center.
+
+Deliberately agent-friendly: `cfl page view <id>` renders the page body as
+**Markdown** (ADF/XHTML on request via `--body-format`), `cfl page list
+--space KEY` and `cfl search "query" --space KEY`/`--cql "..."` cover
+discovery, `--output plain`/`--full` shape terminal output, and
+`--non-interactive` (plus `init --token-stdin`/`--token-from-env`) keeps every
+flow scriptable. Env-token auth, no token at rest:
+
+```sh
+CFL_URL=https://your-site.atlassian.net CFL_EMAIL=you@example.com \
+CFL_API_TOKEN=... cg pi start
+# then run  cfl page view 12345  inside the pi TUI
+```
+
+The token is the **same Atlassian API token** as `JIRA_API_TOKEN`. You only
+need to pass **one** of the two: `start-container.sh` derives the other at
+start, so existing `JIRA_API_TOKEN`-only setups gain Confluence access with
+zero extra env vars:
+
+```sh
+# Same Atlassian token for both CLIs — either one is enough:
+JIRA_API_TOKEN=... cg pi start            # cfl gets CFL_API_TOKEN from it
+# CFL_API_TOKEN=... cg pi start           # jira gets JIRA_API_TOKEN from it
+# then run  cfl page view 12345  inside the pi TUI
+```
+
+Unlike jira-cli there is no config prerequisite: the three `CFL_*` env vars
+alone suffice (`CFL_EMAIL`/`CFL_URL` are still individually required; only
+the token is shared). `cfl init` exists for optional non-secret defaults
+(default space) and is headless-capable, but caged does not require it. The
+OS-keyring token store (`cfl set-credential`) is never used — this container
+has no keyring, and env vars resolve first anyway. Auth behavior and
+pitfalls: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
 ## pi-web-ui (Web UI)
 
@@ -514,8 +564,8 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 > `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.2-rc.1`) so a
 > release bump is explicit. dsh builds on the repo's shared base image
 > `Containerfile.base` (built automatically by the build script), which
-> provides apt essentials including `python3`, the glab/gh/jira-cli CLIs and the
-> non-root user — the same CLI tooling pi ships.
+> provides apt essentials including `python3`, the glab/gh/jira-cli/cfl CLIs
+> and the non-root user — the same CLI tooling pi ships.
 
 ### What it is / isn't
 
@@ -760,6 +810,7 @@ listed.
 | `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |
 | `GH_VERSION` | `2.97.0` | gh version pin (build time, `build-caged-base.sh`) |
 | `JIRA_VERSION` | `1.7.0` | jira-cli version pin (build time, `build-caged-base.sh`) |
+| `CFL_VERSION` | `1.3.96` | cfl (Confluence) version pin (build time, `build-caged-base.sh`) |
 | `PNPM_VERSION` | `10.15.0` | pnpm version pin (build time, `build-caged-base.sh`) |
 | `YARN_VERSION` | `1.22.22` | yarn version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
@@ -779,6 +830,10 @@ listed.
 | `GITLAB_HOST` | *(unset)* | `glab` GitLab instance host (default `https://gitlab.com`) |
 | `GH_TOKEN` | *(unset)* | `gh` (GitHub CLI) API token (passed into container) |
 | `GH_HOST` | *(unset)* | `gh` GitHub Enterprise host (default `github.com`) |
+| `JIRA_API_TOKEN` | *(unset)* | `jira` (jira-cli) API token (passed into container); if unset, derived from `CFL_API_TOKEN` at start — the two are the same Atlassian token |
+| `CFL_URL` | *(unset)* | `cfl` (Confluence) site URL, e.g. `https://your-site.atlassian.net` (passed into container) |
+| `CFL_EMAIL` | *(unset)* | `cfl` (Confluence) login email (passed into container) |
+| `CFL_API_TOKEN` | *(unset)* | `cfl` (Confluence) API token — the same Atlassian token as `JIRA_API_TOKEN` (passed into container); if unset, derived from `JIRA_API_TOKEN` at start |
 
 > dsh's dedicated knobs — `DSH_IMAGE`, `DSH_VERSION`, `DSH_HOST_PORT`,
 > `DSH_MEMORY`, `DSH_PERMISSION_MODE` — are documented in the

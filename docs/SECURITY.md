@@ -42,8 +42,9 @@ the host filesystem beyond the mount, or persist on the host.
    document why.
 
 4. **CLI auth is env-token only; nothing token-bearing is persisted.** All
-   three CLIs authenticate from env vars (`GITLAB_TOKEN` / `GH_TOKEN` /
-   `JIRA_API_TOKEN`) — no `auth login`, no stored credential. Only
+   four CLIs authenticate from env vars (`GITLAB_TOKEN` / `GH_TOKEN` /
+   `JIRA_API_TOKEN` / `CFL_URL`+`CFL_EMAIL`+`CFL_API_TOKEN` for the Confluence
+   `cfl`) — no `auth login`, no stored credential. Only
    non-secret CLI configs land in the seed, at the CLIs' own default
    locations under `$XDG_CONFIG_HOME` (= gitignored `seed/.config/`), and
    caged does not manage them. `jira-cli` in particular writes no token to

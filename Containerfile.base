@@ -94,6 +94,30 @@ RUN set -eux; \
     && rm -rf /tmp/jira /tmp/jira.tar.gz \
     && jira version
 
+# cfl — Confluence Cloud CLI (github.com/open-cli-collective/atlassian-cli),
+# pinned to a versioned release tarball + checksum. Shipped as the `cfl`
+# binary. MIT. Targets Confluence Cloud (v2 REST API); not for Server/DC.
+# Auth is env-token driven (CFL_URL / CFL_EMAIL / CFL_API_TOKEN — the same
+# Atlassian API token as JIRA_API_TOKEN): env vars resolve before the OS
+# keyring, so in this keyring-less container no token is ever persisted to
+# disk and `cfl set-credential` is never used.
+ARG CFL_VERSION=1.3.96
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) sha=e4bbbb79009bdf3a368b72cfece52bcacf65df68736a39c88dabe95c381455e1;; \
+      arm64) sha=27e702c1c2326e328171f420a28a6a1897af860d97c9654a8eed0bf78f62552d;; \
+      *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1;; \
+    esac; \
+    curl -fsSL -o /tmp/cfl.tar.gz \
+      "https://github.com/open-cli-collective/atlassian-cli/releases/download/cfl-v${CFL_VERSION}/cfl_${CFL_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    echo "${sha}  /tmp/cfl.tar.gz" | sha256sum -c -; \
+    mkdir -p /tmp/cfl \
+    && tar -xzf /tmp/cfl.tar.gz -C /tmp/cfl \
+    && install -m 0755 /tmp/cfl/cfl /usr/local/bin/cfl \
+    && rm -rf /tmp/cfl /tmp/cfl.tar.gz \
+    && cfl --version
+
 # Create the shared non-root agent user (no `node` user to remove in a plain Debian base).
 RUN useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash agent \
     && mkdir -p /workspace /agent-home \

@@ -126,6 +126,12 @@ fi
 # --rm normally handles cleanup; rm also covers a previous interrupted run.
 container rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
+# jira-cli and cfl (Confluence) share the same Atlassian API token; if the
+# operator exported only one of JIRA_API_TOKEN / CFL_API_TOKEN, derive the
+# other here so a single token env var covers both CLIs.
+CFL_API_TOKEN="${CFL_API_TOKEN:-${JIRA_API_TOKEN:-}}"
+JIRA_API_TOKEN="${JIRA_API_TOKEN:-${CFL_API_TOKEN:-}}"
+
 RUN_ARGS=(
   --name "$CONTAINER_NAME" --rm -it --workdir /workspace --read-only
   --tmpfs /tmp --memory "$MEMORY" --cap-drop ALL
@@ -137,15 +143,17 @@ RUN_ARGS=(
   -e PI_CODING_AGENT_SESSION_DIR="${PI_CODING_AGENT_SESSION_DIR:-/workspace/.pi/sessions}"
   -e GLAB_SEND_TELEMETRY=false
   # CLI auth is unified on env TOKENS (CI/CD style): GITLAB_TOKEN / GH_TOKEN /
-  # JIRA_API_TOKEN below. We deliberately do NOT point glab/gh/jira-cli at any
-  # custom config dir — they follow their own defaults under $XDG_CONFIG_HOME,
-  # which lives in the seed (gitignored) so any non-secret config they write
-  # persists across restarts. Tokens themselves never touch disk (jira-cli
-  # only; glab/gh additionally accept persisted logins, unused here).
+  # JIRA_API_TOKEN / CFL_URL+CFL_EMAIL+CFL_API_TOKEN below. We deliberately do
+  # NOT point glab/gh/jira-cli/cfl at any custom config dir — they follow their
+  # own defaults under $XDG_CONFIG_HOME, which lives in the seed (gitignored)
+  # so any non-secret config they write persists across restarts. Tokens
+  # themselves never touch disk (all four CLIs; cfl resolves env before its
+  # OS-keyring path, which is unavailable in this container anyway).
   -e XDG_CONFIG_HOME=/agent-home/.config
   -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" -e GITLAB_HOST="${GITLAB_HOST:-}"
   -e GH_TOKEN="${GH_TOKEN:-}"
   -e JIRA_API_TOKEN="${JIRA_API_TOKEN:-}"
+  -e CFL_URL="${CFL_URL:-}" -e CFL_EMAIL="${CFL_EMAIL:-}" -e CFL_API_TOKEN="${CFL_API_TOKEN:-}"
   -e npm_config_cache=/tmp/.npm
   -e XDG_CACHE_HOME=/tmp/.cache
 )
@@ -185,8 +193,8 @@ fi
 
 # Provider credentials are shared by all modes; harmlessly empty values
 # preserve the old scripts' environment contract. CLI auth is env-token based
-# (GITLAB_TOKEN / GH_TOKEN / JIRA_API_TOKEN); CLI configs follow their own
-# defaults under /agent-home/.config (the seed), gitignored.
+# (GITLAB_TOKEN / GH_TOKEN / JIRA_API_TOKEN, and CFL_* for cfl); CLI configs
+# follow their own defaults under /agent-home/.config (the seed), gitignored.
 RUN_ARGS+=(
   -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}" -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}"
   -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" -e LOCAL_API_KEY="${LOCAL_API_KEY:-}"

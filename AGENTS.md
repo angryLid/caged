@@ -61,7 +61,9 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
 
 ## Working here
 
-- Tools: `glab` for GitLab CLI, `jira` (jira-cli) for Jira. Prefer them over
+- Tools: `glab` for GitLab CLI, `jira` (jira-cli) for Jira, `cfl` (atlassian-cli)
+  for Confluence Cloud (reads pages as Markdown via `cfl page view <id>`).
+  Prefer them over
   raw curl. Their auth/persistence behavior and trade-offs: `docs/CLI-AUTH.md`.
 - **No container orchestration.** The container's only job is file isolation,
   so a compose/multi-container stack would add nothing worthwhile; run a
@@ -75,7 +77,7 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   `dsh/` dir.
 - **Shared base image.** `Containerfile.base` (built by
   `scripts/build-caged-base.sh`) holds what the pi and dsh images share —
-  apt essentials, the pinned `glab`/`gh`/`jira` CLIs, the non-root user. Both
+  apt essentials, the pinned `glab`/`gh`/`jira`/`cfl` CLIs, the non-root user. Both
   `Containerfile` and `Containerfile.dsh` are thin `FROM` layers on top of
   it: CLI/pin/base updates belong in the base, agent-specific layers in the
   derived files. `scripts/build-container.sh pi|dsh` rebuilds the base
