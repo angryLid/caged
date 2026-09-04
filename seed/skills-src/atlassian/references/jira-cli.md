@@ -1,69 +1,3 @@
-# JiraCLI
-
-JiraCLI is an interactive command line tool for Atlassian Jira that will help you avoid using the Jira UI to some extent. This
-tool may not be able to do everything, but it has all the essential features required to improve your day-to-day workflow with Jira.
-
-The tool started with the idea of making issue search and navigation as straightforward as possible. However, with the
-help of [outstanding supporters like you](#support-the-project), we evolved, and the tool now includes all necessary
-features like issue creation, cloning, linking, ticket transition, and much more.
-
-## Getting started
-
-#### Cloud server
-
-1. [Get a Jira API token](https://id.atlassian.com/manage-profile/security/api-tokens) and export it to your shell as
-   a `JIRA_API_TOKEN` variable. Add it to your shell configuration file, for instance, `$HOME/.bashrc`, so that the
-   variable is always available. Alternatively, you can also use `.netrc` file or `keychain` to set the token. Learn
-   more [here](https://github.com/ankitpokhrel/jira-cli/discussions/356).
-2. Run `jira init`, select installation type as `Cloud`, and provide required details to generate a config file required
-   for the tool.
-
-#### On-premises installation
-
-1. Export required environment variables:
-   - If you are using basic auth, export the `password` you use to login to Jira as a `JIRA_API_TOKEN` variable.
-   - If you are using personal access token (PAT), get the `token` from your Jira profile and export it as
-     a `JIRA_API_TOKEN` variable. In addition to this, set `JIRA_AUTH_TYPE` env to `bearer`.
-   - Add these ENVs to your shell configuration file, for instance, `$HOME/.bashrc`, so that they are always available.
-   - Alternatively, you can also use `.netrc` file or `keychain` to set the token. Learn
-     more [here](https://github.com/ankitpokhrel/jira-cli/discussions/356).
-2. Run `jira init`, select installation type as `Local`, and provide the required details to generate a config file required
-   for the tool.
-   - The most common auth type for an on-premises installation is `basic`. If you are using your Jira login credentials
-     (username and password), select the `basic` auth type.
-   - If you want to use `mtls` (client certificates), select auth type `mtls` and provide the CA Cert, client Key, and client cert.
-
-> [!IMPORTANT]
-> If your on-premises Jira installation is using a language other than `English`, then the issue/epic creation
-   may not work because the older version of Jira API doesn't return the untranslated name for `issuetypes`. In that case,
-   you will have to fill in `epic.name`, `epic.link` and `issue.types.*.handle` fields manually in the generated config
-   to get the expected behavior.
-
-See [FAQs](https://github.com/ankitpokhrel/jira-cli/discussions/categories/faqs) for frequently asked questions.
-
-#### Authentication types
-
-The tool supports `basic`, `bearer` (Personal Access Token), and `mtls` (Client Certificates) authentication types. Basic auth is used by
-default.
-
-* If you want to use PAT, you need to set `JIRA_AUTH_TYPE` as `bearer`.
-* If you want to use `mtls` run `jira init`. Select installation type `Local`, and then select authentication type as `mtls`.
-  * In case `JIRA_API_TOKEN` variable is set it will be used together with `mtls`.
-
-#### Shell completion
-Check `jira completion --help` for more info on setting up a Bash/Zsh shell completion.
-
-#### Multiple projects
-
-You can load a specific configuration file by using the `--config/-c` flag, or by setting the `JIRA_CONFIG_FILE` environment variable to specify the file's location.
-
-```sh
-$ JIRA_CONFIG_FILE=./local_jira_config.yaml jira issue list
-
-# Alternatively, use the `--config/-c` flag
-$ jira issue list -c ./local_jira_config.yaml
-```
-
 ## Usage
 The tool currently comes with an issue, epic, and sprint explorer. The flags are [POSIX-compliant](https://www.gnu.org/software/libc/manual/html_node/Argument-Syntax.html).
 You can combine available flags in any order to create a unique query. For example, the command below will give you high priority issues created this month
@@ -71,27 +5,6 @@ with status `To Do` that are assigned to you and has the label `backend`.
 ```sh
 jira issue list -yHigh -s"To Do" --created month -lbackend -a$(jira me)
 ```
-
-### Navigation
-The lists are displayed in an interactive UI by default.
-- Use arrow keys or `j, k, h, l` characters to navigate through the list.
-- Use `g` and `G` to quickly navigate to the top and bottom respectively.
-- Use `CTRL + f` to scroll through a page downwards direction.
-- Use `CTRL + b` to scroll through a page in upwards direction.
-- Press `v` to view selected issue details.
-- Press `m` to transition the selected issue.
-- Press `CTRL + r` or `F5` to refresh the issues list.
-- Hit `ENTER` to open the selected issue in the browser.
-- Press `c` to copy issue URL to the system clipboard. This requires `xclip` / `xsel` on Linux.
-- Press `CTRL + k` to copy issue key to the system clipboard.
-- In an explorer view, press `w` or `TAB` to toggle focus between the sidebar and the contents screen.
-- Press `q` / `ESC` / `CTRL + c` to quit.
-- Press `?` to open the help window.
-
-### Resources
-- [FAQs](https://github.com/ankitpokhrel/jira-cli/discussions/categories/faqs)
-- [Introduction and Motivation](https://medium.com/@ankitpokhrel/introducing-jira-cli-the-missing-command-line-tool-for-atlassian-jira-fe44982cc1de)
-- [Getting Started with JiraCLI](https://www.mslinn.com/blog/2022/08/12/jiracli.html)
 
 ## Commands
 ### Issue
@@ -248,8 +161,6 @@ has been changed in `next-gen` project.
 $  jira issue create -tStory -s"Epic during creation" -PEPIC-42
 ```
 
-![Create an issue](.github/assets/create.gif)
-
 You can use a `--custom` flag to set custom fields while creating the issue. See [this post](https://github.com/ankitpokhrel/jira-cli/discussions/346) for more details.
 
 The command supports both [GitHub-flavored](https://github.github.com/gfm/)
@@ -266,9 +177,6 @@ $ jira issue create --template -
 # Or, use pipe to read input directly from standard input
 $ echo "Description from stdin" | jira issue create -s"Summary" -tTask
 ```
-
-![Markdown render preview](.github/assets/markdown.jpg)
-> The preview above shows a Markdown template passed in JiraCLI and how it is rendered in the Jira UI.
 
 #### Edit
 The `edit` command lets you edit an issue.
@@ -312,8 +220,6 @@ $ jira issue assign ISSUE-1 default
 $ jira issue assign ISSUE-1 x
 ```
 
-![Assign issue to a user](.github/assets/assign.gif)
-
 #### Move/Transition
 The `move` command lets you transition an issue from one state to another.
 
@@ -324,8 +230,6 @@ $ jira issue move
 # Pass required parameters to skip prompt
 $ jira issue move ISSUE-1 "In Progress"
 ```
-
-![Move an issue](.github/assets/move.gif)
 
 If your workflow allows to add comment, resolution or assignee while moving an issue, you can do so as shown below.
 See [this documentation](https://confluence.atlassian.com/jirakb/how-to-add-a-comment-during-a-transition-779160682.html) on how to setup your workflow to allow these fields.
@@ -349,8 +253,6 @@ The command uses `less` as a pager by default. To set your own pager, see https:
 ```sh
 $ jira issue view ISSUE-1
 ```
-
-![View an issue](.github/assets/view.gif)
 
 The view screen will display linked issues and the latest comment after the description. Note that the displayed comment may
 not be the latest one if you for some reason have more than 5k comments in a ticket.
@@ -640,77 +542,3 @@ jira project list
 jira board list
 ```
 </details>
-
-## Scripts
-Often times, you may want to use the output of the command to do something cool. However, the default interactive UI might not allow you to do that.
-The tool comes with the `--plain` flag that displays results in a simple layout that can then be manipulated from the shell script.
-
-Some example scripts are listed below.
-
-<details><summary>Tickets created per day this month</summary>
-
-```bash
-#!/usr/bin/env bash
-
-tickets=$(jira issue list --created month --plain --columns created --no-headers | awk '{print $2}' | awk -F'-' '{print $3}' | sort -n | uniq -c)
-
-echo "${tickets}" | while IFS=$'\t' read -r line; do
-  day=$(echo "${line}" | awk '{print $2}')
-  count=$(echo "${line}" | awk '{print $1}')
-
-  printf "Day #%s: %s\n" "${day}" "${count}"
-done
-
-# Output
-Day #01: 19
-Day #02: 10
-Day #03: 21
-...
-```
-</details>
-
-<details><summary>Number of tickets per sprint</summary>
-
-```bash
-#!/usr/bin/env bash
-
-sprints=$(jira sprint list --table --plain --columns id,name --no-headers)
-
-echo "${sprints}" | while IFS=$'\t' read -r id name; do
-  count=$(jira sprint list "${id}" --plain --no-headers 2>/dev/null | wc -l)
-
-  printf "%10s: %3d\n" "${name}" $((count))
-done
-
-# Output
-Sprint 3:   55
-Sprint 2:   40
-Sprint 1:   30
-...
-```
-</details>
-
-<details><summary>Number of unique assignee per sprint</summary>
-
-```bash
-#!/usr/bin/env bash
-
-sprints=$(jira sprint list --table --plain --columns id,name --no-headers)
-
-echo "${sprints}" | while IFS=$'\t' read -r id name; do
-  count=$(jira sprint list "${id}" --plain --columns assignee --no-headers 2>/dev/null | awk '{print $2}' | awk NF | sort -n | uniq | wc -l)
-
-  printf "%10s: %3d\n" "${name}" $((count))
-done
-
-# Output
-Sprint 3:   5
-Sprint 2:   4
-Sprint 1:   3
-```
-</details>
-
-## Known Issues
-
-1. Not all [Atlassian nodes](https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/#nodes) are
-   translated properly at the moment which can cause formatting issues sometimes.

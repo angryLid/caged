@@ -1,67 +1,39 @@
 ---
 name: atlassian
-description: "Atlassian is in play — activate this skill when any of these shows up: (1) a *.atlassian.net URL or domain, issue links (https://<site>.atlassian.net/browse/ABC-1234) or wiki links (https://<site>.atlassian.net/wiki/...) — handle the linked object with the CLI, not curl; (2) a read/view intent on an issue key such as ABC-1234 (e.g. 阅读 / 查看 / 了解 X-123, 'view X-123'); (3) any Jira operation (create/edit/search/transition work items, comment, link, assign, clone) or managing projects, boards, sprints, epics, releases; (4) any Confluence READ intent — a wiki page URL, a page ID, 'read this page' — handled with `cf`. Dispatch by product: Jira objects → `jira` (jira-cli), Confluence page reads → `cf` — the dispatch table is at the top of this skill."
+description: "Use for Atlassian work: any *.atlassian.net URL, Jira issue key or Jira operation, or a request to read a Confluence page. Dispatch Jira targets to jira (jira-cli) and Confluence targets to cf; read the relevant manual before running a command."
 ---
-# atlassian — Jira (jira-cli) + Confluence reading (cf)
+# Atlassian
 
-Two tools for Atlassian Cloud, installed in caged and authenticated
-transparently via env vars injected at container start — the agent never
-handles credentials:
+Use the installed CLI for the target product:
 
-- **`jira` (jira-cli)** — Jira work: issues, epics, sprints, boards, projects, releases.
-- **`cf`** — Confluence page reading: paste a wiki URL, get the full page as Markdown.
+- `jira` (`jira-cli`) for Jira objects and operations.
+- `cf` for reading Confluence Cloud pages as Markdown.
 
-Confluence is **read-only** in this setup: `cf` reads pages. (The older `cfl`
-binary is still installed in the image but is neither used nor documented
-here — prefer `cf` for everything you used `cfl` to read.)
+## Procedure
 
-## Dispatch: which tool?
+1. **Classify the target.** Apply the dispatch table before choosing a command.
+2. **Read the tool manual.** For Jira, read [`references/jira-cli.md`](references/jira-cli.md). For Confluence, read `$(npm root -g)/@caged/cf/README.md`.
+3. **Check write intent.** Before any command that changes remote state, tell the user exactly what will change and wait for explicit confirmation. Read-only commands need no confirmation.
+4. **Run the narrowest documented command** that answers the request.
+5. **Report the result or actionable failure.** Preserve relevant command output and follow the selected manual's troubleshooting guidance.
 
-Pick the tool by the **product the target object lives in** — decide before
-reaching for a command:
+Completion means the correct CLI was selected, its manual was consulted, the request completed or its actionable failure was reported, and every remote write had explicit confirmation first.
 
-| The target is… | Tool | Typical commands |
-|---|---|---|
-| A **Jira object** — an issue key (`ABC-1234`), issue search, project, board, sprint, epic, release, backlog, worklog, or any `/browse/` URL | `jira` | `jira issue view/list/create/edit/move/comment/link/assign/clone`, `jira epic …`, `jira sprint …`, `jira board list`, `jira project list`, `jira release list` |
-| A **Confluence page to read** — any `/wiki/…` URL (spaces/pages, viewpage.action), a page ID to view, "read this wiki page" | `cf` | read the tool's manual first (below) |
+## Dispatch
 
-**One-token test:** `/browse/` → `jira`; `/wiki/` → `cf`. An issue key like
-`ABC-1234` is always Jira; a space key (`DEV`, `~USERSPACE`) or a numeric page
-ID is always Confluence.
+| Target or intent | CLI |
+|---|---|
+| Jira issue key such as `ABC-1234` | `jira` |
+| Jira `/browse/` URL, issue search, project, board, sprint, epic, release, backlog, or worklog | `jira` |
+| Confluence `/wiki/` URL or request to read a wiki page | `cf` |
+| Bare Confluence page ID | Ask for a full page URL; `cf` needs the site from the URL |
 
-## Documentation
+The URL test is deterministic: `/browse/` means Jira and `/wiki/` means Confluence. A Jira issue key always means Jira. Do not send a Confluence page to `jira`, or a Jira issue to `cf`.
 
-Read a tool's documentation **before** using it:
+## Safety and failures
 
-- Jira → [`jira.md`](references/jira-cli.md)
-- Confluence (`cf`) → `cf` ships its own agent-facing manual with the
-  installed package. Read it from the global npm modules:
+Before Jira creates, edits, transitions, comments on, links, assigns, clones, or otherwise changes a remote object, obtain explicit user confirmation immediately before execution.
 
-  ```sh
-  cat "$(npm root -g)/@caged/cf/README.md"
-  ```
+Credentials are injected into the environment and consumed by the CLIs. Never pass credentials as arguments, write them to files, print them, or guess them. If a command reports missing credentials, authentication, authorization, initialization, configuration, or access errors, stop and ask the user to fix the environment or permissions. Follow the selected manual for missing-command, not-found, and rate-limit errors.
 
-  The manual covers everything: usage and options, the exact stdout format,
-  accepted URL shapes, exit codes, what the conversion preserves or drops,
-  and what to do when something fails. If `cf` is not on PATH, the package
-  is not installed — ask the user to rebuild the base image
-  (`scripts/build-caged-base.sh`).
-
-## Auth is invisible
-
-Both tools authenticate through env vars the operator injects at container
-start — the agent just runs the tool:
-
-- `start-container.sh` maps the shared `ATLASSIAN_HOST` / `ATLASSIAN_EMAIL` /
-  `ATLASSIAN_API_TOKEN` trio (or `JIRA_API_TOKEN`) onto the CLI vars.
-- `cf` resolves its own credentials from `CFL_EMAIL` + `CFL_API_TOKEN`
-  (falling back to `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` /
-  `JIRA_API_TOKEN`) and derives the site from the URL itself.
-
-No secret ever touches disk: no login, no keyring, no config step for `cf`.
-
-**ATTENTIONS** You may encounter errors like "need initialization", "invalid
-token", "no credentials found in the environment", 401/403/404, or a missing
-`cf` command. Stop immediately and ask the user to provide or fix the
-credentials — do not attempt to guess or brute-force credentials. `cf`'s
-manual (above) explains every error class and the right response.
+Use `cf` rather than the unsupported `cfl` binary for Confluence reads. Use the CLIs rather than hand-written Atlassian HTTP requests.

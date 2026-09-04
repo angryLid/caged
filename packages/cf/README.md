@@ -1,144 +1,87 @@
-# cf — Confluence page reader (manual for agents)
+# cf — Confluence page reader
 
-`cf` turns a Confluence Cloud page URL into the page's **full content as
-Markdown** on stdout — exactly what you need when a requirement doc, an ADR,
-API spec, meeting note, or onboarding guide lives on the wiki. It does the
-boring work for you: extracting the page ID from the URL, authenticating,
-fetching the right body representation, and converting XHTML/ADF to clean
-Markdown.
+`cf` reads one Confluence Cloud page and writes its complete content as Markdown to stdout. It is intended for agents that need to inspect a wiki page without manually calling the Confluence API.
 
-Do **not** reach for `cfl` (the old Confluence CLI — still present in the
-image but unsupported here) and do **not** hand-roll Confluence REST calls
-with curl. When a page is the target, `cf` is the tool.
+## Quick start
 
-## Authentication — nothing for you to do
+```sh
+cf https://<site>.atlassian.net/wiki/spaces/EMFE/pages/5415665912
+```
 
-Credentials are injected as env vars by `start-container.sh` and resolved
-automatically. The site comes from the URL itself:
+The output contains the page title, a metadata line, and the full converted body. The body is never truncated.
 
-| Need | Resolution (first match wins) |
+## Command reference
+
+```text
+cf <confluence-page-url> [options]
+```
+
+| Option | Result |
 |---|---|
-| site | parsed from the URL — no `CFL_URL` needed |
-| email | `CFL_EMAIL` → `ATLASSIAN_EMAIL` |
-| token | `CFL_API_TOKEN` → `ATLASSIAN_API_TOKEN` → `JIRA_API_TOKEN` |
+| `--no-meta` | Omit the metadata line; keep the title. |
+| `--children` | Append a sorted `Child pages` section with links. Ignored for raw output. |
+| `--show-macros` | Preserve readable markers for supported Confluence macros, such as `[TOC]` and `[INFO]...[/INFO]`. Applies to storage-format pages. |
+| `--raw storage` | Print the unconverted storage XHTML body. |
+| `--raw adf` | Print the unconverted Atlas Document Format body. |
+| `-h`, `--help` | Print help. |
+| `--version` | Print the installed version. |
 
-Never pass credentials yourself, never write them into files, never put them
-in commands. If the tool reports missing credentials, the operator must set
-the env vars — see Troubleshooting.
+`--raw` accepts exactly `storage` or `adf`. A page normally provides one body representation; requesting a different representation exits with an API/network error.
 
-## Usage
+## Accepted URLs
 
-```
-cf <page-url> [options]
-```
-
-The only positional argument is the page URL (see Accepted URL forms).
-
-| Flag | Effect |
-|---|---|
-| `--no-meta` | omit the metadata line (the `# title` line stays) |
-| `--children` | append a `## Child pages` index with links |
-| `--show-macros` | keep Confluence macro markers (`[TOC]`, `[INFO]…[/INFO]`) instead of stripping wrappers |
-| `--raw storage\|adf` | print the raw body (storage XHTML or ADF JSON) instead of converted Markdown |
-| `-h`, `--help` | help text |
-| `--version` | version |
-
-## Output contract
-
-What `cf` prints to **stdout** for a successful read:
-
-1. `# <page title>` (an H1).
-2. One metadata line, e.g.:
-
-   ```
-   Page: https://eachvector.atlassian.net/wiki/spaces/EMFE/pages/5415665912 · Space: EMFE · Version: 7 · Updated: 2026-09-01 10:00:00 UTC · By: 6012abc… · Body: storage
-   ```
-
-   `Body:` tells you which representation the content came from —
-   `storage`, or `atlas_doc_format (storage empty)` for ADF-native pages.
-   Omit this line with `--no-meta`.
-3. A blank line, then the **complete** page body as Markdown.
-
-The body is **never truncated**. An empty page renders as `_(empty page)_`.
-Diagnostics (warnings such as "stripped empty macro", errors) go to
-**stderr**, never stdout — you can pipe stdout straight into a file.
-
-## Accepted URL forms
-
-```
+```text
 https://<site>.atlassian.net/wiki/spaces/<KEY>/pages/<ID>
 https://<site>.atlassian.net/wiki/pages/viewpage.action?pageId=<ID>
 https://<site>.atlassian.net/wiki/pages/<ID>
 ```
 
-A bare numeric page ID is rejected (the site must come from the URL).
+The site is always derived from the URL. A numeric page ID alone is therefore insufficient.
 
-## Exit codes
+## Output
 
-| Code | Meaning | What to do |
-|---|---|---|
-| 0 | success | — |
-| 1 | usage / bad URL | check the URL and flags |
-| 2 | auth / missing credentials | credentials are wrong or not injected — ask the user |
-| 3 | API / network error | retry; mention the error text |
-| 4 | not found (404) | page missing **or hidden by permissions** — ask the user to confirm access |
-| 5 | rate-limited (429) | wait and retry later |
+A successful normal read has this shape:
 
-## What the conversion preserves (and what it drops)
+```text
+# <page title>
 
-Default mode (no `--show-macros`):
+Page: https://<site>.atlassian.net/wiki/spaces/<KEY>/pages/<ID> · Space: <KEY> · Version: <N> · Updated: <timestamp> · By: <account ID> · Body: storage
 
-- `code` / `noformat` macros → fenced code blocks with the language tag.
-- Tables → GFM tables. Headings, lists, quotes, emphasis → regular Markdown.
-- Internal page links → real Markdown links when the target ID is known,
-  `[[SPACE:Title]]` wiki syntax otherwise.
-- Attachments and images → download URLs of the form
-  `https://<site>/wiki/download/attachments/<pageId>/<file>` — you can fetch
-  them yourself if the content matters.
-- `info` / `note` / `warning` / `tip` / `expand` macros → their **content is
-  kept**, the wrapper is dropped. Empty macros are removed (a warning goes to
-  stderr naming the macro).
-- Mentions → `@<userkey>`; emoji are dropped.
-
-With `--show-macros`, macro content is wrapped in readable markers:
-`[INFO]…[/INFO]`, `[WARNING]…[/WARNING]`, `[TOC]`, `[EXPAND title="…"]…[/EXPAND]`.
-
-For ADF-native pages the metadata line says the body came from
-`atlas_doc_format`; the built-in ADF renderer covers headings, paragraphs,
-lists, tables, code, quotes, panels, expand, and media.
-
-If you need the exact unconverted body, use `--raw storage` or `--raw adf`.
-
-## Examples
-
-```sh
-cf https://eachvector.atlassian.net/wiki/spaces/EMFE/pages/5415665912
-cf https://…/pages/5415665912 --no-meta          # content only
-cf https://…/pages/5415665912 --children         # + child-page index
-cf https://…/pages/5415665912 --show-macros      # keep macro markers
-cf https://…/pages/5415665912 --raw storage      # raw storage XHTML
+<complete page body as Markdown>
 ```
 
-## Troubleshooting
+The metadata line is omitted by `--no-meta`. `Body: storage` means the page was read from Confluence storage XHTML. `Body: atlas_doc_format (storage empty)` means the page had no storage body and was read from ADF instead. Empty pages render as `_(empty page)_`.
 
-- **`cf: command not found`** — the package is not installed; the base image
-  needs rebuilding. Tell the user.
-- **`cf: no credentials found in the environment`** — the operator did not
-  inject `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` (or the `CFL_*` /
-  `JIRA_API_TOKEN` spellings). Ask the user to set them and restart.
-- **401/403** — credentials are wrong or lack access. Ask the user.
-- **404** — Confluence hides unauthorized pages as 404: the page may not
-  exist, or the credentials cannot see it. Ask the user to confirm access.
-- **429** — rate limited; back off and retry.
-- Never guess, generate, or brute-force credentials. Stopping and asking the
-  user is always the right move.
+Diagnostics and warnings go to stderr, so stdout can be redirected directly to a Markdown file. For example:
 
----
+```sh
+cf https://<site>.atlassian.net/wiki/spaces/EMFE/pages/5415665912 --no-meta > page.md
+```
 
-## Maintenance (for humans)
+## Conversion
 
-- Tests: `cd packages/cf && npm test` (offline, no credentials).
-- Host-side packaging for the caged image: `scripts/package-cf.sh` creates
-  `packages/cf/dist/caged-cf-<version>.tgz` with the runtime deps bundled;
-  `Containerfile.base` `COPY`s it in and runs `npm install -g`, which is why
-  this manual lands at `$(npm root -g)/@caged/cf/README.md` inside the image.
+The default conversion produces Markdown and preserves the following content:
+
+- `code` and `noformat` macros as fenced code blocks, including language tags when available.
+- Tables as GFM tables; headings, lists, quotes, and emphasis as Markdown.
+- Known internal page links as Markdown links; unresolved links as `[[SPACE:Title]]`.
+- Attachments and images as Confluence download URLs, for example `https://<site>.atlassian.net/wiki/download/attachments/<pageId>/<file>`.
+- The content of `info`, `note`, `warning`, `tip`, and `expand` macros. Their wrappers are removed by default; empty macros are removed with a stderr warning.
+- Mentions as `@<userkey>`.
+
+Emoji are omitted. With `--show-macros`, supported macro wrappers become readable markers such as `[INFO]...[/INFO]`, `[WARNING]...[/WARNING]`, and `[EXPAND title="..."]...[/EXPAND]`. ADF pages use the built-in ADF renderer for headings, paragraphs, lists, tables, code, quotes, panels, expands, and media.
+
+Use `--raw storage` or `--raw adf` when the exact source representation is required.
+
+## Exit codes and recovery
+
+| Code | Meaning | Action |
+|---:|---|---|
+| `0` | Read succeeded. | — |
+| `1` | Invalid arguments or URL. | Check the command and use one of the accepted URL forms. |
+| `2` | Authentication failed. | Stop immediately and notify the user; the agent cannot resolve authentication problems. |
+| `3` | API or network failure. | Retry and inspect the stderr diagnostic. |
+| `4` | Page not found or inaccessible. | Confirm that the page exists and that the credentials can view it; Confluence may hide unauthorized pages as 404. |
+| `5` | Rate limited by Confluence. | Wait before retrying. |
+
+`cf: command not found` means the package is not installed in the image; rebuild the caged base image. Never place credentials in commands or files, and never guess credentials.
