@@ -25,6 +25,15 @@ fail() {
     exit 1
 }
 
+# --- 0. shared Atlassian env assignment (best-effort) ----------------------
+# Map the ATLASSION_HOST/EMAIL/API_TOKEN trio the operator injects onto the
+# vars cfl/jira-cli read (CFL_URL/CFL_EMAIL/CFL_API_TOKEN; JIRA_SERVER/
+# JIRA_LOGIN/JIRA_API_TOKEN). Baked into the base image; skip silently on
+# older builds without it.
+if [ -f /opt/caged/env-atlassian.sh ]; then
+    . /opt/caged/env-atlassian.sh
+fi
+
 # --- 1. fail-fast validation of the live seed bind -----------------------
 
 [ -d "$DSH_HOME_PATH" ] || fail \

@@ -38,6 +38,13 @@ neither stores a secret in this container:
 | CLI | Env vars | Config prerequisite |
 |---|---|---|
 | `jira` | `JIRA_API_TOKEN` | one-time `jira init` (site URL, login, default project/board) |
-| `cfl` | `CFL_URL` + `CFL_EMAIL` + `CFL_API_TOKEN` (shared `ATLASSIAN_*` fallbacks) | none — env-only works |
+| `cfl` | `CFL_URL` + `CFL_EMAIL` + `CFL_API_TOKEN` | none — env-only works |
+
+The caged entrypoint also accepts the shared trio `ATLASSION_HOST` /
+`ATLASSION_EMAIL` / `ATLASSION_API_TOKEN` (injected into the container by
+the operator) and assigns the CLI vars from it inside the container —
+`CFL_URL`/`JIRA_SERVER` ← host, `CFL_EMAIL`/`JIRA_LOGIN` ← email,
+`CFL_API_TOKEN`/`JIRA_API_TOKEN` ← token — so either spelling authenticates
+both CLIs.
 
 **ATTENTIONS** You may encounter errors like "need initialization" or "invalid token". Stop immediately and ask the user provide credentials for you to grant access. Do not attempt to guess or brute-force credentials.

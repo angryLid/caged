@@ -10,6 +10,15 @@ fail() {
     exit 1
 }
 
+# --- shared Atlassian env assignment (best-effort) --------------------------
+# Map the ATLASSION_HOST/EMAIL/API_TOKEN trio the operator injects onto the
+# vars cfl/jira-cli read (CFL_URL/CFL_EMAIL/CFL_API_TOKEN; JIRA_SERVER/
+# JIRA_LOGIN/JIRA_API_TOKEN). Baked into the base image; skip silently on
+# older builds without it.
+if [ -f /opt/caged/env-atlassian.sh ]; then
+    . /opt/caged/env-atlassian.sh
+fi
+
 [ -d "$COMMANDCODE_HOME" ] || fail \
     "state directory '$COMMANDCODE_HOME' not found — /agent-home must be the live seed bind."
 [ -w "$COMMANDCODE_HOME" ] || fail \

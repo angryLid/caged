@@ -20,7 +20,7 @@ that.
 
 | | glab (GitLab) | gh (GitHub) | jira-cli (Jira, `jira`) | cfl (Confluence Cloud, `cfl`) |
 |---|---|---|---|---|
-| Token env var | `GITLAB_TOKEN` (+ `GITLAB_HOST` for self-hosted) | `GH_TOKEN` (+ `GH_HOST` for GH Enterprise) | `JIRA_API_TOKEN` | `CFL_URL` + `CFL_EMAIL` + `CFL_API_TOKEN` (token auto-derived from `JIRA_API_TOKEN` by `start-container.sh`; also honors shared `ATLASSIAN_URL`/`ATLASSIAN_EMAIL`/`ATLASSIAN_API_TOKEN`) |
+| Token env var | `GITLAB_TOKEN` (+ `GITLAB_HOST` for self-hosted) | `GH_TOKEN` (+ `GH_HOST` for GH Enterprise) | `JIRA_API_TOKEN` | `CFL_URL` + `CFL_EMAIL` + `CFL_API_TOKEN` (token auto-derived from `JIRA_API_TOKEN` by `start-container.sh`; alternatively the shared `ATLASSIAN_HOST`/`ATLASSIAN_EMAIL`/`ATLASSIAN_API_TOKEN` trio is forwarded by `start-container.sh` and assigned to the `CFL_*`/`JIRA_API_TOKEN` vars by the image entrypoint inside the container) |
 | Works with zero prior setup? | ✅ | ✅ | ✅ token-wise; config must exist (see below) | ✅ token-wise; URL+email from env, config not required |
 | Token written to disk by caged? | ❌ never — env only | ❌ never | ❌ never (jira-cli has no token-at-rest path at all; `jira init` writes no token) | ❌ never in caged — `cfl set-credential` (keyring/backend) is unused; env is resolved first |
 | Persisted login command | `glab auth login` (exists, **not used here**) | `gh auth login` (exists, **not used here**) | none exists | `cfl init` (writes non-secret config only) / `cfl set-credential` (token store, **not used here**) |
@@ -110,6 +110,22 @@ via `jira init` (jira-cli). Do not document or depend on their internals.
   passing either one token env var covers both CLIs; `CFL_URL`/`CFL_EMAIL`
   are still individually required. Missing any of the three and cfl fails on
   first use; there is no caged-managed fallback.
+- **Or inject the shared `ATLASSION_*` trio once.** The operator may instead
+  pass `ATLASSION_HOST` (site host, e.g. `your-site.atlassian.net` —
+  `https://` is added automatically), `ATLASSION_EMAIL`, and
+  `ATLASSION_API_TOKEN`. `start-container.sh` forwards all three verbatim,
+  and the image entrypoint (`scripts/env-atlassian.sh`, baked into the base,
+  sourced by every agent's entrypoint) assigns **inside the container**:
+  `CFL_URL` and `JIRA_SERVER` ← `ATLASSION_HOST` (normalized to a full https
+  URL; `ATLASSION_URL` still honored as a legacy alias), `CFL_EMAIL` and
+  `JIRA_LOGIN` ← `ATLASSION_EMAIL`, `CFL_API_TOKEN` and `JIRA_API_TOKEN` ←
+  `ATLASSION_API_TOKEN`. Explicit `CFL_*`/`JIRA_*` vars always win over the
+  trio. One token env var in any of its three spellings (`JIRA_API_TOKEN`,
+  `CFL_API_TOKEN`, `ATLASSION_API_TOKEN`) therefore covers both CLIs.
+  Caveat: jira-cli still needs its config file to **exist** (one-time
+  `jira init`); the mapped `JIRA_*` env vars only override the config's
+  server/login/token values at runtime (jira-cli resolves env first), so
+  host/email/token changes don't require re-running `jira init`.
 - **cfl's `config show` keyring noise is expected.** With an env token set,
   `cfl config show` may print `API Token: configured (source: keyring error:
   ... secret-service unavailable ...)`. Commands still authenticate from env;
@@ -154,6 +170,13 @@ jira init --installation cloud \
 jira project list                    # verify
 ```
 
+With the shared `ATLASSION_*` trio injected, the entrypoint also sets
+`JIRA_SERVER`/`JIRA_LOGIN`/`JIRA_API_TOKEN` from it, and jira-cli resolves
+env before config — so the values used at runtime come from the trio, and
+`jira init` only needs to run once to create the (non-secret) config file.
+`jira init` itself still needs the explicit `--server`/`--login` flags (it
+only reads `JIRA_AUTH_TYPE` from env).
+
 cfl (Confluence) needs **no setup at all** when run env-only — and the
 token is optional: `start-container.sh` derives `CFL_API_TOKEN` from
 `JIRA_API_TOKEN` at start, so only `CFL_URL`/`CFL_EMAIL` are strictly new:
@@ -165,6 +188,17 @@ export CFL_EMAIL="you@example.com"
 # set it explicitly to override (e.g. a scoped token).
 cfl me                                   # verify
 cfl page view 12345                      # read a page as Markdown
+```
+
+Or inject the shared trio instead — it covers both CLIs with three vars, and
+the entrypoint does the assignment inside the container (`https://` is added
+to a bare host automatically):
+
+```sh
+export ATLASSION_HOST="mysite.atlassian.net"   # bare host is fine
+export ATLASSION_EMAIL="you@example.com"
+export ATLASSION_API_TOKEN="..."               # same Atlassian API token
+cg pi start                                    # cfl + jira both work
 ```
 
 Optional: persist non-secret defaults (default space) headlessly with
