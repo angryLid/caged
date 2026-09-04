@@ -32,8 +32,7 @@
       "dir": "skills-src",
       "enabled": [
         "caged-persistence",
-        "jira-cli",
-        "jira-kanban-todo",
+        "atlassian",
         "markdown-link",
         "skills-sync"
       ]
