@@ -126,16 +126,25 @@ fi
 # --rm normally handles cleanup; rm also covers a previous interrupted run.
 container rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
-# jira-cli and cfl (Confluence) share the same Atlassian API token; if the
-# operator exported only one of JIRA_API_TOKEN / CFL_API_TOKEN, derive the
-# other here so a single token env var covers both CLIs.
-CFL_API_TOKEN="${CFL_API_TOKEN:-${JIRA_API_TOKEN:-}}"
-JIRA_API_TOKEN="${JIRA_API_TOKEN:-${CFL_API_TOKEN:-}}"
-# The operator may instead inject the shared ATLASSIAN_* trio
-# (ATLASSIAN_HOST / ATLASSIAN_EMAIL / ATLASSIAN_API_TOKEN). We forward it
-# verbatim; the image entrypoint (scripts/env-atlassian.sh) assigns CFL_* /
-# JIRA_* from it INSIDE the container, so no derivation is needed
-# here and the mapping lives in exactly one place.
+# jira-cli and cfl (Confluence) share the same Atlassian API token; the
+# operator may set the token in any of its spellings, and may inject the whole
+# site/email/token picture as the shared ATLASSIAN_* trio. Map everything to
+# the six CLI vars HERE on the host — the values live in the operator shell,
+# not in the image — so the container env is fully populated at launch via
+# -e flags and no in-image script is involved. Explicit CFL_*/JIRA_* vars
+# always win; ATLASSIAN_URL is honored as a legacy alias for the site URL; a
+# bare host gets an https:// prefix.
+ATH_HOST="${ATLASSIAN_URL:-${ATLASSIAN_HOST:-}}"
+case "$ATH_HOST" in
+    http://*|https://*|'') ;;
+    *) ATH_HOST="https://$ATH_HOST" ;;
+esac
+CFL_URL="${CFL_URL:-$ATH_HOST}"
+JIRA_SERVER="${JIRA_SERVER:-$ATH_HOST}"
+CFL_EMAIL="${CFL_EMAIL:-${ATLASSIAN_EMAIL:-}}"
+JIRA_LOGIN="${JIRA_LOGIN:-${ATLASSIAN_EMAIL:-}}"
+CFL_API_TOKEN="${CFL_API_TOKEN:-${JIRA_API_TOKEN:-${ATLASSIAN_API_TOKEN:-}}}"
+JIRA_API_TOKEN="${JIRA_API_TOKEN:-${CFL_API_TOKEN:-${ATLASSIAN_API_TOKEN:-}}}"
 
 RUN_ARGS=(
   --name "$CONTAINER_NAME" --rm -it --workdir /workspace --read-only
@@ -148,9 +157,9 @@ RUN_ARGS=(
   -e PI_CODING_AGENT_SESSION_DIR="${PI_CODING_AGENT_SESSION_DIR:-/workspace/.pi/sessions}"
   -e GLAB_SEND_TELEMETRY=false
   # CLI auth is unified on env TOKENS (CI/CD style): GITLAB_TOKEN / GH_TOKEN /
-  # JIRA_API_TOKEN / CFL_URL+CFL_EMAIL+CFL_API_TOKEN below (the latter also
-  # derivable inside the container from the forwarded ATLASSIAN_* trio). We
-  # deliberately do NOT point glab/gh/jira-cli/cfl at any custom config dir —
+  # and the six CFL_*/JIRA_* vars below (derived from the shared ATLASSIAN_*
+  # trio above when not set explicitly). We deliberately do NOT point
+  # glab/gh/jira-cli/cfl at any custom config dir —
   # they follow their own defaults under $XDG_CONFIG_HOME, which lives in the
   # seed (gitignored) so any non-secret config they write persists across
   # restarts. Tokens themselves never touch disk (all four CLIs; cfl resolves
@@ -159,12 +168,10 @@ RUN_ARGS=(
   -e XDG_CONFIG_HOME=/agent-home/.config
   -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" -e GITLAB_HOST="${GITLAB_HOST:-}"
   -e GH_TOKEN="${GH_TOKEN:-}"
-  -e JIRA_API_TOKEN="${JIRA_API_TOKEN:-}"
+  # Six CLI vars, fully populated above (explicit values, else derived from
+  # the shared ATLASSIAN_* trio) — nothing left to derive inside the image.
   -e CFL_URL="${CFL_URL:-}" -e CFL_EMAIL="${CFL_EMAIL:-}" -e CFL_API_TOKEN="${CFL_API_TOKEN:-}"
-  # Shared Atlassian trio — forwarded verbatim; the entrypoint assigns the
-  # CLI vars (CFL_* / JIRA_*) from these inside the container.
-  -e ATLASSIAN_HOST="${ATLASSIAN_HOST:-}" -e ATLASSIAN_EMAIL="${ATLASSIAN_EMAIL:-}" \
-  -e ATLASSIAN_API_TOKEN="${ATLASSIAN_API_TOKEN:-}"
+  -e JIRA_SERVER="${JIRA_SERVER:-}" -e JIRA_LOGIN="${JIRA_LOGIN:-}" -e JIRA_API_TOKEN="${JIRA_API_TOKEN:-}"
   -e npm_config_cache=/tmp/.npm
   -e XDG_CACHE_HOME=/tmp/.cache
 )
@@ -204,8 +211,9 @@ fi
 
 # Provider credentials are shared by all modes; harmlessly empty values
 # preserve the old scripts' environment contract. CLI auth is env-token based
-# (GITLAB_TOKEN / GH_TOKEN / JIRA_API_TOKEN, CFL_* / ATLASSIAN_* for
-# cfl/jira-cli); CLI configs follow their own defaults under
+# (GITLAB_TOKEN / GH_TOKEN; CFL_URL+CFL_EMAIL+CFL_API_TOKEN and JIRA_SERVER+
+# JIRA_LOGIN+JIRA_API_TOKEN for cfl/jira-cli — derived from the ATLASSIAN_*
+# trio at start when not set); CLI configs follow their own defaults under
 # /agent-home/.config (the seed), gitignored.
 RUN_ARGS+=(
   -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}" -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}"

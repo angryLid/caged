@@ -135,11 +135,6 @@ RUN useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash ag
 # prompts.json) come from the same live mount.
 COPY scripts/skills-sync.mjs scripts/prompt-sync.mjs /opt/caged/
 
-# Shared Atlassian env mapping (scripts/env-atlassian.sh) — sourced by every
-# derived image's entrypoint to assign CFL_URL/CFL_EMAIL/CFL_API_TOKEN and
-# JIRA_API_TOKEN from the injected ATLASSIAN_HOST/EMAIL/API_TOKEN trio.
-COPY scripts/env-atlassian.sh /opt/caged/env-atlassian.sh
-
 # Persistent home and mounted workspace paths used by both derived images.
 ENV HOME=/agent-home WORKSPACE=/workspace
 
