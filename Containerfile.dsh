@@ -8,7 +8,7 @@
 # for dsh's browser Web UI instead of pi's TUI. Builds FROM the shared base
 # image ./Containerfile.base (built first by `scripts/build-container.sh dsh`
 # via scripts/build-caged-base.sh), which provides apt essentials, the
-# glab/acli CLIs, the non-root user — and the skills-sync script shared by
+# glab/gh/jira CLIs, the non-root user — and the skills-sync script shared by
 # every agent image (the skill repos themselves live in the seed, not in any
 # image) — so dsh agents get the same CLI tooling and skills as pi for free.
 # Only dsh-specific layers live here. Key differences from pi:
@@ -35,7 +35,7 @@ FROM ${CAGED_BASE_IMAGE}
 
 # dsh's `$DSH_HOME` dir on the persistent volume (the base only creates
 # /agent-home; the .dsh subdir is dsh-specific).
-RUN mkdir -p /agent-home/.dsh /agent-home/cli-auth/glab /agent-home/cli-auth/acli \
+RUN mkdir -p /agent-home/.dsh /agent-home/.config \
     && chown -R agent:agent /agent-home
 
 # Install dsh (pinned) globally. Open network at build time (npm registry).

@@ -69,7 +69,7 @@ verbose form.
   The `webui` target builds the pi image first (`Containerfile.webui` is
   `FROM caged:latest`); skip with `CAGED_SKIP_PI=1`.
   `Containerfile.base` via `scripts/build-caged-base.sh` (apt essentials,
-  glab, gh, acli, non-root user; tag `caged-base:latest`) — so the pi and dsh
+  glab, gh, jira-cli, non-root user; tag `caged-base:latest`) — so the pi and dsh
   image builds share one cached base. Skip that with `CAGED_SKIP_BASE=1`,
   or point both at a custom `CAGED_BASE_IMAGE`.
 - **`scripts/build-caged-base.sh`** — builds that base, and first clones/pulls

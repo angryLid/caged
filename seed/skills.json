@@ -27,20 +27,12 @@
       ]
     },
     {
-      "name": "acli",
-      "type": "git",
-      "url": "https://github.com/peetzweg/acli-skill.git",
-      "skillsDir": ".",
-      "enabled": [
-        "."
-      ]
-    },
-    {
       "name": "local",
       "type": "local",
       "dir": "skills-src",
       "enabled": [
         "caged-persistence",
+        "jira-cli",
         "jira-kanban-todo",
         "markdown-link",
         "skills-sync"

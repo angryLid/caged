@@ -21,7 +21,7 @@ the host filesystem beyond the mount, or persist on the host.
 | Gain capabilities | `--cap-drop ALL` + `--security-opt no-new-privileges` | ✅ |
 | Kernel exploit | container seccomp profile | ✅ |
 | Exfiltrate secrets via network | **⚠️ intentionally NOT mitigated** — network is fully open by design (pi talks to model providers). See notes below. | ⚠️ |
-| Persistence on host | shared `caged/seed` → `/agent-home` (pi config at `seed/.pi`, dsh state at `seed/.dsh`, CLI auth at `seed/cli-auth`, sessions under `$CAGED_WORKSPACE`) | ✅ |
+| Persistence on host | shared `caged/seed` → `/agent-home` (pi config at `seed/.pi`, dsh state at `seed/.dsh`, CLI configs at `seed/.config` — non-secret, tokens stay env-only, sessions under `$CAGED_WORKSPACE`) | ✅ |
 | Zombie processes | tini as PID 1 | ✅ |
 
 ## Deliberate trade-offs (accepted risks)
@@ -41,12 +41,16 @@ the host filesystem beyond the mount, or persist on the host.
    need them, you are expanding the blast radius — add them explicitly and
    document why.
 
-4. **CLI tokens at rest in the live seed.** `glab auth login`, `gh auth
-   login`, and `acli jira auth login` persist plaintext tokens to
-   `seed/cli-auth/{glab,gh,acli}/` (gitignored, `0600`) so interactive auth
-   survives container restarts — see [CLI-AUTH.md](CLI-AUTH.md) for the full
-   risk analysis. `glab` and `gh` still prefer `GITLAB_TOKEN` / `GH_TOKEN`
-   from the env when set; acli has no env path.
+4. **CLI auth is env-token only; nothing token-bearing is persisted.** All
+   three CLIs authenticate from env vars (`GITLAB_TOKEN` / `GH_TOKEN` /
+   `JIRA_API_TOKEN`) — no `auth login`, no stored credential. Only
+   non-secret CLI configs land in the seed, at the CLIs' own default
+   locations under `$XDG_CONFIG_HOME` (= gitignored `seed/.config/`), and
+   caged does not manage them. `jira-cli` in particular writes no token to
+   disk at all and has no token-at-rest path — see [CLI-AUTH.md](CLI-AUTH.md)
+   for the full risk analysis. A legacy `seed/cli-auth/` dir may still hold
+   token-bearing acli configs from a pre-migration run (gitignored `0600`);
+   delete it when convenient.
 
 5. **Skill sources sit in the read-write seed.** The external skill repos are
    cloned on the host into `seed/skills-sync/vendor/` and reached through the

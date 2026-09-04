@@ -16,7 +16,7 @@ fail() {
     "state directory '$COMMANDCODE_HOME' is not writable — the live seed bind must be rw."
 [ -d /workspace ] || fail "workspace '/workspace' not found."
 
-for dir in "$COMMANDCODE_HOME" /tmp/.npm /tmp/.cache /tmp/.config; do
+for dir in "$COMMANDCODE_HOME" /agent-home/.config /tmp/.npm /tmp/.cache; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done

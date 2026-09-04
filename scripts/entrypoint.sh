@@ -88,7 +88,7 @@ mkdir -p "$SESSION_DIR"
 
 # --- 2. bootstrap (best-effort) ------------------------------------------
 
-for dir in "$PI_HOME" "$PI_HOME/agent" /agent-home/cli-auth/glab /agent-home/cli-auth/acli /tmp/.npm /tmp/.cache; do
+for dir in "$PI_HOME" "$PI_HOME/agent" /agent-home/.config /tmp/.npm /tmp/.cache; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done

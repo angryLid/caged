@@ -47,15 +47,16 @@ seed/.pi/agent/run-history.jsonl
 seed/.local/
 # MCP server runtime caches written into the live seed HOME
 seed/.cache/
-# Shared CLI authentication state. `acli jira auth login`, `glab auth` and
-# `gh auth` login persist credentials here for all agent modes, but these
-# files must never be committed (see docs/CLI-AUTH.md).
-seed/cli-auth/glab/*
-seed/cli-auth/acli/*
-seed/cli-auth/gh/*
-!seed/cli-auth/glab/.gitkeep
-!seed/cli-auth/acli/.gitkeep
-!seed/cli-auth/gh/.gitkeep
+# CLI configs written to their default location (XDG_CONFIG_HOME = $HOME/.config
+# in this container, i.e. seed/.config): glab/gh/jira-cli and friends following
+# their own defaults drop non-secret config here. It is NOT managed by caged —
+# tokens stay in the env (GITLAB_TOKEN/GH_TOKEN/JIRA_API_TOKEN) and never land
+# here (see docs/CLI-AUTH.md).
+seed/.config/
+# Legacy acli configs left over from a pre-migration run (token-bearing,
+# never committed). acli is no longer installed; remove this dir once the
+# table is clear and delete these files (see docs/CLI-AUTH.md).
+seed/cli-auth/
 
 # skills-sync: clones of the external skill repos, refreshed by
 # scripts/build-caged-base.sh (and by running skills-sync.mjs by hand). They

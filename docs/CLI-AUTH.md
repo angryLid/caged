@@ -1,113 +1,134 @@
-# CLI auth behavior — glab, gh & acli
+# CLI auth behavior — glab, gh & jira-cli
 
-How the baked-in CLIs find their credentials, why the login is persisted
-to the live seed mount, and the traps around it. The token-at-rest decision
-and its risk analysis live here as well.
+How the baked-in CLIs authenticate, why everything is token-driven, and where
+their (non-secret) config lands. This file replaces the older
+"persist the login into a managed dir" design.
 
 ## Decision status
 
-**Accepted, by design (2026-08).** Persisting the CLIs' tokens at rest on the
-live shared agent-home seed mount supersedes the earlier "env-only, no
-persistence" posture (previously listed in the README's known issues). `gh`
-follows the same pattern as `glab`/`acli` (env token when set, persisted login
-as the fallback).
+**Accepted, by design (2026-09).** caged runs like a CI/CD pipeline: **all
+three CLIs authenticate via an env TOKEN, nothing else**. `glab` uses
+`GITLAB_TOKEN`, `gh` uses `GH_TOKEN`, `jira-cli` uses `JIRA_API_TOKEN`. No
+interactive `auth login` is needed (or documented) for any of them. We do not
+point any CLI at a custom config location: they follow their own defaults,
+which land inside the seed (gitignored), and caged does not manage their
+behavior beyond that.
 
-## The three models
+## The three models — one pattern
 
-| | glab (GitLab) | gh (GitHub) | acli (Atlassian/Jira) |
+| | glab (GitLab) | gh (GitHub) | jira-cli (Jira, `jira`) |
 |---|---|---|---|
-| Reads an auth token env var implicitly? | ✅ `GITLAB_TOKEN` (+ `GITLAB_HOST` for self-hosted) — works with zero prior login | ✅ `GH_TOKEN` (+ `GH_HOST` for GH Enterprise) — works with zero prior login | ❌ no env path; the token enters only via `acli jira auth login --token` |
-| With no login and no env token | targets gitlab.com (or the configured host) → fails | targets github.com (or the configured host) → fails | refuses: `unauthorized: use 'acli jira auth login' to authenticate` |
-| Precedence | env token > stored config | env token > stored config | stored config only (env ignored) |
-| Re-auth needed | only when the token rotates | only when the token rotates | only when the token rotates |
+| Token env var | `GITLAB_TOKEN` (+ `GITLAB_HOST` for self-hosted) | `GH_TOKEN` (+ `GH_HOST` for GH Enterprise) | `JIRA_API_TOKEN` |
+| Works with zero prior setup? | ✅ | ✅ | ✅ token-wise; config must exist (see below) |
+| Token written to disk by caged? | ❌ never — env only | ❌ never | ❌ never (jira-cli has no token-at-rest path at all; `jira init` writes no token) |
+| Persisted login command | `glab auth login` (exists, **not used here**) | `gh auth login` (exists, **not used here**) | none exists |
+| Config file | `$XDG_CONFIG_HOME/glab-cli/config.yml` (+ `aliases.yml`) | `$XDG_CONFIG_HOME/gh/hosts.yml`, `config.yml` | `$XDG_CONFIG_HOME/.jira/.config.yml` |
+| Config sensitivity | non-secret (host/user settings; token only if you `auth login`, which we don't) | non-secret (host/user; token only via `auth login`, unused here) | non-secret (site URL, login, project, board) |
 
-Verified on the running image (glab 1.112.0, gh 2.97.0, acli 1.3.22): with an
-empty config dir, `glab api user` succeeds from `GITLAB_TOKEN` alone and
-`gh api user` succeeds from `GH_TOKEN` alone, while `acli jira auth status`
-still errors with `JIRA_API_TOKEN` set.
+## Where config lives (defaults, not managed)
 
-## Where the credentials live
+`XDG_CONFIG_HOME` is set to `/agent-home/.config` by `start-container.sh`, so
+each CLI's default config path resolves inside the seed and survives restarts:
 
-| | glab | gh | acli |
-|---|---|---|---|
-| Persisted login dir | `/agent-home/cli-auth/glab/` — shared live agent-home mount used by pi, pi-webui, and dsh | `/agent-home/cli-auth/gh/` — shared live agent-home mount used by pi, pi-webui, and dsh | `/agent-home/cli-auth/acli/` — shared live agent-home mount used by pi, pi-webui, and dsh |
-| Token file | `glab-cli/config.yml` → `hosts.<hostname>.token` + per-host user/api/ssh settings; `aliases.yml` | `hosts.yml` → `github.com.oauth_token` (per-host `user`/`oauth_token`/..); `config.yml` | `acli/acli/jira_config.yaml` (per-product configs; token in the jira one) |
-| Permissions | `0600` file, `0700` dir (verified) | `0600` file, `0700` dir (verified) | `0600` file, `0700` dir (verified) |
-| Git | ignored via `.gitignore` | ignored via `.gitignore` | ignored via `.gitignore` |
+| CLI | Config path (in container) | Seed path |
+|---|---|---|
+| glab | `$XDG_CONFIG_HOME/glab-cli/` | `seed/.config/glab-cli/` |
+| gh | `$XDG_CONFIG_HOME/gh/` | `seed/.config/gh/` |
+| jira-cli | `$XDG_CONFIG_HOME/.jira/` | `seed/.config/.jira/` |
 
-All three stores are **plaintext**: the container has no OS keyring (no
-D-Bus / Secret Service), so every CLI falls back to a plaintext config file.
+All of `seed/.config/` is gitignored. caged does **not** create, seed, or
+inspect these files — the CLIs create them lazily on first use (glab/gh) or
+via `jira init` (jira-cli). Do not document or depend on their internals.
 
-## Why persist the login
+> **Legacy `seed/cli-auth/`.** Older caged releases persisted CLI logins under
+> `seed/cli-auth/{glab,gh,acli}/` and directed the CLIs there via
+> `GLAB_CONFIG_DIR` / `GH_CONFIG_DIR` / `ACLI_CONFIG_DIR`. That is obsolete:
+> the env vars are gone and the dir is fully gitignored. `seed/cli-auth/acli/`
+> may still hold token-bearing configs from a pre-migration run — acli is no
+> longer installed and nothing reads them; delete the dir whenever convenient.
 
-- **Login once per token lifetime, not per container start.** All three CLIs
-  reuse the stored credential on every command; without persistence every
-  restart needs the token fed in again.
-- **Restart survival.** The config dirs point into the live shared
-  `/agent-home` seed mount, so the login outlives the container and is
-  available to pi, pi-webui, and dsh.
-- **`glab` and `gh` keep their automation fast path.** `GITLAB_TOKEN` /
-  `GH_TOKEN` still win when set, so one-shot and CI runs behave exactly as
-  before — persistence only adds a fallback. acli has no env fast path, so
-  persistence is its only supported path.
+## Why token-only
+
+- **Matches how the container is run.** caged is launched per task, like a CI
+  job; tokens are passed by the operator exactly like `GITLAB_TOKEN` flows
+  through a pipeline. No interactive login, no browser, no keyring.
+- **No token at rest (strictly).** With env-token-only use, glab and gh never
+  write their token to a config file (their `auth login` does, but we don't
+  run it). jira-cli cannot store a token at rest even in principle (no
+  `login` command; `jira init` writes no token key).
+- **Restart survival is not needed for auth.** The token comes with each
+  container start; only the non-secret config (host, default project) is
+  persisted, and only because the CLI requires it (jira-cli) or writes it
+  lazily (glab/gh).
 
 ## Risk assessment
 
 | Threat | Mitigation | Residual risk | Applies to |
 |---|---|---|---|
-| Repo push accidentally includes the token | gitignored, never tracked | `git add -f` or future `.gitignore` edits could include it — review diffs before pushing | all |
-| Full-dir backup/sync leaks the token | `0600`/`0700` perms; gitignored | tools that copy the whole tree (`rsync -a`, tarballs, Time Machine, cloud sync) copy ignored files too — the token leaves the machine with any full-tree copy | all |
-| Another host user / host malware reads the file | owner-only perms; container runs as the same uid 1000 = host user | **host compromise == token compromise**; nothing in caged changes that | all |
-| Compromised agent inside the container exfiltrates it | glab/gh: identical exposure to env `GITLAB_TOKEN`/`GH_TOKEN` and `auth.json` — no marginal risk; acli: the file is the *only* carrier (no env copy exists) | one more readable secret; token expiry/rotation limits the blast radius | all |
-| Token expiry/rotation leaves a stale credential | documented re-login path; operator rotates tokens | late auth failures until re-login; a newer env token can silently shadow the stale stored one (glab, gh) | all |
-| Config tampering (agent overwrites the config file) | no integrity protection — same as all of `~/.pi` and `/workspace` | an attacker that can write the seed can do worse things anyway; not a new boundary | all |
+| Repo push accidentally includes a token | tokens are env-only; `seed/.config/` and `seed/cli-auth/` gitignored | `git add -f` or future `.gitignore` edits could include legacy files — review diffs | all |
+| Full-dir backup/sync leaks a token | no token file exists (env-only use); legacy acli files remain `0600` + gitignored | tools that copy the whole tree copy ignored files too — legacy `seed/cli-auth/acli/` leaves the machine with any full-tree copy until deleted | legacy acli only |
+| Compromised agent inside the container exfiltrates the token | identical exposure to the env vars the operator already passes — no marginal risk | token expiry/rotation limits the blast radius | all |
+| Token expiry/rotation leaves a stale credential | operator rotates the env var; no stale at-rest copy to shadow it | late auth failures until the env var is updated | all |
+| Config tampering (agent overwrites a CLI config file) | non-secret config only; no integrity protection — same as all of `~/.pi` and `/workspace` | an attacker that can write the seed can do worse things anyway | all |
 
 ## Pitfalls
 
-- **`JIRA_API_TOKEN` is a decoy.** The container env carries it, but the
-  official acli never reads it — nor `ATLASSIAN_*` / `JIRA_URL` style vars,
-  which belong to third-party atlassian-cli clones. If acli reports
-  unauthorized, `auth login` with the token is the only fix; adding env vars
-  changes nothing.
-- **Env tokens are host-bound (glab, gh).** A `GITLAB_TOKEN` only matches
-  the host named by `GITLAB_HOST` (or a matching git remote); a `GH_TOKEN`
+- **`JIRA_API_TOKEN` is real for jira-cli.** The Atlassian *acli* that
+  previously shipped ignored it (its only path was
+  `acli jira auth login --token`); `jira-cli` reads it implicitly for every
+  command. If `jira` reports unauthorized, check the env var first.
+- **jira still needs a config file, not just a token.** glab/gh derive the
+  host from `GITLAB_HOST`/remotes/HOST and work with env token alone, but
+  jira-cli requires the blueprint from `jira init` (site URL, login, default
+  project). A fresh container with only `JIRA_API_TOKEN` set but no config
+  fails with a token/setup hint.
+- **`jira init` validates against the live instance.** It calls
+  `GET /rest/api/2/myself` and refuses to write a config for an unreachable or
+  untrusted site (`Unable to generate configuration:` / `404 Not Found`). Use
+  the full `https://` URL and a working token the first time. It reads the
+  token from the env (it does **not** read stdin).
+- **Env tokens are host-bound (glab, gh).** A `GITLAB_TOKEN` only matches the
+  host named by `GITLAB_HOST` (or a matching git remote); a `GH_TOKEN`
   likewise matches `GH_HOST`. With the host var unset, the CLI targets
   github.com/gitlab.com and a token minted for another host fails with a
   quiet 401 — easy to misread as a bad token.
-- **`auth status` reports the winning source, not the persistent one.**
-  With the env token set, `glab auth status` / `gh auth status` always claim
-  the token comes from the environment even when a stored credential exists.
-  Unset the env (`env -u GITLAB_TOKEN glab auth status`,
-  `env -u GH_TOKEN gh auth status`) to verify the persisted login.
+- **No OS keyring in this container** (no D-Bus / Secret Service). jira-cli's
+  keyring lookup always misses (its env path comes first); glab/gh are used
+  env-only so no keyring is needed.
 
 ## Accepted / out of scope
 
 * No fail-fast check for a missing token at container start — by explicit
   request; failures surface when the CLI is actually used.
-* No OS keyring: no D-Bus / Secret Service in the container; plaintext
-  config-file fallback is by design (glab warns once, gh and acli do not).
+* No OS keyring: no D-Bus / Secret Service in the container; not needed since
+  all three CLIs run env-token-only.
 * glab `git_protocol: ssh` is dead config — the container ships no ssh
   binary. Log in with `--git-protocol https`.
-* The `git credential` helper is not configured — `gh auth login` / `gh auth
-  setup-git` persist a token for `gh` itself; password-protected HTTPS push/
-  fetch over git uses separate credentials. Point users at `gh auth login`.
+* The `git credential` helper is not configured — `gh auth setup-git` is not
+  used here; HTTPS push/fetch over git uses separate credentials.
 
 ## Verify
 
 ```sh
-glab api user                        # env-token path succeeds, no login needed
-glab auth status                     # shows which source wins
-env -u GITLAB_TOKEN glab auth status # proves the stored credential works
-gh api user                          # env-token path succeeds, no login needed
-gh auth status                       # shows which source wins
-env -u GH_TOKEN gh auth status       # proves the stored credential works
-acli jira auth status                # stored credential only
+glab api user          # works from GITLAB_TOKEN alone, no login, no config seed
+gh api user            # works from GH_TOKEN alone
+jira version           # metadata command, token not required
+git -C seed/.config ls 2>/dev/null   # (optional) where CLI configs land
 ```
 
-## Re-login commands
+## First-time setup
+
+Nothing to do for glab/gh — pass the env tokens when starting the container.
+jira-cli needs its config generated once (token comes from the env):
 
 ```sh
-echo "$GITLAB_TOKEN" | glab auth login --hostname gitlab.example.com --stdin --git-protocol https
-echo "$JIRA_API_TOKEN" | acli jira auth login --site mysite.atlassian.net --email you@example.com --token
-echo "$GH_TOKEN" | gh auth login --hostname github.com --with-token
+export JIRA_API_TOKEN=...            # required: init validates against the instance
+jira init --installation cloud \
+  --server "https://mysite.atlassian.net" \
+  --login "you@example.com" --auth-type basic --force
+jira project list                    # verify
 ```
+
+`jira init` writes `$XDG_CONFIG_HOME/.jira/.config.yml` (= the gitignored
+`seed/.config/.jira/`); `--force` overwrites an existing config,
+`--project`/`--board` set the defaults.

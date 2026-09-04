@@ -136,13 +136,17 @@ RUN_ARGS=(
   # The explicit override also wins over SDK defaults used by webui.
   -e PI_CODING_AGENT_SESSION_DIR="${PI_CODING_AGENT_SESSION_DIR:-/workspace/.pi/sessions}"
   -e GLAB_SEND_TELEMETRY=false
-  -e GLAB_CONFIG_DIR=/agent-home/cli-auth/glab
-  -e ACLI_CONFIG_DIR=/agent-home/cli-auth
-  -e GH_CONFIG_DIR=/agent-home/cli-auth/gh
+  # CLI auth is unified on env TOKENS (CI/CD style): GITLAB_TOKEN / GH_TOKEN /
+  # JIRA_API_TOKEN below. We deliberately do NOT point glab/gh/jira-cli at any
+  # custom config dir — they follow their own defaults under $XDG_CONFIG_HOME,
+  # which lives in the seed (gitignored) so any non-secret config they write
+  # persists across restarts. Tokens themselves never touch disk (jira-cli
+  # only; glab/gh additionally accept persisted logins, unused here).
+  -e XDG_CONFIG_HOME=/agent-home/.config
   -e GITLAB_TOKEN="${GITLAB_TOKEN:-}" -e GITLAB_HOST="${GITLAB_HOST:-}"
   -e GH_TOKEN="${GH_TOKEN:-}"
   -e JIRA_API_TOKEN="${JIRA_API_TOKEN:-}"
-  -e XDG_CONFIG_HOME=/tmp/.config -e npm_config_cache=/tmp/.npm
+  -e npm_config_cache=/tmp/.npm
   -e XDG_CACHE_HOME=/tmp/.cache
 )
 
@@ -180,9 +184,9 @@ else
 fi
 
 # Provider credentials are shared by all modes; harmlessly empty values
-# preserve the old scripts' environment contract. CLI auth is deliberately
-# shared under /agent-home/cli-auth because the complete seed is mounted at
-# /agent-home for every container.
+# preserve the old scripts' environment contract. CLI auth is env-token based
+# (GITLAB_TOKEN / GH_TOKEN / JIRA_API_TOKEN); CLI configs follow their own
+# defaults under /agent-home/.config (the seed), gitignored.
 RUN_ARGS+=(
   -e MY_DEEPSEEK_API_KEY="${MY_DEEPSEEK_API_KEY:-}" -e VOLCENGINE_API_KEY="${VOLCENGINE_API_KEY:-}"
   -e MY_OPENROUTER_API_KEY="${MY_OPENROUTER_API_KEY:-}" -e LOCAL_API_KEY="${LOCAL_API_KEY:-}"

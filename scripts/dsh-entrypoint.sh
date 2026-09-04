@@ -37,7 +37,7 @@ fail() {
 
 # --- 2. bootstrap (best-effort caches on the /tmp tmpfs) ------------------
 
-for dir in /agent-home/cli-auth/glab /agent-home/cli-auth/acli /tmp/.npm /tmp/.cache /tmp/.config; do
+for dir in /agent-home/.config /tmp/.npm /tmp/.cache; do
     mkdir -p "$dir"
     chown "$(id -un):$(id -gn)" "$dir" 2>/dev/null || true
 done

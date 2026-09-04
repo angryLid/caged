@@ -16,7 +16,7 @@ FROM ${CAGED_BASE_IMAGE}
 ARG COMMAND_CODE_VERSION=latest
 RUN npm install -g command-code@${COMMAND_CODE_VERSION} && cmd --version
 
-RUN mkdir -p /agent-home/.commandcode /agent-home/cli-auth/glab /agent-home/cli-auth/acli \
+RUN mkdir -p /agent-home/.commandcode /agent-home/.config \
     && chown -R agent:agent /agent-home
 
 COPY scripts/commandcode-entrypoint.sh /usr/local/bin/commandcode-entrypoint

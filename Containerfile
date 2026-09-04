@@ -14,7 +14,7 @@
 # This file builds FROM the shared base image ./Containerfile.base (built
 # first by `scripts/build-container.sh pi` via scripts/build-caged-base.sh): the
 # base carries the slow, rarely-changing layers — apt essentials, the pinned
-# glab/acli CLIs, the shared non-root `agent` user. What remains here is pi-specific and
+# glab/gh/jira CLIs, the shared non-root `agent` user. What remains here is pi-specific and
 # volatile — chrome-devtools-mcp, the pi npm install, the build-time skill
 # clone, the entrypoint — so a PI_VERSION bump only rebuilds these bottom
 # layers, and a CLI/base-image update is a single-file change in
@@ -30,8 +30,8 @@ FROM ${CAGED_BASE_IMAGE}
 RUN npm install -g chrome-devtools-mcp@1.6.0
 
 # The complete seed is mounted at /agent-home at runtime. pi uses .pi and
-# shared CLI authentication uses the common cli-auth subdirectories.
-RUN mkdir -p /agent-home/.pi/agent /agent-home/cli-auth/glab /agent-home/cli-auth/acli \
+# CLI configs follow their own defaults under $XDG_CONFIG_HOME (= .config).
+RUN mkdir -p /agent-home/.pi/agent /agent-home/.config \
     && chown -R agent:agent /agent-home
 
 # Install pi (pinned) globally. Open network at build time (npm registry).

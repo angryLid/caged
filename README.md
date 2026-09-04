@@ -33,9 +33,12 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 * **GitHub CLI (`gh` v2.97.0)** — official GitHub CLI baked into the
   image: PRs, issues, releases, Actions workflows. Authenticate once with
   `GH_TOKEN` (env var) or a persisted `gh auth login`.
-* **Atlassian CLI (`acli` v1.3.22)** — official Atlassian CLI baked in:
-  **Jira Cloud** work items, projects, admin APIs (also Confluence &
-  Bitbucket). API-token login; state survives restarts.
+* **Jira CLI (`jira` v1.7.0)** — community-maintained, MIT-licensed
+  [jira-cli](https://github.com/ankitpokhrel/jira-cli) baked in: **Jira Cloud
+  & Server/Data Center** work items, epics, sprints, boards, releases, projects
+  (replaces the Atlassian-maintained `acli`). Env-token auth
+  (`JIRA_API_TOKEN`), no token stored on disk; scripting-friendly output
+  (`--plain`/`--raw` JSON/`--csv`).
 * **Python dependency tools** — `python`, `pip`, and `uv` are installed in the
   shared base image for Python scripting, virtual environments, and dependency
   management.
@@ -49,7 +52,8 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
   baked into the image or committed to the repo.
 * **Live shared agent home** — the complete `seed/` directory is a two-way bind
   mount of `/agent-home` for all modes; pi uses `.pi`, dsh uses `.dsh`, and
-  shared CLI auth lives under `cli-auth/`.
+  CLI configs follow the CLIs' own defaults under `$XDG_CONFIG_HOME`
+  (= `seed/.config/`, gitignored). Auth is token-only via env vars.
 * **pi-web-ui Web UI (optional)** — a browser chat frontend for pi, in a
   separate additive image (`cg webui build` + `cg webui start`) — see
   [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
@@ -67,7 +71,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 caged/
 ├── cg                     # unified launcher: cg <agent> <start|build> (replaces build.sh / start.sh)
 ├── Containerfile        # pi image (non-root, pinned pi version)
-├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, acli, non-root user, sync scripts
+├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, jira-cli, non-root user, sync scripts
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.commandcode # OPTIONAL: Command Code image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
@@ -91,7 +95,7 @@ caged/
 ├── README.md             # this file — docs for both images (pi by default, dsh as sibling)
 └── docs/
     ├── SECURITY.md           # threat model & accepted trade-offs
-    ├── CLI-AUTH.md           # glab/gh/acli auth behavior, persistence & risks
+    ├── CLI-AUTH.md           # glab/gh/jira-cli auth behavior, persistence & risks
     ├── APPLE-CONTAINER.md    # running via Apple's container tool
     └── AGENT-INTEGRATION.md  # SOP for adding a new agent image to caged
 
@@ -212,7 +216,7 @@ the host** — the build clones the git skill sources into the seed with
 ```sh
 # 1. build (only needed the first time, or when the images change). The
 #    shared base image (Containerfile.base: apt essentials including python3,
-#    glab, gh, acli, non-root user) is built automatically first, and the git
+#    glab, gh, jira-cli, non-root user) is built automatically first, and the git
 #    skill repos are cloned into seed/skills-sync/vendor/ on the host.
 #    Optionally pick a pi version:   PI_VERSION=x.y.z cg pi build
 cg pi build
@@ -241,13 +245,14 @@ cd /path/to/your/repo
 | Path in container | Backing | Read/write | Purpose |
 |---|---|---|---|
 | `/workspace`   | the dir you ran `cg pi start` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** (also backs pi's per-project session data, see below) |
-| `/agent-home` (`$HOME`) | `<caged>/seed` (`$CAGED_AGENT_HOME`) | rw | **shared live agent home** — contains `.pi`, `.dsh`, and shared CLI auth; all agent modes use the same mount |
+| `/agent-home` (`$HOME`) | `<caged>/seed` (`$CAGED_AGENT_HOME`) | rw | **shared live agent home** — contains `.pi`, `.dsh`, and CLI configs (their own defaults under `.config`); all agent modes use the same mount |
 | `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
 
 `$HOME` is `/agent-home`, and the complete `caged/seed` directory is a live
 bind mount there for every mode. Pi uses `/agent-home/.pi`, dsh uses
-`/agent-home/.dsh`, and shared CLI authentication uses
-`/agent-home/cli-auth`. Whatever an agent writes under this home lands directly
+`/agent-home/.dsh`, and CLI configs follow the CLIs' own defaults under
+`/agent-home/.config` (auth is env-token only, nothing secret is persisted).
+Whatever an agent writes under this home lands directly
 in the repo tree. There is **no baked-in config inside the image** and no
 fresh-volume seeding step — the seed *is* the live agent home.
 Iterate on seed files and they take effect on the *next* container start —
@@ -361,31 +366,18 @@ both the pi and the dsh image inherit it. Use it for
 MRs, issues, pipelines, releases, etc. instead of hand-rolled curl against
 the GitLab API.
 
-Two ways to authenticate:
+Authenticate with an env token (CI/CD style — no `auth login`, no stored
+credential):
 
-* **Env token (primary, for automated runs).** Pass `GITLAB_TOKEN` (plus
-  `GITLAB_HOST=https://gitlab.example.com` for a self-hosted instance) when
-  starting; it takes precedence over stored credentials and never touches
-  disk:
+```sh
+GITLAB_TOKEN=glpat-... cg pi start
+# then run  glab issue list  inside the pi TUI
+```
 
-  ```sh
-  GITLAB_TOKEN=glpat-... cg pi start
-  # then run  glab issue list  inside the pi TUI
-  ```
-
-* **Persisted login (interactive).** `GLAB_CONFIG_DIR` points at
-  `/agent-home/cli-auth/glab` on the live shared `/agent-home` mount, so
-  `glab auth login` state survives container restarts (gitignored, like
-  `acli` and `auth.json`):
-
-  ```sh
-  echo "$GITLAB_TOKEN" | cg pi start
-  # then pipe the same token into  glab auth login ...  inside the TUI
-  ```
-
-  Run from any directory (the workspace can be a throwaway dir). The token is
-  stored as plaintext (`0600`, gitignored) — the trade-offs are analysed in
-  [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
+For a self-hosted instance also pass `GITLAB_HOST=https://gitlab.example.com`
+(bytes are matched per-host, see [docs/CLI-AUTH.md](docs/CLI-AUTH.md)).
+`glab` writes its non-secret config (host/user settings) to its default
+location under the seed; caged does not manage it.
 
 ## gh (GitHub CLI)
 
@@ -396,55 +388,49 @@ checksums); both the pi and the dsh image inherit it. Use it for PRs, issues,
 releases, and Actions workflows instead of hand-rolled curl against the
 GitHub API.
 
-Two ways to authenticate (mirroring `glab`):
+Authenticate with an env token (mirroring `glab` — no `auth login`, no stored
+credential):
 
-* **Env token (primary, for automated runs).** Pass `GH_TOKEN` (+ `GH_HOST`
-  for a GitHub Enterprise host) when starting; it takes precedence over
-  stored credentials and never touches disk:
+```sh
+GH_TOKEN=github_pat_... cg pi start
+# then run  gh pr list  inside the pi TUI
+```
 
-  ```sh
-  GH_TOKEN=github_pat_... cg pi start
-  # then run  gh pr list  inside the pi TUI
-  ```
+For a GitHub Enterprise host pass `GH_HOST` as well. The token never touches
+disk; `gh` lazily writes its non-secret config to its default location under
+the seed. Trade-offs shared with `glab`/`jira-cli`:
+[docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
-* **Persisted login (interactive).** `GH_CONFIG_DIR` points at
-  `/agent-home/cli-auth/gh` on the live shared `/agent-home` mount, so
-  `gh auth login` state survives container restarts (gitignored, like
-  `glab`/`acli` and `auth.json`):
+## jira-cli (Jira)
 
-  ```sh
-  GH_TOKEN=github_pat_... cg pi start
-  # then run  gh auth login --with-token  inside the TUI
-  ```
-
-  The token is stored as plaintext (`0600`, gitignored) — the trade-offs are
-  analysed alongside `glab`/`acli` in [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
-
-## acli (Atlassian CLI)
-
-[`acli`](https://developer.atlassian.com/cloud/acli/) — Atlassian's official
-command line interface (Jira Cloud, Confluence, Bitbucket, admin APIs) — is
-baked into the shared base image (v1.3.22, pinned `ARG ACLI_VERSION`
-in `Containerfile.base`); both the pi and the dsh image inherit it.
-Atlassian only publishes `latest`-style URLs, so the pin is
-enforced via the versioned `.deb` filename + the sha256 taken from
-Atlassian's own apt repo `Packages` index, mirroring the `glab` pattern.
+[`jira-cli`](https://github.com/ankitpokhrel/jira-cli) (binary `jira`) — a
+community-maintained, MIT-licensed Jira client (Jira Cloud + Server/Data
+Center, v2 & v3 APIs) — is baked into the shared base image (v1.7.0, pinned
+`ARG JIRA_VERSION` in `Containerfile.base`); both the pi and the dsh image
+inherit it. It replaces the Atlassian-maintained `acli` for Jira work-item
+workflows (issue/epic/sprint/board/release/project) and is deliberately
+coding-agent friendly: `--plain` / `--raw` (JSON) / `--csv` output,
+`--no-input` scripting, raw-JQL search, and a native `board` command group.
+The release is pinned via the versioned tarball + `checksums.txt` sha256,
+mirroring the `glab` pattern.
 
 Authenticate with an API token (created at
-`id.atlassian.com/manage-profile/security/api-tokens`) read from stdin:
+`id.atlassian.com/manage-profile/security/api-tokens`) via the **env var** —
+no login command, no token at rest:
 
 ```sh
 JIRA_API_TOKEN=... cg pi start
-# then run  acli jira auth login --site "mysite.atlassian.net" \
-#     --email you@example.com --token   inside the TUI
+# then run  jira project list  inside the pi TUI
 ```
 
-`ACLI_CONFIG_DIR` points at `/agent-home/cli-auth/acli` — on the live shared
-`/agent-home` mount, so login state survives restarts while the token stays out
-of git (`seed/cli-auth/acli/` is ignored, like `auth.json`). No secret env var
-is needed; unlike `glab` there is no env-token passthrough, so authenticating
-once per setup is the supported path. Auth behavior and pitfalls for both
-CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
+jira-cli needs a one-time `jira init` (site URL, login, default project/board)
+before first use — the token for that comes from the same `JIRA_API_TOKEN`
+env var. The init writes its non-secret config to jira-cli's default location,
+which resolves to the seed (`XDG_CONFIG_HOME` → gitignored `seed/.config/`),
+so it survives restarts without caged managing it. Unlike `glab` there is no
+persisted token to renew: the token always comes from `JIRA_API_TOKEN`, so
+re-auth happens only when the token rotates. Auth behavior and pitfalls for
+all three CLIs: [docs/CLI-AUTH.md](docs/CLI-AUTH.md).
 
 ## pi-web-ui (Web UI)
 
@@ -528,7 +514,7 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 > `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.2-rc.1`) so a
 > release bump is explicit. dsh builds on the repo's shared base image
 > `Containerfile.base` (built automatically by the build script), which
-> provides apt essentials including `python3`, the glab/gh/acli CLIs and the
+> provides apt essentials including `python3`, the glab/gh/jira-cli CLIs and the
 > non-root user — the same CLI tooling pi ships.
 
 ### What it is / isn't
@@ -664,7 +650,7 @@ inside the container via `cordis.patch.yml`). The container port is a stable
 subset (same as the pi image): `--read-only`, `--cap-drop ALL`, `--tmpfs
 /tmp`, pinned memory — no userns / no `--security-opt`. Env knobs: `DSH_IMAGE`,
 `DSH_VERSION`, `CAGED_AGENT_HOME`, `CAGED_WORKSPACE`, `DSH_MEMORY` (build:
-`CAGED_BASE_IMAGE`, `CAGED_SKIP_BASE`, `GLAB_VERSION`, `ACLI_VERSION`).
+`CAGED_BASE_IMAGE`, `CAGED_SKIP_BASE`, `GLAB_VERSION`, `JIRA_VERSION`).
 
 ### Port mapping
 
@@ -773,7 +759,7 @@ listed.
 | `CAGED_SKIP_BASE` | `0` | set to `1` to skip the automatic base rebuild when building a derived image |
 | `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |
 | `GH_VERSION` | `2.97.0` | gh version pin (build time, `build-caged-base.sh`) |
-| `ACLI_VERSION` | `1.3.22` | acli version pin (build time, `build-caged-base.sh`) |
+| `JIRA_VERSION` | `1.7.0` | jira-cli version pin (build time, `build-caged-base.sh`) |
 | `PNPM_VERSION` | `10.15.0` | pnpm version pin (build time, `build-caged-base.sh`) |
 | `YARN_VERSION` | `1.22.22` | yarn version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
