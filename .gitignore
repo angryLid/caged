@@ -2,6 +2,10 @@
 node_modules/
 .pnpm-store/
 
+# npm pack output (host-built by scripts/package-cf.sh; the Containerfile
+# COPYs packages/cf/dist/*.tgz into the base image and installs it globally).
+packages/cf/dist/
+
 # OS cruft
 .DS_Store
 

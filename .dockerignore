@@ -5,6 +5,10 @@ docs/
 .pi/
 .dsh/
 
+# npm deps must never ride the build context — packages/cf installs its own
+# locked deps inside the image via npm ci.
+node_modules/
+
 # One .dockerignore serves every image build (pi, dsh, webui, cmdc) — they all
 # build from the repo-root context. seed/ is never needed in a build context:
 # the agent homes (.pi, .dsh, .commandcode), the skill sources and both sync

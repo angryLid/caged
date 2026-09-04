@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # caged-base — shared base image for the caged (pi) and dsh images.
-# Contains common runtime essentials, pinned CLIs, the non-root agent user, and persistent directories.
+# Contains common runtime essentials, pinned CLIs, the repo's own `cf` tool,
+# the non-root agent user, and persistent directories.
 
 FROM debian:bookworm-slim
 
@@ -117,6 +118,20 @@ RUN set -eux; \
     && install -m 0755 /tmp/cfl/cfl /usr/local/bin/cfl \
     && rm -rf /tmp/cfl /tmp/cfl.tar.gz \
     && cfl --version
+
+# cf — Confluence page reader for coding agents (this repo's packages/cf).
+# Packaged ON THE HOST by scripts/package-cf.sh (npm pack; the runtime deps —
+# turndown / turndown-plugin-gfm / domino — are bundled into the tarball, so
+# this global install needs no registry access) and COPY'd in as a ready
+# artifact. Auth is env-token driven (CFL_EMAIL + CFL_API_TOKEN, populated by
+# start-container.sh from the shared ATLASSIAN_* trio or JIRA_API_TOKEN): cf
+# resolves the env vars itself and derives the site from the URL — no config,
+# no init, no keyring, no credential handling by the agent.
+COPY packages/cf/dist/*.tgz /opt/caged/
+RUN set -eux; \
+    npm install -g --no-audit --no-fund /opt/caged/*.tgz; \
+    rm -rf /root/.npm; \
+    cf --version
 
 # Create the shared non-root agent user (no `node` user to remove in a plain Debian base).
 RUN useradd --create-home --home-dir /agent-home --uid 1000 --shell /bin/bash agent \

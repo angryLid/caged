@@ -1,0 +1,32 @@
+{
+  "name": "@caged/cf",
+  "version": "0.1.0",
+  "description": "Confluence page reader for coding agents — give it a page URL, get the full page as Markdown.",
+  "license": "MIT",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "cf": "bin/cf.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/cf.test.js"
+  },
+  "dependencies": {
+    "domino": "^2.1.6",
+    "turndown": "^7.2.0",
+    "turndown-plugin-gfm": "^1.0.2"
+  },
+  "bundledDependencies": [
+    "domino",
+    "turndown",
+    "turndown-plugin-gfm"
+  ]
+}

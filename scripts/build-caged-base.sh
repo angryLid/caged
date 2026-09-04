@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # scripts/build-caged-base.sh — build the shared caged-base image
 # (./Containerfile.base: apt essentials including python3, glab, gh, jira,
-# cfl, non-root user) and clone/pull the git skill sources into the seed.
+# cfl, the repo's own `cf` page reader, non-root user) and clone/pull the git
+# skill sources into the seed.
 #
 # Called automatically by scripts/build-container.sh (run with the argument
 # `pi` or `dsh`) before it builds the derived image;
@@ -43,7 +44,15 @@ if [ "${CAGED_SKIP_SKILLS_SYNC:-0}" != "1" ]; then
 else
   echo "==> CAGED_SKIP_SKILLS_SYNC=1 — reusing the existing seed skill vendor."
 fi
-echo "==> Building base image: ${CAGED_BASE_IMAGE} (GLAB_VERSION=${GLAB_VERSION:-1.112.0}, GH_VERSION=${GH_VERSION:-2.97.0}, JIRA_VERSION=${JIRA_VERSION:-1.7.0}, CFL_VERSION=${CFL_VERSION:-1.3.96}, PNPM_VERSION=${PNPM_VERSION:-10.15.0}, YARN_VERSION=${YARN_VERSION:-1.22.22})..."
+# --- cf: pack the Confluence reader on the host (outside the Dockerfile) ----
+# Same rationale as the skill clones above: the network-touching step (npm
+# pack with bundled deps) happens HERE, on the host; the Containerfile only
+# COPYs the resulting tarball in and runs `npm install -g`. Skip with
+# CAGED_SKIP_CF_PACKAGE=1 (offline rebuilds reuse the tarball already in
+# packages/cf/dist).
+"${SCRIPT_DIR}/package-cf.sh"
+
+echo "==> Building base image: ${CAGED_BASE_IMAGE} (GLAB_VERSION=${GLAB_VERSION:-1.112.0}, GH_VERSION=${GH_VERSION:-2.97.0}, JIRA_VERSION=${JIRA_VERSION:-1.7.0}, CFL_VERSION=${CFL_VERSION:-1.3.96}, cf=packages/cf, PNPM_VERSION=${PNPM_VERSION:-10.15.0}, YARN_VERSION=${YARN_VERSION:-1.22.22})..."
 
 # Repo root as the build context (same .dockerignore as the derived builds).
 container build \
