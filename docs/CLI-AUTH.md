@@ -201,13 +201,34 @@ export ATLASSIAN_API_TOKEN="..."               # same Atlassian API token
 cg pi start                                    # cfl + jira both work
 ```
 
-Optional: persist non-secret defaults (default space) headlessly with
-`cfl init --non-interactive --url "$CFL_URL" --email "$CFL_EMAIL" --token-stdin`
-(the token itself only lands in the config store if you let it; env remains
-the source of truth here).
+### Complete init commands (one-time, inside the container)
 
-`jira init` writes `$XDG_CONFIG_HOME/.jira/.config.yml` (= the gitignored
-`seed/.config/.jira/`); `cfl init` writes `$XDG_CONFIG_HOME/cfl/config.yml`
-(= the gitignored `seed/.config/cfl/`); `--force`/`--non-interactive`
-overwrite/replace prompting as needed. `--project`/`--board` set the jira
-defaults.
+Run inside a container started with the `ATLASSIAN_*` trio — the entrypoint
+has already exported `JIRA_SERVER`/`JIRA_LOGIN`/`JIRA_API_TOKEN` and
+`CFL_URL`/`CFL_EMAIL`/`CFL_API_TOKEN` from it:
+
+```sh
+# jira-cli — required once. Validates against the live instance; the token is
+# read from env automatically, but --server/--login must be explicit (v1.7.0
+# init only falls back to env for JIRA_AUTH_TYPE).
+jira init --installation cloud \
+  --server "$JIRA_SERVER" --login "$JIRA_LOGIN" \
+  --auth-type basic --force
+jira project list                    # verify
+
+# cfl — optional: env-only works with zero setup (cfl me already verifies);
+# init only persists non-secret defaults such as default_space.
+cfl init --non-interactive \
+  --url "$CFL_URL" --email "$CFL_EMAIL" --token-stdin <<<"$CFL_API_TOKEN"
+```
+
+`jira init` writes `$XDG_CONFIG_HOME/.jira/.config.yml` (gitignored
+`seed/.config/.jira/`); `cfl init` writes the non-secret config under
+`seed/.config/` (gitignored). Afterward, server/login/token at runtime come
+from the mapped env, so rotations need no re-init. `--force`/
+`--non-interactive` skip/replace prompting; `--project`/`--board` set the
+jira defaults. The container has no OS keyring and cfl resolves env before
+the keyring, so neither command stores the token — the keyring line in
+`cfl config show` is expected diagnostic noise. `cfl init --non-interactive
+--token-stdin` is the headless variant documented against cfl v1.3.96; run
+`cfl init --help` if a flag is rejected.
