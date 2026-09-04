@@ -11,7 +11,7 @@ fail() {
 }
 
 # --- shared Atlassian env assignment (best-effort) --------------------------
-# Map the ATLASSION_HOST/EMAIL/API_TOKEN trio the operator injects onto the
+# Map the ATLASSIAN_HOST/EMAIL/API_TOKEN trio the operator injects onto the
 # vars cfl/jira-cli read (CFL_URL/CFL_EMAIL/CFL_API_TOKEN; JIRA_SERVER/
 # JIRA_LOGIN/JIRA_API_TOKEN). Baked into the base image; skip silently on
 # older builds without it.

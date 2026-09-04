@@ -435,7 +435,7 @@ env var. The init writes its non-secret config to jira-cli's default location,
 which resolves to the seed (`XDG_CONFIG_HOME` → gitignored `seed/.config/`),
 so it survives restarts without caged managing it. Unlike `glab` there is no
 persisted token to renew: the token always comes from `JIRA_API_TOKEN`, so
-re-auth happens only when the token rotates. With the shared `ATLASSION_*`
+re-auth happens only when the token rotates. With the shared `ATLASSIAN_*`
 trio injected, the entrypoint additionally sets `JIRA_SERVER`/`JIRA_LOGIN`
 from it, and jira-cli resolves env before config — so server/login/token
 rotations need no `jira init` re-run. Auth behavior and pitfalls for
@@ -477,13 +477,13 @@ JIRA_API_TOKEN=... cg pi start            # cfl gets CFL_API_TOKEN from it
 # then run  cfl page view 12345  inside the pi TUI
 ```
 
-Alternatively, inject the shared `ATLASSION_*` trio once — the container's
+Alternatively, inject the shared `ATLASSIAN_*` trio once — the container's
 entrypoint assigns the CLI vars from it inside the container (a bare
-`ATLASSION_HOST` gets an `https://` prefix):
+`ATLASSIAN_HOST` gets an `https://` prefix):
 
 ```sh
-ATLASSION_HOST=your-site.atlassian.net ATLASSION_EMAIL=you@example.com \
-ATLASSION_API_TOKEN=... cg pi start      # cfl and jira both authenticate
+ATLASSIAN_HOST=your-site.atlassian.net ATLASSIAN_EMAIL=you@example.com \
+ATLASSIAN_API_TOKEN=... cg pi start      # cfl and jira both authenticate
 ```
 
 Unlike jira-cli there is no config prerequisite: the three `CFL_*` env vars
@@ -846,9 +846,9 @@ listed.
 | `CFL_URL` | *(unset)* | `cfl` (Confluence) site URL, e.g. `https://your-site.atlassian.net` (passed into container) |
 | `CFL_EMAIL` | *(unset)* | `cfl` (Confluence) login email (passed into container) |
 | `CFL_API_TOKEN` | *(unset)* | `cfl` (Confluence) API token — the same Atlassian token as `JIRA_API_TOKEN` (passed into container); if unset, derived from `JIRA_API_TOKEN` at start |
-| `ATLASSION_HOST` | *(unset)* | Shared Atlassian site host, e.g. `your-site.atlassian.net` (forwarded into container; entrypoint assigns `CFL_URL` and `JIRA_SERVER` from it, adding `https://` to a bare host) |
-| `ATLASSION_EMAIL` | *(unset)* | Shared Atlassian login email (forwarded into container; entrypoint assigns `CFL_EMAIL` and `JIRA_LOGIN` from it) |
-| `ATLASSION_API_TOKEN` | *(unset)* | Shared Atlassian API token (forwarded into container; entrypoint assigns `CFL_API_TOKEN` and `JIRA_API_TOKEN` from it — same token as `JIRA_API_TOKEN`/`CFL_API_TOKEN`) |
+| `ATLASSIAN_HOST` | *(unset)* | Shared Atlassian site host, e.g. `your-site.atlassian.net` (forwarded into container; entrypoint assigns `CFL_URL` and `JIRA_SERVER` from it, adding `https://` to a bare host) |
+| `ATLASSIAN_EMAIL` | *(unset)* | Shared Atlassian login email (forwarded into container; entrypoint assigns `CFL_EMAIL` and `JIRA_LOGIN` from it) |
+| `ATLASSIAN_API_TOKEN` | *(unset)* | Shared Atlassian API token (forwarded into container; entrypoint assigns `CFL_API_TOKEN` and `JIRA_API_TOKEN` from it — same token as `JIRA_API_TOKEN`/`CFL_API_TOKEN`) |
 
 > dsh's dedicated knobs — `DSH_IMAGE`, `DSH_VERSION`, `DSH_HOST_PORT`,
 > `DSH_MEMORY`, `DSH_PERMISSION_MODE` — are documented in the

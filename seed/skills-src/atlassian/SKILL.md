@@ -40,8 +40,8 @@ neither stores a secret in this container:
 | `jira` | `JIRA_API_TOKEN` | one-time `jira init` (site URL, login, default project/board) |
 | `cfl` | `CFL_URL` + `CFL_EMAIL` + `CFL_API_TOKEN` | none — env-only works |
 
-The caged entrypoint also accepts the shared trio `ATLASSION_HOST` /
-`ATLASSION_EMAIL` / `ATLASSION_API_TOKEN` (injected into the container by
+The caged entrypoint also accepts the shared trio `ATLASSIAN_HOST` /
+`ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` (injected into the container by
 the operator) and assigns the CLI vars from it inside the container —
 `CFL_URL`/`JIRA_SERVER` ← host, `CFL_EMAIL`/`JIRA_LOGIN` ← email,
 `CFL_API_TOKEN`/`JIRA_API_TOKEN` ← token — so either spelling authenticates

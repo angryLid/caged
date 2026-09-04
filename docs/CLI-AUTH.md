@@ -110,18 +110,18 @@ via `jira init` (jira-cli). Do not document or depend on their internals.
   passing either one token env var covers both CLIs; `CFL_URL`/`CFL_EMAIL`
   are still individually required. Missing any of the three and cfl fails on
   first use; there is no caged-managed fallback.
-- **Or inject the shared `ATLASSION_*` trio once.** The operator may instead
-  pass `ATLASSION_HOST` (site host, e.g. `your-site.atlassian.net` —
-  `https://` is added automatically), `ATLASSION_EMAIL`, and
-  `ATLASSION_API_TOKEN`. `start-container.sh` forwards all three verbatim,
+- **Or inject the shared `ATLASSIAN_*` trio once.** The operator may instead
+  pass `ATLASSIAN_HOST` (site host, e.g. `your-site.atlassian.net` —
+  `https://` is added automatically), `ATLASSIAN_EMAIL`, and
+  `ATLASSIAN_API_TOKEN`. `start-container.sh` forwards all three verbatim,
   and the image entrypoint (`scripts/env-atlassian.sh`, baked into the base,
   sourced by every agent's entrypoint) assigns **inside the container**:
-  `CFL_URL` and `JIRA_SERVER` ← `ATLASSION_HOST` (normalized to a full https
-  URL; `ATLASSION_URL` still honored as a legacy alias), `CFL_EMAIL` and
-  `JIRA_LOGIN` ← `ATLASSION_EMAIL`, `CFL_API_TOKEN` and `JIRA_API_TOKEN` ←
-  `ATLASSION_API_TOKEN`. Explicit `CFL_*`/`JIRA_*` vars always win over the
+  `CFL_URL` and `JIRA_SERVER` ← `ATLASSIAN_HOST` (normalized to a full https
+  URL; `ATLASSIAN_URL` still honored as a legacy alias), `CFL_EMAIL` and
+  `JIRA_LOGIN` ← `ATLASSIAN_EMAIL`, `CFL_API_TOKEN` and `JIRA_API_TOKEN` ←
+  `ATLASSIAN_API_TOKEN`. Explicit `CFL_*`/`JIRA_*` vars always win over the
   trio. One token env var in any of its three spellings (`JIRA_API_TOKEN`,
-  `CFL_API_TOKEN`, `ATLASSION_API_TOKEN`) therefore covers both CLIs.
+  `CFL_API_TOKEN`, `ATLASSIAN_API_TOKEN`) therefore covers both CLIs.
   Caveat: jira-cli still needs its config file to **exist** (one-time
   `jira init`); the mapped `JIRA_*` env vars only override the config's
   server/login/token values at runtime (jira-cli resolves env first), so
@@ -170,7 +170,7 @@ jira init --installation cloud \
 jira project list                    # verify
 ```
 
-With the shared `ATLASSION_*` trio injected, the entrypoint also sets
+With the shared `ATLASSIAN_*` trio injected, the entrypoint also sets
 `JIRA_SERVER`/`JIRA_LOGIN`/`JIRA_API_TOKEN` from it, and jira-cli resolves
 env before config — so the values used at runtime come from the trio, and
 `jira init` only needs to run once to create the (non-secret) config file.
@@ -195,9 +195,9 @@ the entrypoint does the assignment inside the container (`https://` is added
 to a bare host automatically):
 
 ```sh
-export ATLASSION_HOST="mysite.atlassian.net"   # bare host is fine
-export ATLASSION_EMAIL="you@example.com"
-export ATLASSION_API_TOKEN="..."               # same Atlassian API token
+export ATLASSIAN_HOST="mysite.atlassian.net"   # bare host is fine
+export ATLASSIAN_EMAIL="you@example.com"
+export ATLASSIAN_API_TOKEN="..."               # same Atlassian API token
 cg pi start                                    # cfl + jira both work
 ```
 
