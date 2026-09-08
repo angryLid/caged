@@ -47,6 +47,8 @@
         {
           "id": "z-ai/glm-5.3-flash",
           "name": "GLM-5.3 Flash (OpenRouter, FP8 only)",
+          "contextWindow": 270000,
+          "maxTokens": 16384,
           "compat": {
             "openRouterRouting": {
               "quantizations": ["fp8"]
