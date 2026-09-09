@@ -21,7 +21,7 @@
 # Per-image knobs (env vars, defaults listed):
 #   pi:    CAGED_IMAGE (caged:latest),      PI_VERSION (0.84.4)
 #   dsh:   DSH_IMAGE (dsh:latest),          DSH_VERSION (0.1.2-rc.1)
-#   webui: CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (0.26.0)
+#   webui: CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (0.71.0)
 #   cmdc: COMMANDCODE_IMAGE (commandcode:latest), COMMAND_CODE_VERSION (1.50.1)
 # Shared: CAGED_BASE_IMAGE (caged-base:latest), CAGED_SKIP_BASE (0)
 
@@ -55,7 +55,7 @@ webui)
     CONTAINERFILE="Containerfile.webui"
     IMAGE_TAG="${CAGED_WEB_IMAGE:-caged-webui:latest}"
     VERSION_ARG="PI_WEB_UI_VERSION"
-    VERSION_VALUE="${PI_WEB_UI_VERSION:-0.26.0}"
+    VERSION_VALUE="${PI_WEB_UI_VERSION:-0.71.0}"
     ;;
 cmdc)
     CONTAINERFILE="Containerfile.commandcode"

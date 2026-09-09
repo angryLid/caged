@@ -36,7 +36,7 @@ USER root
 # --allow-scripts is required on npm >= 12 (install scripts default-deny,
 # which would silently skip node-pty's compile and break the terminal at
 # runtime) and is a no-op on npm 11.
-ARG PI_WEB_UI_VERSION=0.26.0
+ARG PI_WEB_UI_VERSION=0.71.0
 RUN npm install -g --allow-scripts=node-pty,@google/genai,protobufjs pi-web-ui@${PI_WEB_UI_VERSION} \
     && pi-web-ui --version
 

@@ -826,7 +826,7 @@ listed.
 | `PNPM_VERSION` | `10.15.0` | pnpm version pin (build time, `build-caged-base.sh`) |
 | `YARN_VERSION` | `1.22.22` | yarn version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
-| `PI_WEB_UI_VERSION` | `0.26.0` | pi-web-ui version pin (build time, `cg webui build`) |
+| `PI_WEB_UI_VERSION` | `0.71.0` | pi-web-ui version pin (build time, `cg webui build`) |
 | `CAGED_SKIP_PI` | `0` | set to `1` to skip the pi image build when building `webui` (e.g. it is already current) |
 | `PI_WEBUI_HOST_PORT` | `8787` | host-loopback port of the Web UI (`http://127.0.0.1:8787`) |
 | `PI_WEBUI_MEMORY` | `4g` | RAM for the web-mode container VM (`CAGED_MEMORY` for the TUI) |
