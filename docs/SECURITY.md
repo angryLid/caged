@@ -88,7 +88,8 @@ listening port plus the origin check:
 
 ## Layered defense quick reference
 
-* Image: non-root USER agent, pinned agent version, minimal base layer.
+* Image: non-root USER agent, agent version defaulting to `latest` (pin via
+  env-var build-args when reproducibility matters), minimal base layer.
 * Seed: `seed/` ships only **configuration, never secrets** — `models.json`
   references key env-var names, real values arrive via container env at
   runtime and live only in the process/volume `auth.json`.

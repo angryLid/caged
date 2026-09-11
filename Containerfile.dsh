@@ -38,14 +38,16 @@ FROM ${CAGED_BASE_IMAGE}
 RUN mkdir -p /agent-home/.dsh /agent-home/.config \
     && chown -R agent:agent /agent-home
 
-# Install dsh (pinned) globally. Open network at build time (npm registry).
-# This is the volatile layer: a DSH_VERSION bump rebuilds only this (and the
-# few below it), keeping the base/toolchain layers cached. The published npm
-# set is internally consistent at rc.1 (@deepseek-ai/dsh and all its
-# @deepseek-ai/dsh-* bundle deps are ^0.1.2-rc.1); its native deps (node-pty,
+# Install dsh globally, defaulting to latest so rapid upstream iterations are
+# picked up on every rebuild; pin a specific version via DSH_VERSION=x.y.z.
+# Open network at build time (npm registry).
+# This is the volatile layer: a DSH_VERSION change rebuilds only this (and the
+# few below it), keeping the base/toolchain layers cached. dsh's npm
+# bundle deps are internally consistent (@deepseek-ai/dsh and all its
+# @deepseek-ai/dsh-* bundle deps share one version range); its native deps (node-pty,
 # node-addon-require-builtin) ship prebuilt linux x64/arm64-gnu binaries; the
 # shared base already provides the build toolchain for node-pty.
-ARG DSH_VERSION=0.1.2-rc.1
+ARG DSH_VERSION=latest
 RUN npm install -g @deepseek-ai/dsh@${DSH_VERSION} && dsh --version
 
 # $DSH_HOME is intentionally NOT copied into the image: at runtime

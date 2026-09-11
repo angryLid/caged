@@ -547,12 +547,13 @@ TUI run:
 
 Caveats:
 
-* **Updating pi-web-ui = bump `PI_WEB_UI_VERSION` and rebuild the image.**
+* **Updating pi-web-ui = rebuild the image (latest by default; pin via
+  `PI_WEB_UI_VERSION=x.y.z`).**
   The runtime rootfs is read-only, so the UI's in-app self-update and
   `pi-web-ui server install` (systemd/launchd) don't apply inside caged —
   run the foreground server only (which is what the script does).
 * The web server bundles its own pi SDK copy (`^0.83`), which can lag the
-  pinned global pi (`0.84.4`). The seed config format is compatible and the
+  global pi. The seed config format is compatible and the
   two don't interfere.
 * One caged container at a time per seed: don't run the TUI (`caged-pi`)
   and the Web UI (`caged-pi-webui`) simultaneously against the same
@@ -572,9 +573,9 @@ and the same "live seed, no rebuild for config" philosophy, but for dsh's
 **browser Web UI** (and one-shot headless mode) instead of pi's TUI.
 
 > dsh is a **developer preview** that is iterating rapidly, with
-> compatibility-breaking changes expected. The version is pinned in
-> `Containerfile.dsh` (build-arg `DSH_VERSION`, default `0.1.2-rc.1`) so a
-> release bump is explicit. dsh builds on the repo's shared base image
+> compatibility-breaking changes expected. `Containerfile.dsh` installs dsh
+> (build-arg `DSH_VERSION`, default `latest`); pin a specific version with
+> `DSH_VERSION=x.y.z` so a release bump is explicit. dsh builds on the repo's shared base image
 > `Containerfile.base` (built automatically by the build script), which
 > provides apt essentials including `python3`, the glab/gh/jira-cli/cfl CLIs
 > and the non-root user — the same CLI tooling pi ships.
@@ -595,7 +596,7 @@ sharing the same `scripts/` and `seed/` directories (see the full tree at the
 top of this file). The dsh-specific pieces:
 
 - `Containerfile.dsh` — dsh image: thin `FROM` layer on the shared base,
-  pinned dsh (`ARG DSH_VERSION`)
+  dsh (`ARG DSH_VERSION`, default `latest`)
 - `scripts/dsh-entrypoint.sh` — fail-fast seed check + tini + workspace seed
 - `scripts/dsh-ensure-workspace.mjs` — best-effort: register `/workspace` as Web default
 - `seed/.dsh/` — LIVE `$DSH_HOME` bind source — ships our home-level
@@ -826,7 +827,7 @@ listed.
 | `PNPM_VERSION` | `10.15.0` | pnpm version pin (build time, `build-caged-base.sh`) |
 | `YARN_VERSION` | `1.22.22` | yarn version pin (build time, `build-caged-base.sh`) |
 | `CAGED_WEB_IMAGE` | `caged-webui:latest` | pi-web-ui image tag (build + run of the web mode) |
-| `PI_WEB_UI_VERSION` | `0.71.0` | pi-web-ui version pin (build time, `cg webui build`) |
+| `PI_WEB_UI_VERSION` | `latest` | pi-web-ui version (build time, `cg webui build`; pin via env var) |
 | `CAGED_SKIP_PI` | `0` | set to `1` to skip the pi image build when building `webui` (e.g. it is already current) |
 | `PI_WEBUI_HOST_PORT` | `8787` | host-loopback port of the Web UI (`http://127.0.0.1:8787`) |
 | `PI_WEBUI_MEMORY` | `4g` | RAM for the web-mode container VM (`CAGED_MEMORY` for the TUI) |
@@ -853,6 +854,17 @@ listed.
 > dsh's dedicated knobs — `DSH_IMAGE`, `DSH_VERSION`, `DSH_HOST_PORT`,
 > `DSH_MEMORY`, `DSH_PERMISSION_MODE` — are documented in the
 > [dsh (DeepSeek Harness)](#dsh-deepseek-harness) section.
+
+> Agent version knobs (`PI_VERSION`, `PI_WEB_UI_VERSION`, `DSH_VERSION`,
+> `COMMAND_CODE_VERSION`) default to `latest`: `build-container.sh` resolves
+> `latest` against the npm registry (`npm view <pkg> version`) and passes the
+> concrete version as the build-arg. This matters for layer caching — a
+> literal `latest` never changes, so BuildKit would reuse the first build's
+> install layer forever and never pick up new agent releases. Resolving to a
+> real version number means the cache invalidates only when a release
+> actually lands. If the registry is unreachable the literal `latest` is
+> passed through with a warning (the build still runs, it just may reuse a
+> stale layer).
 
 ## Runtime hardening (applied by `cg start` → scripts/start-container.sh)
 
@@ -897,11 +909,11 @@ These are known rough edges we've consciously chosen **not** to fix yet.
   bothers you: drop `pi-mcp-adapter`/`pi-web-access` from `packages` in
   `seed/.pi/agent/settings.json` (`"packages": []`), or accept the delay
   per container start.
-* The pi version is pinned via `ARG PI_VERSION` (default `0.84.4`). Rebuild a
-  specific version with `PI_VERSION=x.y.z cg pi build`. (We
+* The pi version defaults to `latest` via `ARG PI_VERSION`; pin a specific
+  version with `PI_VERSION=x.y.z cg pi build`. (We
   deliberately don't quote a number here — the project is still iterating.)
 * The web mode (`caged-webui`) bundles its own pi SDK copy (`^0.83`), which
-  can lag the pinned global pi — config format is compatible, they don't
+  can lag the global pi — config format is compatible, they don't
   interfere; see [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
 
 ## License / notes

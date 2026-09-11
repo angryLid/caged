@@ -29,14 +29,15 @@ FROM ${CAGED_IMAGE}
 # npm must install the global package into the image's system prefix.
 USER root
 
-# pi-web-ui (pinned) — web chat UI running the pi SDK in-process. Installed
+# pi-web-ui — web chat UI running the pi SDK in-process. Defaults to latest
+# (agents iterate fast); pin via PI_WEB_UI_VERSION=x.y.z. Installed
 # INTO the image at build time (the runtime rootfs is read-only). The pi SDK
 # / pi-web-ui config comes from the live seed mount at runtime, exactly like
 # the TUI: pi-web-ui reads PI_CODING_AGENT_DIR (= /agent-home/.pi/agent).
 # --allow-scripts is required on npm >= 12 (install scripts default-deny,
 # which would silently skip node-pty's compile and break the terminal at
 # runtime) and is a no-op on npm 11.
-ARG PI_WEB_UI_VERSION=0.71.0
+ARG PI_WEB_UI_VERSION=latest
 RUN npm install -g --allow-scripts=node-pty,@google/genai,protobufjs pi-web-ui@${PI_WEB_UI_VERSION} \
     && pi-web-ui --version
 

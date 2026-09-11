@@ -86,8 +86,8 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   `Containerfile.webui` (pi-web-ui Web UI, `scripts/build-container.sh webui`)
   is a third, **additive layer on top of the pi image** (`FROM caged:latest`,
   not the base): it inherits the entrypoint and the sync scripts and adds only
-  the node-pty toolchain + the pinned `pi-web-ui`, so TUI users never pay for
-  the toolchain. Don't move it onto the base — dsh would inherit the bloat.
+  the node-pty toolchain + `pi-web-ui` (latest by default, pin via
+  `PI_WEB_UI_VERSION`), so TUI users never pay for the toolchain. Don't move it onto the base — dsh would inherit the bloat.
 - Skills can be synced by hand with `node scripts/skills-sync.mjs`
   (`--dry-run` to preview, `--link-only` / `--clone-only` for the split paths).
   The git skill repos are cloned **on the host into the seed**

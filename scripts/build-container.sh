@@ -19,10 +19,10 @@
 # (skip the pi step with CAGED_SKIP_PI=1 when it's already current).
 #
 # Per-image knobs (env vars, defaults listed):
-#   pi:    CAGED_IMAGE (caged:latest),      PI_VERSION (0.84.4)
-#   dsh:   DSH_IMAGE (dsh:latest),          DSH_VERSION (0.1.2-rc.1)
-#   webui: CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (0.71.0)
-#   cmdc: COMMANDCODE_IMAGE (commandcode:latest), COMMAND_CODE_VERSION (1.50.1)
+#   pi:    CAGED_IMAGE (caged:latest),      PI_VERSION (latest)
+#   dsh:   DSH_IMAGE (dsh:latest),          DSH_VERSION (latest)
+#   webui: CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (latest)
+#   cmdc: COMMANDCODE_IMAGE (commandcode:latest), COMMAND_CODE_VERSION (latest)
 # Shared: CAGED_BASE_IMAGE (caged-base:latest), CAGED_SKIP_BASE (0)
 
 set -euo pipefail
@@ -43,25 +43,29 @@ pi)
     CONTAINERFILE="Containerfile"
     IMAGE_TAG="${CAGED_IMAGE:-caged:latest}"
     VERSION_ARG="PI_VERSION"
-    VERSION_VALUE="${PI_VERSION:-0.84.4}"
+    VERSION_VALUE="${PI_VERSION:-latest}"
+    PKG_NAME="@earendil-works/pi-coding-agent"
     ;;
 dsh)
     CONTAINERFILE="Containerfile.dsh"
     IMAGE_TAG="${DSH_IMAGE:-dsh:latest}"
     VERSION_ARG="DSH_VERSION"
-    VERSION_VALUE="${DSH_VERSION:-0.1.2-rc.1}"
+    VERSION_VALUE="${DSH_VERSION:-latest}"
+    PKG_NAME="@deepseek-ai/dsh"
     ;;
 webui)
     CONTAINERFILE="Containerfile.webui"
     IMAGE_TAG="${CAGED_WEB_IMAGE:-caged-webui:latest}"
     VERSION_ARG="PI_WEB_UI_VERSION"
-    VERSION_VALUE="${PI_WEB_UI_VERSION:-0.71.0}"
+    VERSION_VALUE="${PI_WEB_UI_VERSION:-latest}"
+    PKG_NAME="pi-web-ui"
     ;;
 cmdc)
     CONTAINERFILE="Containerfile.commandcode"
     IMAGE_TAG="${COMMANDCODE_IMAGE:-commandcode:latest}"
     VERSION_ARG="COMMAND_CODE_VERSION"
-    VERSION_VALUE="${COMMAND_CODE_VERSION:-1.50.1}"
+    VERSION_VALUE="${COMMAND_CODE_VERSION:-latest}"
+    PKG_NAME="command-code"
     ;;
 *)
     echo "Error: unknown image '${1}' — expected 'pi', 'dsh', 'webui' or 'cmdc'." >&2
@@ -69,6 +73,24 @@ cmdc)
     exit 2
     ;;
 esac
+
+# Cache-busting via version resolution: the layer cache key includes the ARG
+# value, so a literal "latest" would keep the install layer cached forever and
+# never pick up new agent releases. Resolve "latest" to the concrete npm
+# dist-tag version here instead — the ARG value (and thus the cache key)
+# changes only when a new release actually lands, keeping the cache useful
+# between releases. Explicit versions pass through untouched. Falls back to
+# the literal "latest" when the registry is unreachable (build still works,
+# it just reuses the cached layer).
+if [ "${VERSION_VALUE}" = "latest" ]; then
+    RESOLVED_VERSION="$(npm view "${PKG_NAME}" version 2>/dev/null || true)"
+    if [ -n "${RESOLVED_VERSION}" ]; then
+        echo "==> ${VERSION_ARG}: latest = ${RESOLVED_VERSION} (npm dist-tag)"
+        VERSION_VALUE="${RESOLVED_VERSION}"
+    else
+        echo "==> Warning: could not resolve latest ${PKG_NAME} from npm; building with literal '${VERSION_VALUE}' (layer cache may serve a stale version)." >&2
+    fi
+fi
 
 # Shared base image (Containerfile.base): apt essentials including python3/pip,
 # uv, pnpm, yarn, glab, gh, jira-cli, non-root user. Override the tag with CAGED_BASE_IMAGE (must exist or be built); skip
@@ -94,7 +116,7 @@ fi
 if [ "${1}" = "webui" ] && [ "${CAGED_SKIP_PI:-0}" != "1" ]; then
     echo "==> webui needs the pi image (Containerfile.webui is FROM caged:latest) — building it first..."
     CAGED_IMAGE="${CAGED_IMAGE:-caged:latest}" \
-    PI_VERSION="${PI_VERSION:-0.84.4}" \
+    PI_VERSION="${PI_VERSION:-latest}" \
     CAGED_SKIP_BASE=1 \
     bash "${SCRIPT_DIR}/build-container.sh" pi
 fi

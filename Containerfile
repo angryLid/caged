@@ -34,10 +34,11 @@ RUN npm install -g chrome-devtools-mcp@1.6.0
 RUN mkdir -p /agent-home/.pi/agent /agent-home/.config \
     && chown -R agent:agent /agent-home
 
-# Install pi (pinned) globally. Open network at build time (npm registry).
+# Install pi globally, defaulting to latest so rapid upstream iterations are
+# picked up on every rebuild; pin a specific version via PI_VERSION=x.y.z.
 # Volatile layer: sits after the cached base layers above so a PI_VERSION
-# bump only rebuilds this layer (and the few below it).
-ARG PI_VERSION=0.84.4
+# change only rebuilds this layer (and the few below it).
+ARG PI_VERSION=latest
 RUN npm install -g @earendil-works/pi-coding-agent@${PI_VERSION}
 
 # The agent home is intentionally NOT copied into the image: at runtime

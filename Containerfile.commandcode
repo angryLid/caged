@@ -13,7 +13,8 @@ ARG CAGED_BASE_IMAGE=caged-base:latest
 
 FROM ${CAGED_BASE_IMAGE}
 
-ARG COMMAND_CODE_VERSION=1.50.1
+# Latest by default (agents iterate fast); pin via COMMAND_CODE_VERSION=x.y.z.
+ARG COMMAND_CODE_VERSION=latest
 RUN npm install -g command-code@${COMMAND_CODE_VERSION} && cmd --version
 
 RUN mkdir -p /agent-home/.commandcode /agent-home/.config \
