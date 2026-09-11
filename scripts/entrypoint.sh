@@ -67,22 +67,48 @@ if [ -f "$AGENT_DIR/mcp.json" ]; then
 fi
 
 # The seed must be writable (both ways) and pi's session dir must be usable.
-# Sessions are no longer a separate bind mount: seed/.pi/agent/settings.json
-# sets "sessionDir": "/workspace/.pi/sessions", and /workspace is already the
-# rw workspace bind, so sessions land in $CAGED_WORKSPACE/.pi/sessions on the
-# host with no extra mount. pi creates the dir itself; we resolve the setting
-# (falling back to the default ~/.pi/agent/sessions) and fail fast here if the
-# target isn't writable, instead of letting pi start half-configured.
-SESSION_DIR="$(sed -nE 's/.*"sessionDir"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$AGENT_DIR/settings.json" 2>/dev/null | head -n1)"
-[ -n "$SESSION_DIR" ] || SESSION_DIR="$AGENT_DIR/sessions"
-case "$SESSION_DIR" in
-    ~/*) SESSION_DIR="$HOME/${SESSION_DIR#\~/}" ;;
-    /*) ;;
-    *) SESSION_DIR="$PWD/$SESSION_DIR" ;;
-esac
-mkdir -p "$SESSION_DIR"
-[ -w "$SESSION_DIR" ] || fail \
-    "sessions dir '$SESSION_DIR' is not writable — the agent runs as uid 1000, so the" \
+# Sessions live on the shared workspace bind, NOT in the seed. The pi SDK has a
+# single default (<agentDir>/sessions/<--encoded-cwd-->/) and neither pi-web-ui
+# (which runs the SDK in-process, bypassing the TUI's settings resolution
+# chain) nor the SDK itself honors the settings.json "sessionDir" key or
+# PI_CODING_AGENT_SESSION_DIR for writes. So instead of pointing the setting at
+# /workspace, we relocate the seed's sessions dir itself (the same pattern the
+# commandcode entrypoint uses): pre-existing data moves into
+# /workspace/.pi/sessions and the seed path becomes a symlink. Both the pi TUI
+# and pi-web-ui then read AND write per-project sessions on the host workspace
+# with no configuration, keeping the SDK default per-cwd subdirectory layout so
+# the two agents share one location and see each other's sessions.
+PI_SESSIONS_SEED="$AGENT_DIR/sessions"
+PI_SESSIONS_WS="/workspace/.pi/sessions"
+if [ -L "$PI_SESSIONS_SEED" ]; then
+    # Already relocated; just make sure the target exists.
+    mkdir -p "$PI_SESSIONS_WS"
+elif [ -e "$PI_SESSIONS_SEED" ]; then
+    # Pre-existing real data in the seed: copy it into the workspace (cp -a
+    # merges into an existing target), then swap the seed path for a symlink.
+    if mkdir -p "$PI_SESSIONS_WS" && cp -a "$PI_SESSIONS_SEED"/. "$PI_SESSIONS_WS"/; then
+        rm -rf "$PI_SESSIONS_SEED"
+        ln -s "$PI_SESSIONS_WS" "$PI_SESSIONS_SEED"
+    else
+        echo "caged: warning: could not relocate sessions to '$PI_SESSIONS_WS' — keeping them in the seed" >&2
+    fi
+else
+    mkdir -p "$PI_SESSIONS_WS"
+    ln -s "$PI_SESSIONS_WS" "$PI_SESSIONS_SEED"
+fi
+# One-time legacy migration: sessions written before the relocation (when
+# settings.json pointed sessionDir at /workspace) sit FLAT at the top of the
+# target, but the default picker only scans per-cwd subdirectories. File them
+# under --workspace-- (the encoding of the container's fixed /workspace cwd).
+for f in "$PI_SESSIONS_WS"/*.jsonl; do
+    [ -f "$f" ] || break
+    mkdir -p "$PI_SESSIONS_WS/--workspace--"
+    mv "$f" "$PI_SESSIONS_WS/--workspace--/" 2>/dev/null || true
+done
+# Fail fast if the relocated sessions dir isn't writable (uid 1000 must own the
+# host side) instead of letting pi start half-configured.
+[ -w "$PI_SESSIONS_WS" ] || fail \
+    "sessions dir '$PI_SESSIONS_WS' is not writable — the agent runs as uid 1000, so the" \
     "corresponding host directory must be writable by that uid."
 [ -w "$AGENT_DIR" ] || fail "'$AGENT_DIR' is not writable — the live seed bind must be rw."
 

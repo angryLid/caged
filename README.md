@@ -279,22 +279,24 @@ Keep runtime state out of git: `seed/.pi/agent/auth.json` and
 written the first time you authenticate, so don't worry if it doesn't exist
 yet.
 
-**Session data lives per-project on the host without a dedicated mount**: pi
-no longer writes sessions into its config home. `seed/.pi/agent/settings.json`
-sets `"sessionDir": "/workspace/.pi/sessions"`, and since `/workspace` is the
-live workspace bind, that lands in `$CAGED_WORKSPACE/.pi/sessions` on the host
-— the same location as before, so no directory-level migration is needed.
-`pi -c`, `pi -r` and the `/resume` picker scan that directory. Deleting
-`seed/.pi/agent` or `auth.json` does **not** touch your sessions or your API
-keys' cached auth.
+**Session data lives per-project on the host without a dedicated mount**: the
+entrypoint relocates pi's sessions dir out of the seed — it moves any
+pre-existing `seed/.pi/agent/sessions` data into `/workspace/.pi/sessions` and
+replaces the seed path with a symlink. Since the SDK's single default is
+`<agentDir>/sessions/<--encoded-cwd-->/` and both pi-web-ui (which runs the
+SDK in-process) and the SDK itself ignore the `settings.json` `"sessionDir"`
+key and `PI_CODING_AGENT_SESSION_DIR` for writes, relocating the directory is
+the only way both the pi TUI and the Web UI read AND write the same
+per-project session history on the host workspace. The per-cwd subdirectory
+layout stays the SDK default, so `pi -c`, `pi -r`, the `/resume` picker and
+the Web UI's history all scan the same files. Deleting `seed/.pi/agent` or
+`auth.json` does **not** touch your sessions or your API keys' cached auth.
 
-> **Layout note for pre-existing sessions:** with a custom `sessionDir`, pi
-> stores session files *flat* in that directory instead of under a per-cwd
-> subdirectory. Sessions written by an older container (which mounted
-> `/agent-home/.pi/agent/sessions`) live in `.pi/sessions/<encoded-workspace-path>/`
-> and no longer show up in the picker automatically — open them with
-> `pi --session <path>` or move the `.jsonl` files up one level into
-> `.pi/sessions/`.
+> **Legacy flat sessions:** older caged versions pointed `sessionDir` at
+> `/workspace/.pi/sessions`, which made the TUI store session files *flat* at
+> the top of that directory. The entrypoint moves those top-level `.jsonl`
+> files into `--workspace--/` (the encoded per-cwd directory) on the first
+> start, so they show up in the pickers again; no manual step is needed.
 
 ## Seed config (`seed/`)
 
@@ -538,10 +540,12 @@ TUI run:
   `http://127.0.0.1:8787` and stays off the LAN.
 * Chat history is per-project: `PI_WEB_DATA_DIR=/workspace/.pi-web`
   (= `$CAGED_WORKSPACE/.pi-web` on the host), the same pattern as sessions.
-  Gitignore `.pi-web/` in your workspace repo. The launcher also passes
-  `PI_CODING_AGENT_SESSION_DIR=/workspace/.pi/sessions` explicitly, so the
-  Web UI's embedded pi SDK uses the same session directory as the TUI rather
-  than falling back to `/agent-home/.pi/agent/sessions`.
+  Gitignore `.pi-web/` in your workspace repo. pi sessions themselves land on
+  the same workspace bind via the relocated `~/.pi/agent/sessions` symlink
+  (see above), so the Web UI and the TUI share one per-project history —
+  pi-web-ui runs the SDK in-process and ignores `PI_CODING_AGENT_SESSION_DIR`
+  and the `settings.json` `"sessionDir"` key for writes, which is exactly why
+  the relocation approach is used instead of those settings.
 * Memory defaults to 4 GB (`PI_WEBUI_MEMORY`): the web mode keeps agents
   running in-process and conversations alive in the background.
 

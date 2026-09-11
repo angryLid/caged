@@ -155,9 +155,6 @@ RUN_ARGS=(
   -v "$WORKSPACE_HOST:/workspace:rw"
   -v "$AGENT_HOME_HOST:/agent-home:rw"
   -e HOME=/agent-home -e LANG=C.UTF-8
-  # Keep pi and pi-web-ui on the same per-workspace pi session directory.
-  # The explicit override also wins over SDK defaults used by webui.
-  -e PI_CODING_AGENT_SESSION_DIR="${PI_CODING_AGENT_SESSION_DIR:-/workspace/.pi/sessions}"
   -e GLAB_SEND_TELEMETRY=false
   # CLI auth is unified on env TOKENS (CI/CD style): GITLAB_TOKEN / GH_TOKEN /
   # and the six CFL_*/JIRA_* vars below (derived from the shared ATLASSIAN_*
