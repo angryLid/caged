@@ -18,7 +18,11 @@ chrome_cdp_up() { curl -s "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1;
 bridge_up() { curl -s "http://$GATEWAY:$PORT/json/version" >/dev/null 2>&1; }
 
 start_bridge() {
-  if bridge_up; then
+  # Health = the bridge PROCESS is alive AND its port answers. Port-reachable
+  # alone is not enough: anything else listening on $PORT (or a stale half-open
+  # state) would produce a false "already reachable" and silently leave no
+  # bridge in place.
+  if pgrep -f "node .*caged-host-cdp-bridge\.js" >/dev/null 2>&1 && bridge_up; then
     echo "OK: bridge already reachable at $GATEWAY:$PORT"
     return 0
   fi
