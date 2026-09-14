@@ -77,10 +77,12 @@ The host side is managed by `cg browser` (run on the host; see
 - `cg browser stop` — stop bridge and debug Chrome (the user's normal Chrome
   is untouched; only the throwaway-profile instance is killed).
 
-Inside the container, `devtools-forward.js`
-(`seed/.pi/agent/scripts/devtools-forward.js`) forwards `127.0.0.1:19222` to
-the gateway (`192.168.64.1:9222`) because Chrome's DevTools server rejects
-non-localhost Host headers — the client's IP-literal Host passes. When host
+Inside the container, the browser helper and custom scripts connect
+**directly** to the host's vmnet gateway IP (`192.168.64.1:9222`):
+Chrome's DevTools server rejects non-localhost *hostnames* in the Host
+header but accepts IP literals, and it echoes that Host back as the
+`webSocketDebuggerUrl`, so HTTP discovery and the WebSocket both go
+straight to the gateway — no in-container forwarder needed. When host
 CDP is unreachable, the skill says so and falls back to local mode — no
 silent confusion.
 

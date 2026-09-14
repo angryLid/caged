@@ -16,7 +16,7 @@ conversation.
 
 | | `local` (default) | `host` (`BROWSER_MODE=host`) |
 |---|---|---|
-| Browser | disposable headless Chromium in the container, started lazily by `browserd` | the host's Chrome, attached over CDP via `devtools-forward.js` |
+| Browser | disposable headless Chromium in the container, started lazily by `browserd` | the host's Chrome, attached over CDP via the host's vmnet gateway IP |
 | State | profile under `/tmp/caged-browser` — persists while the container runs, **dies with the container** | the host Chrome's throwaway profile (`.caged-chrome-devtools`) |
 | Reaches | the internet, `/workspace` files | host `localhost` dev servers, VPN/intranet |
 
@@ -59,7 +59,7 @@ async function main() {
   const endpoint = require("child_process")
     .execFileSync(process.execPath, [`${process.env.HOME}/.pi/agent/scripts/browserd`, "ensure"])
     .toString().trim();
-  // host mode instead: const endpoint = "http://127.0.0.1:19222";
+  // host mode instead: const endpoint = "http://192.168.64.1:9222"; // host vmnet gateway
   const browser = await chromium.connectOverCDP(endpoint);
   const context = browser.contexts()[0] || (await browser.newContext());
   const page = await context.newPage();

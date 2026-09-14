@@ -3,10 +3,10 @@
 # `cg browser start|stop|status` forwards here. Manages two things:
 #   * a debug Chrome (--remote-debugging-port=9222, throwaway user-data-dir —
 #     Chrome 136+ refuses remote debugging on the default profile)
-#   * a TCP bridge 0.0.0.0:9222 -> 127.0.0.1:9222 so the container-side
-#     forwarder (seed/.pi/agent/scripts/devtools-forward.js) can reach Chrome
-# Raw TCP pipe only; Chrome's Host-header check passes because the container
-# client uses an IP-literal Host. Needs only node + curl, no socat.
+#   * a TCP bridge 0.0.0.0:9222 -> 127.0.0.1:9222 so the container can reach
+#     loopback-bound Chrome via the vmnet gateway (the container connects
+#     directly to the gateway IP; Chrome accepts IP-literal Host headers).
+# Raw TCP pipe only. Needs only node + curl, no socat.
 set -u
 
 PORT="${CAGED_CDP_PORT:-9222}"

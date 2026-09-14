@@ -19,9 +19,9 @@
  * Modes (env BROWSER_MODE, default local):
  *   local   disposable headless Chromium in the container, lazily started by
  *           `browserd`; profile under /tmp, dies with the container.
- *   host    attach to the host's Chrome over CDP (via devtools-forward.js on
- *           127.0.0.1:19222) — for host-localhost dev servers and
- *           VPN/intranet. Needs host Chrome listening on :9222.
+ *   host    attach to the host's Chrome over CDP (direct to the host's vmnet
+ *           gateway IP, default http://192.168.64.1:9222) — for host-localhost
+ *           dev servers and VPN/intranet. Needs `cg browser start` on the host.
  *
  * Design and rationale: docs/BROWSER.md.
  */
@@ -34,9 +34,12 @@ const os = require("os");
 const path = require("path");
 
 const BROWSERD = path.join(os.homedir(), ".pi", "agent", "scripts", "browserd");
-const FORWARDER = path.join(os.homedir(), ".pi", "agent", "scripts", "devtools-forward.js");
 const MODE = (process.env.BROWSER_MODE || "local").toLowerCase();
-const FORWARDER_PORT = parseInt(process.env.CDP_LOCAL_PORT || "19222", 10);
+// Host-attach endpoint: the host's vmnet gateway IP. Chrome's DevTools server
+// accepts Host headers that are IP literals, so the container can connect
+// directly — no in-container forwarder needed. Override both via env.
+const CDP_HOST = process.env.CDP_HOST || "192.168.64.1";
+const CDP_REMOTE_PORT = parseInt(process.env.CDP_REMOTE_PORT || "9222", 10);
 
 // --- arg parsing ----------------------------------------------------------
 const argv = process.argv.slice(2);
@@ -63,9 +66,9 @@ const cmd = positional.shift();
 if (!["open", "shot", "pdf", "eval", "cdp"].includes(cmd)) usage();
 
 // --- endpoint resolution --------------------------------------------------
-function tcpOpen(port) {
+function tcpOpen(port, host = "127.0.0.1") {
   return new Promise((resolve) => {
-    const sock = net.connect(port, "127.0.0.1", () => { sock.destroy(); resolve(true); });
+    const sock = net.connect(port, host, () => { sock.destroy(); resolve(true); });
     sock.on("error", () => { sock.destroy(); resolve(false); });
     sock.setTimeout(1000, () => { sock.destroy(); resolve(false); });
   });
@@ -80,28 +83,13 @@ async function ensureLocal() {
 
 async function ensureHost() {
   if (process.env.BROWSER_CDP_URL) return process.env.BROWSER_CDP_URL;
-  const endpoint = `http://127.0.0.1:${FORWARDER_PORT}`;
-  if (await tcpOpen(FORWARDER_PORT)) return endpoint;
-  // Same idempotent trick as before: spawn the forwarder detached if it is
-  // not listening yet, then re-probe.
-  if (fs.existsSync(FORWARDER)) {
-    spawn(process.execPath, [FORWARDER], { detached: true, stdio: "ignore" }).unref();
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline && !(await tcpOpen(FORWARDER_PORT))) {
-      await new Promise((r) => setTimeout(r, 200));
-    }
-  }
-  if (!(await tcpOpen(FORWARDER_PORT))) {
-    console.error(`browser: host Chrome CDP not reachable — host mode unavailable (endpoint tried: ${endpoint}).`);
-    console.error(`Start a debug Chrome on the host, then retry:`);
-    console.error(`  macOS:  open -na "Google Chrome" --args --remote-debugging-port=9222 '--remote-allow-origins=*' --user-data-dir="$HOME/.caged-chrome-devtools" --no-first-run`);
-    console.error(`          # Chrome binds loopback only — bridge to the vmnet gateway:`);
-    console.error(`          socat TCP-LISTEN:192.168.64.1:9222,fork TCP:127.0.0.1:9222 &`);
-    console.error(`  Linux:  google-chrome --remote-debugging-port=9222 '--remote-allow-origins=*' --user-data-dir="$HOME/.caged-chrome-devtools" --no-first-run &`);
-    console.error(`Or stay on the default: BROWSER_MODE=local (headless Chromium in this container).`);
-    process.exit(1);
-  }
-  return endpoint;
+  const endpoint = `http://${CDP_HOST}:${CDP_REMOTE_PORT}`;
+  if (await tcpOpen(CDP_REMOTE_PORT, CDP_HOST)) return endpoint;
+  console.error(`browser: host Chrome CDP not reachable at ${endpoint} — host mode unavailable.`);
+  console.error(`On the host, run:  cg browser start   (debug Chrome + CDP bridge)`);
+  console.error(`Check with:        cg browser status`);
+  console.error(`Or stay on the default: BROWSER_MODE=local (headless Chromium in this container).`);
+  process.exit(1);
 }
 
 async function connectPage() {

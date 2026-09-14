@@ -323,9 +323,8 @@ the Web UI's history all scan the same files. Deleting `seed/.pi/agent` or
   The **same** primer is installed to cmdc's `~/.commandcode/AGENTS.md`, so the
   global prompt is identical across agents — edit `seed/prompt-src/global.md`,
   never the generated copies.
-* `.pi/agent/scripts/` — `browserd` (lazy headless Chromium supervisor),
-  `browser` (one-shot browser helper) and `devtools-forward.js` (host-attach
-  CDP forwarder) — see `docs/BROWSER.md`
+* `.pi/agent/scripts/` — `browserd` (lazy headless Chromium supervisor) and
+  `browser` (one-shot browser helper) — see `docs/BROWSER.md`
 
 To change the config, just edit `seed/.pi/agent/` — it is the live config,
 mounted into the container (effective on next container start). No rebuild
@@ -384,10 +383,11 @@ deliberate output enters the context — no per-action snapshots.
   and logins persist while the container lives and die with it. Start/stop:
   `~/.pi/agent/scripts/browserd status|stop`.
 * **Host mode** — `BROWSER_MODE=host browser ...` attaches to the host's
-  Chrome over CDP (`devtools-forward.js` forwards container-local port 19222
-  to the host). Set the host side up with `cg browser start` (debug Chrome
-  with a throwaway profile + CDP bridge to the vmnet gateway; `status`/`stop`
-  also available). For host `localhost` dev servers and VPN/intranet targets
+  Chrome over CDP, connecting directly to the host's vmnet gateway IP
+  (`192.168.64.1:9222` — Chrome accepts IP-literal Host headers). Set the
+  host side up with `cg browser start` (debug Chrome with a throwaway
+  profile + CDP bridge to the vmnet gateway; `status`/`stop` also
+  available). For host `localhost` dev servers and VPN/intranet targets
   only — Chrome 136+ refuses remote debugging on the default profile, so
   this is a throwaway profile, not your real logins.
 
