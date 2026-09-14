@@ -52,8 +52,11 @@ EOF
 
 cmd_start() {
   # Optional page-traffic proxy (CDP control channel is unaffected):
-  #   CAGED_PROXY="socks5://127.0.0.1:1080" cg browser start
+  #   CAGED_PROXY="socks5://127.0.0.1:1080" cg browser start   # or http://
   #   CAGED_PROXY_BYPASS="<local>;*.internal.example.com"  (optional)
+  # Chrome accepts http/https/socks4/socks5/quic schemes — NOT curl's
+  # socks5h notation. Chrome sends hostnames to socks5 proxies itself,
+  # so proxy-side DNS works with plain socks5://.
   # A change vs. the running instance restarts the debug Chrome.
   proxy_args=""
   [ -n "${CAGED_PROXY:-}" ] && proxy_args="--proxy-server=$CAGED_PROXY"
