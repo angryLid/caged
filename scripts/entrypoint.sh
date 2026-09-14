@@ -5,8 +5,8 @@
 #   1. Fail-fast validation BEFORE launching pi. There is deliberately no
 #      config baked into the image: /agent-home must be the live bind mount of
 #      the host `seed` directory (scripts/start-container.sh does this). If
-#      the seed is missing, incomplete, or internally
-#      inconsistent, we
+#      the seed is missing, incomplete, internally inconsistent, or carries a
+#      malformed skills.json / mcp.json, we
 #      exit non-zero with a clear message — never let pi start
 #      half-configured.
 #   2. Best-effort ownership bootstrap (matters for fresh named volumes) and
@@ -56,9 +56,64 @@ for f in models.json settings.json AGENTS.md; do
         "(check CAGED_AGENT_HOME: it must point at <caged>/seed so /agent-home/.pi/agent has the seed files)."
 done
 
-# mcp.json is optional, but every command it references must exist — a
-# dangling pointer would otherwise silently disable that MCP server.
+# JSON fail-fast validation (syntax + minimal structure) for the two seed
+# configs this entrypoint depends on: skills.json (drives the declarative
+# skills install) and mcp.json (registers MCP servers). A malformed file must
+# stop startup with a clear message instead of degrading into best-effort
+# warnings or silently disabled servers after pi is up. Structure checks are
+# deliberately minimal — shape, not semantics.
+validate_json() {
+    node -e '
+        const [file, kind] = process.argv.slice(1);
+        const bad = (msg) => { console.error(file + ": " + msg); process.exit(1); };
+        let doc;
+        try {
+            doc = JSON.parse(require("fs").readFileSync(file, "utf8"));
+        } catch (e) {
+            bad("invalid JSON: " + e.message);
+        }
+        if (kind === "skills") {
+            if (!doc || typeof doc !== "object" || Array.isArray(doc)) bad("top level must be an object");
+            if (!Array.isArray(doc.sources) || doc.sources.length === 0) bad("sources must be a non-empty array");
+            for (const s of doc.sources) {
+                if (!s || typeof s !== "object" || Array.isArray(s)) bad("every sources[] entry must be an object");
+                if (typeof s.name !== "string" || !s.name) bad("every sources[] entry needs a non-empty name");
+                if (s.type === "git" && (typeof s.url !== "string" || !s.url)) bad("git source " + s.name + " needs a url");
+                else if (s.type === "local" && (typeof s.dir !== "string" || !s.dir)) bad("local source " + s.name + " needs a dir");
+                else if (s.type !== "git" && s.type !== "local") bad("source " + s.name + " has unknown type " + JSON.stringify(s.type));
+                if (s.enabled !== undefined && !Array.isArray(s.enabled)) bad("source " + s.name + " enabled must be an array");
+            }
+            if (!Array.isArray(doc.linkTargets)) bad("linkTargets must be an array");
+            for (const t of doc.linkTargets) {
+                if (!t || typeof t !== "object" || Array.isArray(t)) bad("every linkTargets[] entry must be an object");
+                if (typeof t.name !== "string" || !t.name) bad("every linkTargets[] entry needs a non-empty name");
+                if (typeof t.dir !== "string" || !t.dir) bad("linkTarget " + t.name + " needs a dir");
+            }
+        } else if (kind === "mcp") {
+            if (!doc || typeof doc !== "object" || Array.isArray(doc)) bad("top level must be an object");
+            if (doc.mcpServers !== undefined) {
+                if (typeof doc.mcpServers !== "object" || Array.isArray(doc.mcpServers)) bad("mcpServers must be an object");
+                for (const [name, srv] of Object.entries(doc.mcpServers)) {
+                    if (!srv || typeof srv !== "object" || Array.isArray(srv)) bad("mcpServers." + name + " must be an object");
+                    if (srv.command !== undefined && typeof srv.command !== "string") bad("mcpServers." + name + ".command must be a string");
+                }
+            }
+        }
+    ' "$1" "$2"
+}
+
+SKILLS_JSON="${HOME:-/agent-home}/skills.json"
+if [ -f "$SKILLS_JSON" ]; then
+    validate_json "$SKILLS_JSON" skills || \
+        fail "skills.json is malformed — fix it before starting; the declarative skills install depends on it."
+fi
+
+# mcp.json is optional, but it must be valid JSON and every command it
+# references must exist — a dangling pointer would otherwise silently disable
+# that MCP server.
 if [ -f "$AGENT_DIR/mcp.json" ]; then
+    validate_json "$AGENT_DIR/mcp.json" mcp || \
+        fail "mcp.json is malformed — fix it before starting."
     for cmd in $(sed -nE 's/.*"command"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$AGENT_DIR/mcp.json" 2>/dev/null); do
         case "$cmd" in
             /*) [ -x "$cmd" ] || fail "mcp.json references missing executable: '$cmd'." ;;

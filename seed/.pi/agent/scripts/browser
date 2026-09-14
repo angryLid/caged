@@ -1,0 +1,195 @@
+#!/usr/bin/env node
+/**
+ * browser — one-shot helper for driving the browser from pi scripts.
+ *
+ * The model's default tool: small tasks run as one command; anything complex
+ * is a custom Playwright script (same connection pattern — see the browser
+ * skill). One command = one browser action set = one model turn; output goes
+ * to stdout and only what was asked for.
+ *
+ * Usage:
+ *   browser open <url> [--chars=N] [--wait=load|networkidle|domcontentloaded]
+ *   browser shot <url> [outfile.png] [--full]
+ *   browser pdf  <url> [outfile.pdf]
+ *   browser eval <url> <js-expression>
+ *   browser cdp                          # print the CDP endpoint only
+ *
+ * Global flags: --timeout=ms (navigation/evaluation timeout, default 30000).
+ *
+ * Modes (env BROWSER_MODE, default local):
+ *   local   disposable headless Chromium in the container, lazily started by
+ *           `browserd`; profile under /tmp, dies with the container.
+ *   host    attach to the host's Chrome over CDP (via devtools-forward.js on
+ *           127.0.0.1:19222) — for host-localhost dev servers and
+ *           VPN/intranet. Needs host Chrome listening on :9222.
+ *
+ * Design and rationale: docs/BROWSER.md.
+ */
+"use strict";
+
+const { spawn, execFileSync } = require("child_process");
+const fs = require("fs");
+const net = require("net");
+const os = require("os");
+const path = require("path");
+
+const BROWSERD = path.join(os.homedir(), ".pi", "agent", "scripts", "browserd");
+const FORWARDER = path.join(os.homedir(), ".pi", "agent", "scripts", "devtools-forward.js");
+const MODE = (process.env.BROWSER_MODE || "local").toLowerCase();
+const FORWARDER_PORT = parseInt(process.env.CDP_LOCAL_PORT || "19222", 10);
+
+// --- arg parsing ----------------------------------------------------------
+const argv = process.argv.slice(2);
+const flags = {};
+const positional = [];
+for (const a of argv) {
+  const m = /^--([^=]+)(?:=(.*))?$/.exec(a);
+  if (m) flags[m[1]] = m[2] === undefined ? true : m[2];
+  else positional.push(a);
+}
+const TIMEOUT = parseInt(flags.timeout || "30000", 10);
+
+function usage() {
+  console.error(`usage:
+  browser open <url> [--chars=N] [--wait=load|networkidle|domcontentloaded] [--timeout=ms]
+  browser shot <url> [outfile.png] [--full] [--timeout=ms]
+  browser pdf  <url> [outfile.pdf] [--timeout=ms]
+  browser eval <url> <js-expression> [--timeout=ms]
+  browser cdp`);
+  process.exit(2);
+}
+
+const cmd = positional.shift();
+if (!["open", "shot", "pdf", "eval", "cdp"].includes(cmd)) usage();
+
+// --- endpoint resolution --------------------------------------------------
+function tcpOpen(port) {
+  return new Promise((resolve) => {
+    const sock = net.connect(port, "127.0.0.1", () => { sock.destroy(); resolve(true); });
+    sock.on("error", () => { sock.destroy(); resolve(false); });
+    sock.setTimeout(1000, () => { sock.destroy(); resolve(false); });
+  });
+}
+
+async function ensureLocal() {
+  if (process.env.BROWSER_CDP_URL) return process.env.BROWSER_CDP_URL;
+  // browserd ensure prints the endpoint on stdout, diagnostics on stderr.
+  return execFileSync(process.execPath, [BROWSERD, "ensure"], { stdio: ["ignore", "pipe", "inherit"] })
+    .toString().trim();
+}
+
+async function ensureHost() {
+  if (process.env.BROWSER_CDP_URL) return process.env.BROWSER_CDP_URL;
+  const endpoint = `http://127.0.0.1:${FORWARDER_PORT}`;
+  if (await tcpOpen(FORWARDER_PORT)) return endpoint;
+  // Same idempotent trick as before: spawn the forwarder detached if it is
+  // not listening yet, then re-probe.
+  if (fs.existsSync(FORWARDER)) {
+    spawn(process.execPath, [FORWARDER], { detached: true, stdio: "ignore" }).unref();
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && !(await tcpOpen(FORWARDER_PORT))) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  if (!(await tcpOpen(FORWARDER_PORT))) {
+    console.error(`browser: host Chrome CDP not reachable — host mode unavailable (endpoint tried: ${endpoint}).`);
+    console.error(`Start a debug Chrome on the host, then retry:`);
+    console.error(`  macOS:  open -na "Google Chrome" --args --remote-debugging-port=9222 '--remote-allow-origins=*' --user-data-dir="$HOME/.caged-chrome-devtools" --no-first-run`);
+    console.error(`          # Chrome binds loopback only — bridge to the vmnet gateway:`);
+    console.error(`          socat TCP-LISTEN:192.168.64.1:9222,fork TCP:127.0.0.1:9222 &`);
+    console.error(`  Linux:  google-chrome --remote-debugging-port=9222 '--remote-allow-origins=*' --user-data-dir="$HOME/.caged-chrome-devtools" --no-first-run &`);
+    console.error(`Or stay on the default: BROWSER_MODE=local (headless Chromium in this container).`);
+    process.exit(1);
+  }
+  return endpoint;
+}
+
+async function connectPage() {
+  // playwright-core is only a nested dep of the global playwright install, so
+  // require the top-level package (resolvable via NODE_PATH from any cwd)
+  const { chromium } = require("playwright");
+  const endpoint = MODE === "host" ? await ensureHost() : await ensureLocal();
+  const browser = await chromium.connectOverCDP(endpoint, { timeout: TIMEOUT });
+  const context = browser.contexts()[0] || (await browser.newContext());
+  const page = await context.newPage();
+  return { browser, page };
+}
+
+// Local mode: new tabs on the shared context would litter the persistent
+// browser, so pages are closed after each command (state lives in the context).
+async function withPage(fn) {
+  const { page } = await connectPage();
+  try {
+    await fn(page);
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function goto(page, url) {
+  await page.goto(url, { waitUntil: flags.wait || "load", timeout: TIMEOUT });
+  try {
+    await page.waitForLoadState("networkidle", { timeout: 3000 });
+  } catch {
+    // long-polling SPAs never go idle — the load state above is good enough
+  }
+}
+
+// --- commands -------------------------------------------------------------
+(async () => {
+if (cmd === "cdp") {
+  console.log(MODE === "host" ? await ensureHost() : await ensureLocal());
+} else if (cmd === "open") {
+  const [url] = positional;
+  if (!url) usage();
+  await withPage(async (page) => {
+    await goto(page, url);
+    const title = await page.title();
+    const finalUrl = page.url();
+    let text = await page.evaluate(() => (document.body ? document.body.innerText : ""));
+    text = text.replace(/\n{3,}/g, "\n\n").trim();
+    const max = parseInt(flags.chars || "12000", 10);
+    if (text.length > max) text = text.slice(0, max) + `\n\n[truncated at ${max} chars — raise with --chars=N]`;
+    console.log(`# ${title}\n${finalUrl}\n\n${text || "[empty page]"}`);
+  });
+} else if (cmd === "shot") {
+  const [url, outfile = "browser-shot.png"] = positional;
+  if (!url) usage();
+  await withPage(async (page) => {
+    await goto(page, url);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.screenshot({ path: outfile, fullPage: !!flags.full });
+    console.log(`${path.resolve(outfile)} — ${await page.title()} (${page.url()})`);
+  });
+} else if (cmd === "pdf") {
+  const [url, outfile = "browser-page.pdf"] = positional;
+  if (!url) usage();
+  await withPage(async (page) => {
+    await goto(page, url);
+    try {
+      await page.pdf({ path: outfile, format: "A4", printBackground: true });
+    } catch (err) {
+      // page.pdf only works in headless Chromium; host attach is headed
+      if (MODE === "host") err.message += " (pdf requires headless mode — use BROWSER_MODE=local)";
+      throw err;
+    }
+    console.log(path.resolve(outfile));
+  });
+} else if (cmd === "eval") {
+    const [url, ...rest] = positional;
+    const expr = rest.join(" ");
+    if (!url || !expr) usage();
+    await withPage(async (page) => {
+      await goto(page, url);
+      const result = await page.evaluate(expr);
+      try {
+        console.log(JSON.stringify(result, null, 2));
+      } catch {
+        console.log(String(result));
+      }
+    });
+  }
+})().then(() => process.exit(0)).catch((err) => {
+  console.error(`browser: ${err.message}`);
+  process.exit(1);
+});

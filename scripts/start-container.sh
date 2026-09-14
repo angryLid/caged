@@ -43,9 +43,12 @@ AGENT_HOME_HOST="${CAGED_AGENT_HOME:-$ROOT_DIR/seed}"
 
 case "$MODE" in
   pi)
-    IMAGE_TAG="${CAGED_IMAGE:-caged:latest}"
+    # pi runs on the browser layer (Playwright + headless Chromium baked in);
+    # see docs/BROWSER.md. Override with CAGED_IMAGE to run the plain pi image.
+    IMAGE_TAG="${CAGED_IMAGE:-caged-browser:latest}"
     CONTAINER_NAME="${CONTAINER_NAME:-caged-pi}"
-    MEMORY="${CAGED_MEMORY:-2g}"
+    # 4g: headless Chromium under real pages needs more than the old 2g default.
+    MEMORY="${CAGED_MEMORY:-4g}"
     PORT=""
     ;;
   webui)

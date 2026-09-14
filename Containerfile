@@ -15,19 +15,17 @@
 # first by `scripts/build-container.sh pi` via scripts/build-caged-base.sh): the
 # base carries the slow, rarely-changing layers — apt essentials, the pinned
 # glab/gh/jira CLIs, the shared non-root `agent` user. What remains here is pi-specific and
-# volatile — chrome-devtools-mcp, the pi npm install, the build-time skill
-# clone, the entrypoint — so a PI_VERSION bump only rebuilds these bottom
-# layers, and a CLI/base-image update is a single-file change in
-# Containerfile.base.
+# volatile — the pi npm install, the build-time skill clone, the entrypoint — so a
+# PI_VERSION bump only rebuilds these bottom layers, and a CLI/base-image update is a
+# single-file change in Containerfile.base.
+#
+# Note: this image is an intermediate stage, not what pi runs on. The browser
+# layer (./Containerfile.browser, Playwright + Chromium) builds on top of it,
+# and pi (TUI) and pi-web-ui both run on that layer — see docs/BROWSER.md.
 
 ARG CAGED_BASE_IMAGE=caged-base:latest
 
 FROM ${CAGED_BASE_IMAGE}
-
-# chrome-devtools-mcp, pinned, installed INTO the image (not via npx): the
-# runtime /tmp is a noexec tmpfs, so npx'ing from $npm_config_cache=/tmp/.npm
-# fails with "Permission denied".
-RUN npm install -g chrome-devtools-mcp@1.6.0
 
 # The complete seed is mounted at /agent-home at runtime. pi uses .pi and
 # CLI configs follow their own defaults under $XDG_CONFIG_HOME (= .config).

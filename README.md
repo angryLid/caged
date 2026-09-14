@@ -50,9 +50,12 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
   management.
 * **Node.js package managers** — `pnpm` and `yarn` are installed globally and
   available to every derived image.
-* **Chrome DevTools MCP extension** — pi can drive your host Chrome through
-  the chrome-devtools MCP server (browse, search, screenshots, JS
-  evaluation). Optional: needs host Chrome listening on `:9222`.
+* **Browser layer (Playwright + headless Chromium)** — pi runs on an image
+  layer that bakes in Playwright and Chromium: the agent drives the browser
+  by writing and running scripts (no browser MCP, no per-action tool calls)
+  against a lazily-started disposable headless Chromium, or over CDP to the
+  host's Chrome when host-network reachability is needed — see
+  [Browser automation](#browser-automation) and `docs/BROWSER.md`.
 * **Multiple LLM providers** — DeepSeek, Volcengine Ark, OpenRouter, plus a
   private local gateway; keys are passed via environment variables, never
   baked into the image or committed to the repo.
@@ -76,14 +79,15 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 ```
 caged/
 ├── cg                     # unified launcher: cg <agent> <start|build> (replaces build.sh / start.sh)
-├── Containerfile        # pi image (non-root, pinned pi version)
+├── Containerfile        # pi image (non-root, pinned pi version) — intermediate; see the layer below
+├── Containerfile.browser # browser layer: Playwright + Chromium; pi (TUI) and webui RUN on this
 ├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, jira-cli, cfl, non-root user, sync scripts
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.commandcode # OPTIONAL: Command Code image
 ├── Containerfile.webui  # OPTIONAL: pi-web-ui Web chat UI (additive layer on caged:latest)
 ├── seed/                # agent homes — LIVE bind-mount sources
 │   ├── .pi/agent/       # pi's ~/.pi: models.json (providers), settings.json,
-│   │                    #   mcp.json, AGENTS.md, skills/, scripts/
+│   │                    #   AGENTS.md, skills/, scripts/
 │   ├── .dsh/            # dsh's $DSH_HOME: cordis.patch.yml + generated config, skills/
 │   ├── .commandcode/    # Command Code's HOME state: settings.json (bypass), skills/
 │   ├── skills-src/      # git-tracked local skills (source of truth, shared by all agents)
@@ -91,7 +95,7 @@ caged/
 │   └── skills.json      # declarative skills config (shared by all agents)
 ├── scripts/
 │   ├── build-caged-base.sh  # shared base image build (Containerfile.base) — built automatically by the one below
-│   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|dsh|webui|cmdc  (arg required, no default)
+│   ├── build-container.sh   # Apple `container` build:  build-container.sh pi|browser|dsh|webui|cmdc  (arg required, no default)
 │   ├── start-container.sh   # Apple `container` run: pi|webui|dsh|cmdc + command args
 │   ├── entrypoint.sh        # pi seed validation (fail-fast) + skills sync + tini, runs as USER agent
 │   ├── dsh-entrypoint.sh    # dsh seed validation + skills sync + tini
@@ -228,7 +232,8 @@ the host** — the build clones the git skill sources into the seed with
 cg pi build
 
 # 2. run from the repo you want as the workspace. The unified launcher accepts
-#    an agent (pi, webui, dsh, or cmdc) and a command (start); pi is the default agent.
+#    an agent (pi, webui, dsh, or cmdc; 'browser' is a build-only target) and a
+#    command (start); pi is the default agent.
 cd /path/to/your/repo
 /path/to/caged/cg pi start              # pi TUI
 /path/to/caged/cg webui start           # pi Web UI
@@ -237,7 +242,7 @@ cd /path/to/your/repo
 /path/to/caged/cg pi start --continue   # pass command args
 ```
 
-`cg` mounts the **directory you run it from** as `/workspace`. Its first argument selects the agent (`pi`, `webui`, `dsh`, or `cmdc`), the second the command (`build` or `start`); remaining arguments are passed through — for `start`, they replace the image's default command. `cg` replaces the old root-level `build.sh` and `start.sh` wrappers and forwards to `scripts/build-container.sh` and `scripts/start-container.sh`, so all environment overrides keep working unchanged.
+`cg` mounts the **directory you run it from** as `/workspace`. Its first argument selects the agent (`pi`, `webui`, `dsh`, or `cmdc`; `browser` is a build-only target for the browser layer), the second the command (`build` or `start`); remaining arguments are passed through — for `start`, they replace the image's default command. `cg` replaces the old root-level `build.sh` and `start.sh` wrappers and forwards to `scripts/build-container.sh` and `scripts/start-container.sh`, so all environment overrides keep working unchanged.
 
 > **Why scripts, not compose?** caged runs a *single* disposable container — the
 > container's only job is isolation, so a compose/multi-container stack would add
@@ -252,7 +257,7 @@ cd /path/to/your/repo
 |---|---|---|---|
 | `/workspace`   | the dir you ran `cg pi start` from, or `$CAGED_WORKSPACE` | rw | **the code pi works on** (also backs pi's per-project session data, see below) |
 | `/agent-home` (`$HOME`) | `<caged>/seed` (`$CAGED_AGENT_HOME`) | rw | **shared live agent home** — contains `.pi`, `.dsh`, and CLI configs (their own defaults under `.config`); all agent modes use the same mount |
-| `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `mcp.json`, `AGENTS.md`, `skills/`) |
+| `/agent-home/.pi/agent` | *(part of the mount above)* — `seed/.pi/agent` | rw | pi's config dir (`models.json`, `settings.json`, `AGENTS.md`, `skills/`) |
 
 `$HOME` is `/agent-home`, and the complete `caged/seed` directory is a live
 bind mount there for every mode. Pi uses `/agent-home/.pi`, dsh uses
@@ -269,7 +274,7 @@ at the `/tmp` tmpfs (`npm_config_cache`, `XDG_CACHE_HOME`), keeping the
 container stateful-free apart from the two mounts and scratch.
 
 The entrypoint validates the mount **before** launching pi: if the seed is
-missing or incomplete, `mcp.json` references a missing executable, or the
+missing or incomplete, `skills.json` is malformed, or the
 seed is read-only, it exits non-zero with a diagnostic instead of letting pi
 run half-configured. This also catches a wrong `$CAGED_AGENT_HOME` — e.g. a path that does not
 contain `.pi/agent` (the required-files check fails immediately).
@@ -311,7 +316,6 @@ the Web UI's history all scan the same files. Deleting `seed/.pi/agent` or
   prefill cache off to free VRAM for the KV cache, so it is a poor fit for
   RAG-style work)
 * `.pi/agent/settings.json` — trust + `pi-mcp-adapter` extension
-* `.pi/agent/mcp.json` — chrome-devtools MCP (needs host Chrome on `:9222`, optional)
 * `.pi/agent/skills/` — pi's installed skills (generated by skills-sync at
   container start; sources of truth: `seed/skills.json` + `seed/skills-src/`)
 * `.pi/agent/AGENTS.md` — pi's environment primer (generated by prompt-sync at
@@ -319,7 +323,9 @@ the Web UI's history all scan the same files. Deleting `seed/.pi/agent` or
   The **same** primer is installed to cmdc's `~/.commandcode/AGENTS.md`, so the
   global prompt is identical across agents — edit `seed/prompt-src/global.md`,
   never the generated copies.
-* `.pi/agent/scripts/` — `start-chrome-devtools-mcp.sh`, `devtools-forward.js` (CDP helpers, referenced by `mcp.json`)
+* `.pi/agent/scripts/` — `browserd` (lazy headless Chromium supervisor),
+  `browser` (one-shot browser helper) and `devtools-forward.js` (host-attach
+  CDP forwarder) — see `docs/BROWSER.md`
 
 To change the config, just edit `seed/.pi/agent/` — it is the live config,
 mounted into the container (effective on next container start). No rebuild
@@ -352,18 +358,40 @@ cg pi start     # then run  pi auth  inside the TUI
 
 Never put API keys in `/workspace` — anything there is readable by pi.
 
-## chrome-devtools MCP
+## Browser automation (browser layer)
 
-`seed/.pi/agent/mcp.json` registers a chrome-devtools MCP server. It forwards
-the container-local port `19222` to the host's Chrome CDP and requires:
+pi runs on **`caged-browser:latest`**, an image layer between the pi image
+and pi-web-ui:
 
-1. Host Chrome running with `--remote-debugging-port=9222`
-2. Host Chrome's CDP reachable at `192.168.64.1:9222` (the Apple
-   `container` vmnet gateway; on macOS Chrome binds loopback only, so bridge
-   it with socat — see `docs/APPLE-CONTAINER.md`.)
+```
+caged-base:latest ──► caged:latest ──► caged-browser:latest ──► caged-webui:latest
+   Containerfile.base   Containerfile     Containerfile.browser     Containerfile.webui
+```
 
-Without host Chrome listening, pi will report the MCP server as unavailable —
-that's expected, not a caged bug.
+`Containerfile.browser` adds the pinned Playwright npm package and Chromium
+(both installed into the image — the runtime `/tmp` is a noexec tmpfs).
+`cg pi build` builds the whole chain; `cg pi start` runs `caged-browser:latest`
+(override with `CAGED_IMAGE`). dsh and cmdc do not inherit the layer.
+
+There is deliberately **no browser MCP server** in this path: the agent
+writes and runs Playwright scripts via bash (a `browser` skill teaches the
+patterns, plus one-shot helpers in `seed/.pi/agent/scripts/browser`). One
+script can perform many browser actions for one model turn, and only its
+deliberate output enters the context — no per-action snapshots.
+
+* **Local mode (default)** — `browserd` (seed-side supervisor) lazily starts
+  a disposable headless Chromium on first use (`127.0.0.1:19223`); cookies
+  and logins persist while the container lives and die with it. Start/stop:
+  `~/.pi/agent/scripts/browserd status|stop`.
+* **Host mode** — `BROWSER_MODE=host browser ...` attaches to the host's
+  Chrome over CDP (`devtools-forward.js` forwards container-local port 19222
+  to the host). Set the host side up with `cg browser start` (debug Chrome
+  with a throwaway profile + CDP bridge to the vmnet gateway; `status`/`stop`
+  also available). For host `localhost` dev servers and VPN/intranet targets
+  only — Chrome 136+ refuses remote debugging on the default profile, so
+  this is a throwaway profile, not your real logins.
+
+Design rationale and rejected alternatives: [docs/BROWSER.md](docs/BROWSER.md).
 
 ## glab (GitLab CLI)
 
@@ -510,14 +538,14 @@ sibling.
 web toolchain:
 
 ```sh
-cg webui build        # builds base -> pi -> webui (caged-webui:latest)
+cg webui build        # builds base -> pi -> browser -> webui (caged-webui:latest)
 ```
 
-`Containerfile.webui` is a thin layer `FROM caged:latest`: it adds the pinned
+`Containerfile.webui` is a thin layer `FROM caged-browser:latest`: it adds the pinned
 `pi-web-ui` package and changes the CMD. The shared base includes the node-pty
 C++ build toolchain (`build-essential` and `python3`); node-pty ships no Linux
 prebuilds, so it must run `node-gyp rebuild` at install time. The entrypoint, the
-skills-sync script and the chrome-devtools MCP are inherited unchanged. Rollback
+skills-sync script and the browser layer are inherited unchanged. Rollback
 is trivial: stop using it, the pi TUI image is untouched.
 
 **Run** — same workflow as the TUI, from the repo you want as the workspace:
@@ -815,13 +843,16 @@ of `seed/.dsh`, so:
 ## Environment knobs
 
 `cg` (forwarding to `scripts/start-container.sh` and
-`scripts/build-container.sh pi|dsh|webui` /
+`scripts/build-container.sh pi|browser|dsh|webui` /
 `scripts/build-caged-base.sh`) reads these from the calling shell; defaults
 listed.
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `CAGED_IMAGE` | `caged:latest` | image tag to run |
+| `CAGED_IMAGE` | `caged:latest` | intermediate pi image tag (build); override the image the pi TUI runs (default `caged-browser:latest`) |
+| `CAGED_BROWSER_IMAGE` | `caged-browser:latest` | browser layer image tag (build + the image pi runs) |
+| `PLAYWRIGHT_VERSION` | `latest` | Playwright version pin (build time, `cg pi build` / `cg browser build`) |
+| `CAGED_SKIP_BROWSER` | `0` | set to `1` to skip the browser layer build when building `pi` |
 | `CAGED_BASE_IMAGE` | `caged-base:latest` | shared base image tag — built first by `build-caged-base.sh`, imported via FROM in both Containerfiles |
 | `CAGED_SKIP_BASE` | `0` | set to `1` to skip the automatic base rebuild when building a derived image |
 | `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |

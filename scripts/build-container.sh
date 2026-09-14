@@ -3,7 +3,9 @@
 # `container` tool. Invoked by the unified launcher: `cg <agent> build`.
 #
 # Usage:
-#   cg pi build            # the pi agent image (./Containerfile)
+#   cg pi build            # the pi agent image (./Containerfile), then the
+#                          # browser layer on top (./Containerfile.browser)
+#   cg browser build       # only the browser layer (./Containerfile.browser)
 #   cg dsh build           # the DeepSeek Harness image (./Containerfile.dsh)
 #   cg webui build         # the pi-web-ui Web UI image (./Containerfile.webui)
 #   cg cmdc build          # the Command Code image (./Containerfile.commandcode)
@@ -14,15 +16,18 @@
 #
 # pi and dsh build FROM the shared base image (./Containerfile.base, built
 # first via scripts/build-caged-base.sh; skip with CAGED_SKIP_BASE=1).
-# webui builds FROM the pi image (./Containerfile.webui is an additive layer
-# on caged:latest), so the script builds base -> pi -> webui in order
-# (skip the pi step with CAGED_SKIP_PI=1 when it's already current).
+# The browser layer (./Containerfile.browser) builds FROM the pi image, and
+# webui builds FROM the browser layer, so the script builds
+# base -> pi -> browser -> webui in order (skip the pi step with
+# CAGED_SKIP_PI=1, the browser step with CAGED_SKIP_BROWSER=1, when they're
+# already current).
 #
 # Per-image knobs (env vars, defaults listed):
-#   pi:    CAGED_IMAGE (caged:latest),      PI_VERSION (latest)
-#   dsh:   DSH_IMAGE (dsh:latest),          DSH_VERSION (latest)
-#   webui: CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (latest)
-#   cmdc: COMMANDCODE_IMAGE (commandcode:latest), COMMAND_CODE_VERSION (latest)
+#   pi:      CAGED_IMAGE (caged:latest),           PI_VERSION (latest)
+#   browser: CAGED_BROWSER_IMAGE (caged-browser:latest), PLAYWRIGHT_VERSION (latest)
+#   dsh:     DSH_IMAGE (dsh:latest),               DSH_VERSION (latest)
+#   webui:   CAGED_WEB_IMAGE (caged-webui:latest), PI_WEB_UI_VERSION (latest)
+#   cmdc:    COMMANDCODE_IMAGE (commandcode:latest), COMMAND_CODE_VERSION (latest)
 # Shared: CAGED_BASE_IMAGE (caged-base:latest), CAGED_SKIP_BASE (0)
 
 set -euo pipefail
@@ -46,6 +51,13 @@ pi)
     VERSION_VALUE="${PI_VERSION:-latest}"
     PKG_NAME="@earendil-works/pi-coding-agent"
     ;;
+browser)
+    CONTAINERFILE="Containerfile.browser"
+    IMAGE_TAG="${CAGED_BROWSER_IMAGE:-caged-browser:latest}"
+    VERSION_ARG="PLAYWRIGHT_VERSION"
+    VERSION_VALUE="${PLAYWRIGHT_VERSION:-latest}"
+    PKG_NAME="playwright"
+    ;;
 dsh)
     CONTAINERFILE="Containerfile.dsh"
     IMAGE_TAG="${DSH_IMAGE:-dsh:latest}"
@@ -68,8 +80,8 @@ cmdc)
     PKG_NAME="command-code"
     ;;
 *)
-    echo "Error: unknown image '${1}' — expected 'pi', 'dsh', 'webui' or 'cmdc'." >&2
-    echo "Usage: $0 pi|dsh|webui|cmdc" >&2
+    echo "Error: unknown image '${1}' — expected 'pi', 'browser', 'dsh', 'webui' or 'cmdc'." >&2
+    echo "Usage: $0 pi|browser|dsh|webui|cmdc" >&2
     exit 2
     ;;
 esac
@@ -108,13 +120,13 @@ if [ "${CAGED_SKIP_BASE}" != "1" ]; then
   CAGED_BASE_IMAGE="${CAGED_BASE_IMAGE}" bash "${SCRIPT_DIR}/build-caged-base.sh"
 fi
 
-# The webui image is an additive layer on top of the pi image
-# (Containerfile.webui is `FROM caged:latest`), so building it needs the pi
-# image present — build it first. Cached layers make this cheap when nothing
-# pi-specific changed; skip with CAGED_SKIP_PI=1 (e.g. the pi image is
-# already current).
+# The webui image is an additive layer on top of the browser layer
+# (Containerfile.webui is `FROM caged-browser:latest`), so building it needs
+# the pi image present — build it first; that build now also chains the
+# browser layer. Cached layers make this cheap when nothing below changed;
+# skip with CAGED_SKIP_PI=1 (e.g. everything below webui is already current).
 if [ "${1}" = "webui" ] && [ "${CAGED_SKIP_PI:-0}" != "1" ]; then
-    echo "==> webui needs the pi image (Containerfile.webui is FROM caged:latest) — building it first..."
+    echo "==> webui needs the browser layer (Containerfile.webui is FROM caged-browser:latest) — building it first..."
     CAGED_IMAGE="${CAGED_IMAGE:-caged:latest}" \
     PI_VERSION="${PI_VERSION:-latest}" \
     CAGED_SKIP_BASE=1 \
@@ -128,11 +140,26 @@ container build \
   --file "${ROOT_DIR}/${CONTAINERFILE}" \
   --build-arg CAGED_BASE_IMAGE="${CAGED_BASE_IMAGE}" \
   --build-arg CAGED_IMAGE="${CAGED_IMAGE:-caged:latest}" \
+  --build-arg CAGED_BROWSER_IMAGE="${CAGED_BROWSER_IMAGE:-caged-browser:latest}" \
   --build-arg "${VERSION_ARG}=${VERSION_VALUE}" \
   "${ROOT_DIR}"
 
+# The pi image alone is not runnable-as-pi: the browser layer on top of it is
+# what pi actually runs on (both the TUI and webui; see docs/BROWSER.md).
+# Chain it unless explicitly skipped.
+if [ "${1}" = "pi" ] && [ "${CAGED_SKIP_BROWSER:-0}" != "1" ]; then
+    echo "==> pi runs on the browser layer — building ${CAGED_BROWSER_IMAGE:-caged-browser:latest}..."
+    CAGED_SKIP_BASE=1 \
+    CAGED_IMAGE="${CAGED_IMAGE:-caged:latest}" \
+    PLAYWRIGHT_VERSION="${PLAYWRIGHT_VERSION:-latest}" \
+    bash "${SCRIPT_DIR}/build-container.sh" browser
+fi
+
 echo "==> Build complete: ${IMAGE_TAG}"
 case "${1}" in
+pi)
+    echo "==> Start it with: cg pi start"
+    ;;
 cmdc)
     echo "==> Start it with: cg cmdc start"
     ;;

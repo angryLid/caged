@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+/**
+ * browserd — lazy supervisor for caged's disposable headless Chromium.
+ *
+ * Started on first browser use (never by the entrypoint): `browserd ensure`
+ * probes the local CDP endpoint and, if nothing is answering, spawns a
+ * headless Chromium (the one baked into the image's browser layer) detached
+ * from this process. The browser stays up across turns so cookies, localStorage
+ * and logins survive between script runs; its profile lives under /tmp
+ * (disposable — dies with the container). Design: docs/BROWSER.md.
+ *
+ * Subcommands:
+ *   ensure    start the browser if needed, print the CDP endpoint (default)
+ *   status    report whether the browser is up (and its endpoint/pid)
+ *   stop      terminate the browser and remove the pid file
+ *
+ * Environment:
+ *   BROWSER_CDP_PORT    local CDP port (default 19223)
+ *   BROWSER_STATE_DIR   state dir: profile + pid + log (default /tmp/caged-browser)
+ */
+"use strict";
+
+const { spawn } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+const HOST = "127.0.0.1";
+const PORT = parseInt(process.env.BROWSER_CDP_PORT || "19223", 10);
+const ENDPOINT = `http://${HOST}:${PORT}`;
+const STATE_DIR = process.env.BROWSER_STATE_DIR || "/tmp/caged-browser";
+const PROFILE_DIR = path.join(STATE_DIR, "profile");
+const LOG_FILE = path.join(STATE_DIR, "chromium.log");
+const PID_FILE = path.join(STATE_DIR, "chromium.pid");
+const READY_TIMEOUT_MS = 20000;
+
+async function probe() {
+  try {
+    const res = await fetch(`${ENDPOINT}/json/version`, { signal: AbortSignal.timeout(1500) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function chromiumExecutable() {
+  let exe;
+  try {
+    exe = require("playwright").chromium.executablePath();
+  } catch (err) {
+    console.error(`browserd: cannot load playwright (${err.message}) — is the browser layer installed? Rebuild with: cg pi build`);
+    process.exit(1);
+  }
+  if (!fs.existsSync(exe)) {
+    console.error(`browserd: chromium not found at ${exe} — browser layer incomplete. Rebuild with: cg pi build`);
+    process.exit(1);
+  }
+  return exe;
+}
+
+async function ensure() {
+  if (await probe()) {
+    console.log(ENDPOINT);
+    return;
+  }
+  fs.mkdirSync(PROFILE_DIR, { recursive: true });
+  const out = fs.openSync(LOG_FILE, "a");
+  const child = spawn(chromiumExecutable(), [
+    "--headless",
+    `--remote-debugging-port=${PORT}`,
+    `--user-data-dir=${PROFILE_DIR}`,
+    "--no-sandbox",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--hide-scrollbars",
+    "about:blank",
+  ], { detached: true, stdio: ["ignore", out, out] });
+  fs.writeFileSync(PID_FILE, String(child.pid));
+  child.unref();
+  const deadline = Date.now() + READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (await probe()) {
+      console.log(ENDPOINT);
+      return;
+    }
+    if (child.exitCode !== null && child.exitCode !== undefined) {
+      console.error(`browserd: chromium exited with code ${child.exitCode} — see ${LOG_FILE}`);
+      process.exit(1);
+    }
+  }
+  console.error(`browserd: chromium not ready after ${READY_TIMEOUT_MS / 1000}s — see ${LOG_FILE}`);
+  process.exit(1);
+}
+
+async function status() {
+  if (await probe()) {
+    const pid = fs.existsSync(PID_FILE) ? fs.readFileSync(PID_FILE, "utf8").trim() : "?";
+    console.log(`running at ${ENDPOINT} (pid ${pid})`);
+    return;
+  }
+  console.log("not running");
+  process.exitCode = 1;
+}
+
+async function stop() {
+  if (!fs.existsSync(PID_FILE)) {
+    console.log("not running (no pid file)");
+    return;
+  }
+  const pid = parseInt(fs.readFileSync(PID_FILE, "utf8").trim(), 10);
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    // already gone — fall through to cleanup
+  }
+  const deadline = Date.now() + 5000;
+  while ((await probe()) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  fs.rmSync(PID_FILE, { force: true });
+  console.log("stopped");
+}
+
+const cmd = process.argv[2] || "ensure";
+const handlers = { ensure, status, stop };
+if (!handlers[cmd]) {
+  console.error(`usage: browserd [ensure|status|stop]`);
+  process.exit(2);
+}
+handlers[cmd]().catch((err) => {
+  console.error(`browserd: ${err.message}`);
+  process.exit(1);
+});

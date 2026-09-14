@@ -51,7 +51,7 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
 - **Open network is deliberate.** Not a sandbox to add; document trade-offs in
   `docs/SECURITY.md` instead of trying to lock egress.
 - **Fail-fast seed validation.** `scripts/entrypoint.sh` validates the seed
-  mount (missing/incomplete seed, bad `mcp.json` executable, read-only seed)
+  mount (missing/incomplete seed, malformed `skills.json`, read-only seed)
   and exits non-zero with a diagnostic rather than letting pi run
   half-configured. Preserve that property when you touch the entrypoint.
 - **Runtime state stays out of git.** `seed/.pi/agent/auth.json`,
@@ -83,11 +83,19 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   it: CLI/pin/base updates belong in the base, agent-specific layers in the
   derived files. `scripts/build-container.sh pi|dsh` rebuilds the base
   automatically unless `CAGED_SKIP_BASE=1`.
+  `Containerfile.browser` (Playwright + Chromium, `scripts/build-container.sh
+  browser`) is a third, **additive layer on top of the pi image**
+  (`FROM caged:latest`, not the base): it adds the pinned Playwright npm
+  package + Chromium (baked in — the runtime `/tmp` is noexec), and pi (TUI)
+  and pi-web-ui both run on it (`caged-browser:latest`, see
+  `docs/BROWSER.md`). Don't move it onto the base — dsh/cmdc would inherit
+  the bloat.
   `Containerfile.webui` (pi-web-ui Web UI, `scripts/build-container.sh webui`)
-  is a third, **additive layer on top of the pi image** (`FROM caged:latest`,
-  not the base): it inherits the entrypoint and the sync scripts and adds only
-  the node-pty toolchain + `pi-web-ui` (latest by default, pin via
-  `PI_WEB_UI_VERSION`), so TUI users never pay for the toolchain. Don't move it onto the base — dsh would inherit the bloat.
+  is a fourth, **additive layer on top of the browser layer**
+  (`FROM caged-browser:latest`): it inherits the entrypoint, the sync scripts
+  and the browser layer, and adds only the node-pty toolchain + `pi-web-ui`
+  (latest by default, pin via `PI_WEB_UI_VERSION`), so TUI users never pay
+  for the toolchain. Don't move it onto the base — dsh would inherit the bloat.
 - Skills can be synced by hand with `node scripts/skills-sync.mjs`
   (`--dry-run` to preview, `--link-only` / `--clone-only` for the split paths).
   The git skill repos are cloned **on the host into the seed**

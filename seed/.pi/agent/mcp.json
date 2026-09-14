@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "chrome-devtools": {
-      "command": "/agent-home/.pi/agent/scripts/start-chrome-devtools-mcp.sh",
-      "args": []
-    }
-  }
-}

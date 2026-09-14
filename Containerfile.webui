@@ -2,10 +2,11 @@
 #
 # caged-webui — the pi-web-ui web chat UI for the pi agent.
 #
-# A thin ADDITIVE layer on top of the pi image (./Containerfile, tag
-# caged:latest): it inherits everything pi-specific (the pinned pi CLI, the
-# chrome-devtools MCP, the build-time skill vendor, the caged entrypoint)
-# and only adds what a web server needs on top:
+# A thin ADDITIVE layer on top of the browser layer (./Containerfile.browser,
+# tag caged-browser:latest): it inherits everything below it (the pinned pi
+# CLI, Playwright + headless Chromium, the build-time
+# skill vendor, the caged entrypoint) and only adds what a web server needs
+# on top:
 #
 #   * the pi-web-ui npm package, pinned. The shared base provides the
 #     node-gyp toolchain needed by its node-pty dependency (which ships no
@@ -15,14 +16,14 @@
 #
 # Keeping this separate from ./Containerfile means TUI-only users never pay
 # for the ~400MB toolchain — build only what you need:
-#   scripts/build-container.sh webui      (builds base -> pi -> webui)
+#   scripts/build-container.sh webui      (builds base -> pi -> browser -> webui)
 #
 # Runtime hardening is identical (read-only rootfs, cap-drop all, tmpfs)
 # and is applied by scripts/start-container.sh webui.
 
-ARG CAGED_IMAGE=caged:latest
+ARG CAGED_BROWSER_IMAGE=caged-browser:latest
 
-FROM ${CAGED_IMAGE}
+FROM ${CAGED_BROWSER_IMAGE}
 
 # The pi image ends with USER agent. Switch back to root for the build-time
 # package installation; apt needs to create /var/lib/apt/lists/partial and

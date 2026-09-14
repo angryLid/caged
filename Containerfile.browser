@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1
+#
+# caged-browser — the browser layer of the pi image chain.
+#
+#   caged-base:latest ──► caged:latest ──► caged-browser:latest ──► caged-webui:latest
+#                        (Containerfile)   (this file)              (Containerfile.webui)
+#
+# Both the pi TUI and pi-web-ui build and run on this layer; dsh and cmdc do
+# not inherit it. It adds only what browser automation needs:
+#
+#   * the pinned Playwright npm package + Chromium, both installed INTO the
+#     image (the runtime /tmp is a noexec tmpfs, so a runtime
+#     `playwright install` or npx would fail with "Permission denied").
+#   * NODE_PATH so agent-written scripts can `require("playwright")` against
+#     the global install from any working directory.
+#
+# The browser runtime itself is NOT started here: `browserd`
+# (seed/.pi/agent/scripts/browserd) lazily spawns a disposable headless
+# Chromium on first use — see docs/BROWSER.md for the design.
+
+ARG CAGED_IMAGE=caged:latest
+
+FROM ${CAGED_IMAGE}
+
+# Switch back to root: apt (--with-deps) must create /var/lib/apt/lists and
+# npm must install into the image's system prefix.
+USER root
+
+# Browsers live in an image-owned path (read-only at runtime), not in a home
+# directory (which is a live bind mount of the seed — build artifacts do not
+# belong there). Shared and world-readable so the `agent` user can execute them.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+
+ARG PLAYWRIGHT_VERSION=latest
+# --no-shell skips the redundant chromium-headless-shell download (the full
+# chromium binary is what browserd launches); requires Playwright >= 1.49,
+# guaranteed by the build script's dist-tag resolution unless pinned older.
+RUN npm install -g playwright@${PLAYWRIGHT_VERSION} \
+    && playwright install --with-deps --no-shell chromium \
+    && chmod -R a+rX /opt/ms-playwright
+
+# Let `require("playwright")` resolve the global install from any cwd.
+ENV NODE_PATH=/usr/lib/node_modules
+
+USER agent
+WORKDIR /workspace

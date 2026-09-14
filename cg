@@ -2,10 +2,9 @@
 # cg — unified caged launcher: build and start agent containers.
 #
 # Usage:
-#   cg <agent> build    # build the image for <agent> (pi|dsh|webui|cmdc)
+#   cg <agent> build    # build the image for <agent> (pi|dsh|webui|cmdc|browser)
 #   cg <agent> start    # run the container for <agent> (pi|dsh|webui|cmdc)
-#   cg <agent> start -b # rebuild the image first, then start
-#
+#   cg browser start|stop|status  # host Chrome + CDP bridge for host-attach mode#
 # Examples:
 #   cg pi build          # build the pi agent image
 #   cg pi start          # start the pi TUI
@@ -27,17 +26,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
     cat >&2 <<'EOF'
 Usage: cg <agent> <start|build>
+       cg browser <start|stop|status>
 
 Agents:
-  pi      pi agent TUI (default)
+  pi      pi agent TUI on the browser layer (default)
   webui   pi-web-ui on http://127.0.0.1:${PI_WEBUI_HOST_PORT:-8787}
   dsh     DeepSeek Harness on http://127.0.0.1:${DSH_HOST_PORT:-3080}
   cmdc    Command Code CLI
+  browser build-only: the browser layer (Playwright + Chromium) — pi and
+          webui run on top of it; no container runtime of its own.
+          With start|stop|status instead of build/start: control the host
+          Chrome + CDP bridge used by the container's browser host-attach mode
 
 Commands:
   build   build the image (scripts/build-container.sh)
   start   run the container (scripts/start-container.sh)
   start -b  rebuild the image first, then start
+  cg browser start|stop|status  # host-side browser host-attach control
 
 Examples:
   cg pi build
@@ -61,13 +66,13 @@ COMMAND="$2"
 shift 2
 
 case "$AGENT" in
-    pi|webui|dsh|cmdc) ;;
+    pi|webui|dsh|cmdc|browser) ;;
     --help|-h)
         usage
         exit 0
         ;;
     *)
-        echo "Error: unknown agent '$AGENT' — expected 'pi', 'webui', 'dsh' or 'cmdc'." >&2
+        echo "Error: unknown agent '$AGENT' — expected 'pi', 'webui', 'dsh', 'cmdc' or 'browser'." >&2
         usage
         exit 2
         ;;
@@ -77,7 +82,14 @@ case "$COMMAND" in
     build)
         exec "$SCRIPT_DIR/scripts/build-container.sh" "$AGENT" "$@"
         ;;
-    start)
+    start|stop|status)
+        if [ "$AGENT" = "browser" ]; then
+            exec "$SCRIPT_DIR/scripts/host-browser.sh" "$COMMAND" "$@"
+        fi
+        if [ "$COMMAND" != "start" ]; then
+            echo "Error: 'cg $AGENT $COMMAND' is not supported — host browser commands are 'cg browser start|stop|status'." >&2
+            exit 2
+        fi
         if [ "${1:-}" = "-b" ]; then
             shift
             "$SCRIPT_DIR/scripts/build-container.sh" "$AGENT"
@@ -89,7 +101,7 @@ case "$COMMAND" in
         exit 0
         ;;
     *)
-        echo "Error: unknown command '$COMMAND' — expected 'start' or 'build'." >&2
+        echo "Error: unknown command '$COMMAND' — expected 'start', 'build', or 'cg browser start|stop|status'." >&2
         usage
         exit 2
         ;;
