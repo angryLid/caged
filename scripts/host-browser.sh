@@ -47,19 +47,30 @@ EOF
 }
 
 cmd_start() {
-  if chrome_cdp_up; then
-    echo "OK: Chrome CDP already listening on 127.0.0.1:$PORT"
+  # Optional page-traffic proxy (CDP control channel is unaffected):
+  #   CAGED_PROXY="socks5://127.0.0.1:1080" cg browser start
+  #   CAGED_PROXY_BYPASS="<local>;*.internal.example.com"  (optional)
+  # A change vs. the running instance restarts the debug Chrome.
+  proxy_args=""
+  [ -n "${CAGED_PROXY:-}" ] && proxy_args="--proxy-server=$CAGED_PROXY"
+  [ -n "${CAGED_PROXY_BYPASS:-}" ] && proxy_args="$proxy_args --proxy-bypass-list=$CAGED_PROXY_BYPASS"
+  PROXY_STATE="/tmp/caged-host-cdp-proxy"
+  prev_proxy="$(cat "$PROXY_STATE" 2>/dev/null || true)"
+  if chrome_cdp_up && [ "$prev_proxy" = "$proxy_args" ]; then
+    echo "OK: Chrome CDP already listening on 127.0.0.1:$PORT (same proxy config)"
   else
     echo "Restarting Chrome with --remote-debugging-port=$PORT ..."
     pkill -x "Google Chrome" 2>/dev/null || true
     sleep 1
-    open -na "Google Chrome" --args --remote-debugging-port="$PORT" --remote-allow-origins='*' --user-data-dir="$HOME/.caged-chrome-devtools" --no-first-run
+    # shellcheck disable=SC2086 -- proxy_args must split into separate args
+    open -na "Google Chrome" --args --remote-debugging-port="$PORT" --remote-allow-origins='*' --user-data-dir="$HOME/.caged-chrome-devtools" --no-first-run $proxy_args
     i=0
     until chrome_cdp_up; do
       i=$((i + 1))
       if [ "$i" -gt 30 ]; then echo "ERROR: Chrome CDP did not come up on 127.0.0.1:$PORT" >&2; exit 1; fi
       sleep 0.5
     done
+    printf '%s' "$proxy_args" > "$PROXY_STATE"
     echo "OK: Chrome CDP listening on 127.0.0.1:$PORT"
   fi
   start_bridge
