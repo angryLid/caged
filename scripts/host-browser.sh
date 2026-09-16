@@ -6,7 +6,7 @@
 #   * a TCP bridge 0.0.0.0:9222 -> 127.0.0.1:9222 so the container can reach
 #     loopback-bound Chrome via the vmnet gateway (the container connects
 #     directly to the gateway IP; Chrome accepts IP-literal Host headers).
-# Raw TCP pipe only. Needs only node + curl, no socat.
+# Raw TCP pipe only. Needs only node + curl + lsof, no socat.
 set -u
 
 PORT="${CAGED_CDP_PORT:-9222}"
@@ -14,8 +14,38 @@ GATEWAY="${CAGED_GATEWAY:-192.168.64.1}"
 BRIDGE_JS="/tmp/caged-host-cdp-bridge.js"
 BRIDGE_LOG="/tmp/caged-host-cdp-bridge.log"
 
-chrome_cdp_up() { curl -s "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1; }
-bridge_up() { curl -s "http://$GATEWAY:$PORT/json/version" >/dev/null 2>&1; }
+# Healthy = the endpoint answers real DevTools JSON, not merely a TCP
+# listener: a stale forwarder or half-dead socket accepts connections and then
+# hangs up (curl exit 52, empty body), which a plain curl success check would
+# happily call "up".
+cdp_version() { curl -s --max-time 3 "http://127.0.0.1:$PORT/json/version" 2>/dev/null; }
+chrome_cdp_up() { cdp_version | grep -q '"Browser"'; }
+gateway_version() { curl -s --max-time 3 "http://$GATEWAY:$PORT/json/version" 2>/dev/null; }
+bridge_up() { gateway_version | grep -q '"Browser"'; }
+
+port_listeners() { lsof -t -iTCP:"$PORT" -sTCP:LISTEN -n -P 2>/dev/null; }
+port_owner_line() { lsof -iTCP:"$PORT" -sTCP:LISTEN -n -P 2>/dev/null | tail -n +2; }
+
+# Free $PORT when a stale caged process squats on it; abort on foreign ones.
+# Without this, a leftover forwarder holding the port made `start` a silent
+# no-op ("already listening", no Chrome behind it, no window ever appears).
+clean_port_or_die() {
+  [ -z "$(port_listeners)" ] && return 0
+  if pgrep -f "caged-host-cdp-bridge" >/dev/null 2>&1 || pgrep -f "caged-chrome-devtools" >/dev/null 2>&1; then
+    echo "Cleaning stale caged processes holding port $PORT:"
+    port_owner_line
+    pkill -f "caged-host-cdp-bridge" 2>/dev/null || true
+    pkill -f "caged-chrome-devtools" 2>/dev/null || true
+    i=0
+    while [ -n "$(port_listeners)" ] && [ "$i" -lt 10 ]; do sleep 0.5; i=$((i + 1)); done
+  fi
+  if [ -n "$(port_listeners)" ]; then
+    echo "ERROR: port $PORT is held by a process caged did not start - not touching it:" >&2
+    port_owner_line >&2
+    echo "Close it yourself (or export CAGED_CDP_PORT=<other port>) and re-run: cg browser start" >&2
+    exit 1
+  fi
+}
 
 start_bridge() {
   # Health = the bridge PROCESS is alive AND its port answers. Port-reachable
@@ -42,10 +72,13 @@ EOF
   nohup node "$BRIDGE_JS" >"$BRIDGE_LOG" 2>&1 &
   sleep 1
   if bridge_up; then
-    echo "OK: bridge reachable at $GATEWAY:$PORT (log: $BRIDGE_LOG)"
+    echo "OK: bridge serves DevTools JSON at $GATEWAY:$PORT (log: $BRIDGE_LOG)"
   else
-    echo "ERROR: bridge NOT reachable at $GATEWAY:$PORT - see $BRIDGE_LOG" >&2
-    echo "If macOS firewall blocked node, allow it in System Settings > Network > Firewall." >&2
+    echo "ERROR: bridge at $GATEWAY:$PORT did not return DevTools JSON - see $BRIDGE_LOG" >&2
+    tail -n 5 "$BRIDGE_LOG" 2>/dev/null >&2
+    if [ -n "$(port_listeners)" ]; then echo "Port $PORT listeners:" >&2; port_owner_line >&2; fi
+    echo "Host-side check: curl -s http://127.0.0.1:$PORT/json/version | head -3" >&2
+    echo "If the host works but the gateway does not, allow node in macOS Firewall (System Settings > Network > Firewall)." >&2
     exit 1
   fi
 }
@@ -64,10 +97,14 @@ cmd_start() {
   PROXY_STATE="/tmp/caged-host-cdp-proxy"
   prev_proxy="$(cat "$PROXY_STATE" 2>/dev/null || true)"
   if chrome_cdp_up && [ "$prev_proxy" = "$proxy_args" ]; then
-    echo "OK: Chrome CDP already listening on 127.0.0.1:$PORT (same proxy config)"
+    echo "OK: Chrome CDP healthy on 127.0.0.1:$PORT (same proxy config)"
   else
-    echo "Restarting Chrome with --remote-debugging-port=$PORT ..."
-    pkill -x "Google Chrome" 2>/dev/null || true
+    # A stale forwarder squatting on the port used to make this branch a
+    # silent no-op - the port answered TCP but there was no Chrome behind it.
+    clean_port_or_die
+    echo "Starting Chrome with --remote-debugging-port=$PORT ..."
+    # Only the throwaway-profile debug Chrome — never the user's own browser.
+    pkill -f "caged-chrome-devtools" 2>/dev/null || true
     sleep 1
     # shellcheck disable=SC2086 -- proxy_args must split into separate args
     open -na "Google Chrome" --args --remote-debugging-port="$PORT" --remote-allow-origins='*' --user-data-dir="$HOME/.caged-chrome-devtools" --no-first-run $proxy_args
@@ -87,11 +124,22 @@ cmd_stop() {
   pkill -f "caged-host-cdp-bridge" 2>/dev/null && echo "Stopped bridge." || echo "Bridge was not running."
   # Only the throwaway-profile debug Chrome — your normal Chrome is untouched.
   pkill -f "caged-chrome-devtools" 2>/dev/null && echo "Stopped debug Chrome." || echo "Debug Chrome was not running."
+  if [ -n "$(port_listeners)" ]; then
+    echo "WARNING: port $PORT is still held by:" >&2
+    port_owner_line >&2
+    echo "Kill it before the next 'cg browser start', or start will refuse to run." >&2
+  fi
 }
 
 cmd_status() {
-  chrome_cdp_up && c="up" || c="down"
-  bridge_up && b="up" || b="down"
+  if chrome_cdp_up; then c="up"
+  elif [ -n "$(port_listeners)" ]; then c="occupied (no healthy CDP endpoint)"
+  else c="down"
+  fi
+  if bridge_up; then b="up"
+  elif [ -n "$(port_listeners)" ]; then b="listener-only (nothing healthy behind it)"
+  else b="down"
+  fi
   echo "Chrome CDP (127.0.0.1:$PORT): $c"
   echo "Bridge ($GATEWAY:$PORT): $b"
   if [ "$b" = "up" ]; then
