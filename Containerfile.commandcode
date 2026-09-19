@@ -8,6 +8,9 @@
 # in the seed (seed/skills-sync/vendor, cloned on the host at build time), and
 # the entrypoint installs the enabled skills into
 # /agent-home/.commandcode/skills at every start.
+# The browser layer (./Containerfile.browser) builds on top of this image as
+# commandcode-browser:latest — cg cmdc build chains it and cg cmdc start runs
+# it by default (see docs/BROWSER.md).
 
 ARG CAGED_BASE_IMAGE=caged-base:latest
 

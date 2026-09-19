@@ -47,11 +47,11 @@ function chromiumExecutable() {
   try {
     exe = require("playwright").chromium.executablePath();
   } catch (err) {
-    console.error(`browserd: cannot load playwright (${err.message}) — is the browser layer installed? Rebuild with: cg pi build`);
+    console.error(`browserd: cannot load playwright (${err.message}) — is the browser layer installed? Rebuild with: cg pi build (pi) or cg cmdc build (Command Code)`);
     process.exit(1);
   }
   if (!fs.existsSync(exe)) {
-    console.error(`browserd: chromium not found at ${exe} — browser layer incomplete. Rebuild with: cg pi build`);
+    console.error(`browserd: chromium not found at ${exe} — browser layer incomplete. Rebuild with: cg pi build (pi) or cg cmdc build (Command Code)`);
     process.exit(1);
   }
   return exe;

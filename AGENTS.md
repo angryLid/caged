@@ -84,12 +84,14 @@ If a key is missing, tell the user which env var to set; don't fabricate one.
   derived files. `scripts/build-container.sh pi|dsh` rebuilds the base
   automatically unless `CAGED_SKIP_BASE=1`.
   `Containerfile.browser` (Playwright + Chromium, `scripts/build-container.sh
-  browser`) is a third, **additive layer on top of the pi image**
-  (`FROM caged:latest`, not the base): it adds the pinned Playwright npm
-  package + Chromium (baked in — the runtime `/tmp` is noexec), and pi (TUI)
-  and pi-web-ui both run on it (`caged-browser:latest`, see
-  `docs/BROWSER.md`). Don't move it onto the base — dsh/cmdc would inherit
-  the bloat.
+  browser`) is a third, **additive layer with a parameterised FROM** (`ARG
+  CAGED_IMAGE`, not the base): it adds the pinned Playwright npm package +
+  Chromium (baked in — the runtime `/tmp` is noexec). On the pi chain it sits
+  on the pi image (`caged-browser:latest` — what the TUI and pi-web-ui run,
+  webui builds on top of it); on the cmdc chain it sits on the commandcode
+  image (`commandcode-browser:latest` — what `cg cmdc start` runs; see
+  `docs/BROWSER.md`). Don't move it onto the base — dsh would inherit the
+  bloat.
   `Containerfile.webui` (pi-web-ui Web UI, `scripts/build-container.sh webui`)
   is a fourth, **additive layer on top of the browser layer**
   (`FROM caged-browser:latest`): it inherits the entrypoint, the sync scripts

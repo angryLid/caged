@@ -76,7 +76,10 @@ case "$MODE" in
     mkdir -p "$DSH_HOME_HOST"
     ;;
   cmdc)
-    IMAGE_TAG="${COMMANDCODE_IMAGE:-commandcode:latest}"
+    # cmdc runs on the browser layer (Playwright + headless Chromium baked in),
+    # same as pi; see docs/BROWSER.md. Override with COMMANDCODE_IMAGE to run
+    # the plain commandcode image.
+    IMAGE_TAG="${COMMANDCODE_IMAGE:-commandcode-browser:latest}"
     CONTAINER_NAME="${CONTAINER_NAME:-caged-commandcode}"
     MEMORY="${COMMANDCODE_MEMORY:-4g}"
     PORT=""

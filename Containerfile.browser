@@ -1,12 +1,13 @@
 # syntax=docker/dockerfile:1
 #
-# caged-browser — the browser layer of the pi image chain.
+# The browser layer of the pi and commandcode image chains — one file, two
+# FROM bases (the FROM below is parameterised via CAGED_IMAGE):
 #
-#   caged-base:latest ──► caged:latest ──► caged-browser:latest ──► caged-webui:latest
-#                        (Containerfile)   (this file)              (Containerfile.webui)
+#   pi chain:   caged-base ──► caged ──► caged-browser ──► caged-webui
+#   cmdc chain: caged-base ──► commandcode ──► commandcode-browser
 #
-# Both the pi TUI and pi-web-ui build and run on this layer; dsh and cmdc do
-# not inherit it. It adds only what browser automation needs:
+# The pi TUI, pi-web-ui and cmdc build and run on this layer; dsh does not
+# inherit it. It adds only what browser automation needs:
 #
 #   * the pinned Playwright npm package + Chromium, both installed INTO the
 #     image (the runtime /tmp is a noexec tmpfs, so a runtime

@@ -32,9 +32,9 @@ Agents:
   pi      pi agent TUI on the browser layer (default)
   webui   pi-web-ui on http://127.0.0.1:${PI_WEBUI_HOST_PORT:-8787}
   dsh     DeepSeek Harness on http://127.0.0.1:${DSH_HOST_PORT:-3080}
-  cmdc    Command Code CLI
-  browser build-only: the browser layer (Playwright + Chromium) — pi and
-          webui run on top of it; no container runtime of its own.
+  cmdc    Command Code CLI on the browser layer (default)
+  browser build-only: the browser layer (Playwright + Chromium) — the pi and
+          cmdc image chains run on top of it; no container runtime of its own.
           With start|stop|status instead of build/start: control the host
           Chrome + CDP bridge used by the container's browser host-attach mode
 

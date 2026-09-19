@@ -66,7 +66,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 * **pi-web-ui Web UI (optional)** — a browser chat frontend for pi, in a
   separate additive image (`cg webui build` + `cg webui start`) — see
   [pi-web-ui (Web UI)](#pi-web-ui-web-ui).
-* **Command Code image (optional)** — `cmdc`, a sibling container for [Command Code](https://commandcode.ai/), which requires Node.js 22+ and stores its login/state under `seed/.commandcode/`.
+* **Command Code image (optional)** — `cmdc`, a sibling container for [Command Code](https://commandcode.ai/), which requires Node.js 22+, stores its login/state under `seed/.commandcode/`, and runs on the same browser layer as pi (`cg cmdc build`).
 * **DeepSeek Harness (`dsh`) image (optional)** — a sibling container for
   [`@deepseek-ai/dsh`](https://github.com/deepseek-ai/deepseek-harness): the
   same hardening for dsh's browser Web UI and one-shot headless mode — see
@@ -80,7 +80,7 @@ of pi's TUI. See [dsh (DeepSeek Harness)](#dsh-deepseek-harness) and [Command Co
 caged/
 ├── cg                     # unified launcher: cg <agent> <start|build> (replaces build.sh / start.sh)
 ├── Containerfile        # pi image (non-root, pinned pi version) — intermediate; see the layer below
-├── Containerfile.browser # browser layer: Playwright + Chromium; pi (TUI) and webui RUN on this
+├── Containerfile.browser # browser layer: Playwright + Chromium; the pi (TUI/webui) and cmdc chains RUN on it
 ├── Containerfile.base   # shared base for all images: apt essentials (including python3/pip, uv, pnpm, yarn), glab, gh, jira-cli, cfl, non-root user, sync scripts
 ├── Containerfile.dsh    # OPTIONAL: DeepSeek Harness (`@deepseek-ai/dsh`) image
 ├── Containerfile.commandcode # OPTIONAL: Command Code image
@@ -359,18 +359,24 @@ Never put API keys in `/workspace` — anything there is readable by pi.
 
 ## Browser automation (browser layer)
 
-pi runs on **`caged-browser:latest`**, an image layer between the pi image
-and pi-web-ui:
+pi and cmdc run on a browser layer — an image layer with the pinned Playwright
+npm package and Chromium added on top of each agent image:
 
 ```
 caged-base:latest ──► caged:latest ──► caged-browser:latest ──► caged-webui:latest
    Containerfile.base   Containerfile     Containerfile.browser     Containerfile.webui
+
+caged-base:latest ──► commandcode:latest ──► commandcode-browser:latest
+   Containerfile.base   Containerfile.commandcode   Containerfile.browser
 ```
 
 `Containerfile.browser` adds the pinned Playwright npm package and Chromium
-(both installed into the image — the runtime `/tmp` is a noexec tmpfs).
-`cg pi build` builds the whole chain; `cg pi start` runs `caged-browser:latest`
-(override with `CAGED_IMAGE`). dsh and cmdc do not inherit the layer.
+(both installed into the image — the runtime `/tmp` is a noexec tmpfs); the
+same file serves both chains via its parameterised `FROM`.
+`cg pi build` builds the pi chain and `cg pi start` runs `caged-browser:latest`
+(override with `CAGED_IMAGE`); `cg cmdc build` builds the cmdc chain and
+`cg cmdc start` runs `commandcode-browser:latest` (override with
+`COMMANDCODE_IMAGE`). dsh does not inherit the layer.
 
 There is deliberately **no browser MCP server** in this path: the agent
 writes and runs Playwright scripts via bash (a `browser` skill teaches the
@@ -851,8 +857,10 @@ listed.
 |---|---|---|
 | `CAGED_IMAGE` | `caged:latest` | intermediate pi image tag (build); override the image the pi TUI runs (default `caged-browser:latest`) |
 | `CAGED_BROWSER_IMAGE` | `caged-browser:latest` | browser layer image tag (build + the image pi runs) |
+| `COMMANDCODE_IMAGE` | `commandcode:latest` | intermediate Command Code image tag (build); override the image cmdc runs (default `commandcode-browser:latest`) |
+| `COMMANDCODE_BROWSER_IMAGE` | `commandcode-browser:latest` | browser layer image tag on the cmdc chain (build + the image cmdc runs) |
 | `PLAYWRIGHT_VERSION` | `latest` | Playwright version pin (build time, `cg pi build` / `cg browser build`) |
-| `CAGED_SKIP_BROWSER` | `0` | set to `1` to skip the browser layer build when building `pi` |
+| `CAGED_SKIP_BROWSER` | `0` | set to `1` to skip the browser layer build when building `pi` or `cmdc` |
 | `CAGED_BASE_IMAGE` | `caged-base:latest` | shared base image tag — built first by `build-caged-base.sh`, imported via FROM in both Containerfiles |
 | `CAGED_SKIP_BASE` | `0` | set to `1` to skip the automatic base rebuild when building a derived image |
 | `GLAB_VERSION` | `1.112.0` | glab version pin (build time, `build-caged-base.sh`) |

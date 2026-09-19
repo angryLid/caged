@@ -1,6 +1,6 @@
 ---
 name: browser
-description: Drive a browser from pi — read JS-heavy pages, screenshot, fill forms, test local dev servers. Uses Playwright scripts against a lazily-started headless Chromium in the container (default) or the host's Chrome over CDP (host mode). Use for any task needing a real browser beyond plain HTTP fetching.
+description: Drive a browser from the agent — read JS-heavy pages, screenshot, fill forms, test local dev servers. Uses Playwright scripts against a lazily-started headless Chromium in the container (default) or the host's Chrome over CDP (host mode). Use for any task needing a real browser beyond plain HTTP fetching.
 ---
 
 # Browser
@@ -24,14 +24,16 @@ Use local mode unless the target only exists on the host network. If host
 mode fails because no debug Chrome is listening, ask the user to run
 `cg browser start` on the host — do not stay stuck retrying.
 
-Note: the browser layer exists only in the pi / pi-web-ui images. On the dsh
-or Command Code images these commands fail with a missing `playwright` module
-— that is expected, not a bug.
+Note: the browser layer ships in the pi / pi-web-ui images and in the Command
+Code image (`commandcode-browser`). On the dsh image these commands fail with
+a missing `playwright` module — that is expected, not a bug.
 
 ## Quick helpers
 
-`seed/.pi/agent/scripts/browser` covers the common one-shot cases (run from
-`/workspace`, output files land in the project):
+`seed/.pi/agent/scripts/browser` covers the common one-shot cases. It is not
+on `PATH` — invoke it as `~/.pi/agent/scripts/browser` (the examples below
+abbreviate it to `browser`). Run from `/workspace` so output files land in
+the project:
 
 ```sh
 browser open  https://example.com                 # title + final URL + readable text
@@ -104,7 +106,8 @@ cat /tmp/caged-browser/chromium.log   # chromium's own stderr
 
 If pages render oddly, stopping and letting `browserd` respawn usually fixes
 it. If the container runs out of memory under heavy browsing, ask the user to
-restart with `CAGED_MEMORY=4g cg pi start`.
+restart with `CAGED_MEMORY=4g cg pi start` (cmdc: `COMMANDCODE_MEMORY=4g cg
+cmdc start`).
 
 ## Host mode setup (user-side, on the host)
 

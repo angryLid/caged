@@ -28,11 +28,15 @@ the browser skill.
 ## Image layer: `Containerfile.browser`
 
 Part of the pi image chain — both the pi TUI and pi-web-ui build and run on
-it; dsh and cmdc do not inherit the weight:
+it; dsh does not inherit the weight. The Command Code image builds its own
+copy of the same file on top of `commandcode:latest`:
 
 ```
 caged-base:latest ──► caged:latest ──► caged-browser:latest ──► caged-webui:latest
    Containerfile.base   Containerfile     Containerfile.browser     Containerfile.webui
+
+caged-base:latest ──► commandcode:latest ──► commandcode-browser:latest
+   Containerfile.base   Containerfile.commandcode   Containerfile.browser
 ```
 
 - The pinned Playwright npm package + full Chromium are baked into the image
@@ -111,8 +115,8 @@ Playwright's is the better-maintained one for "make the page do the thing".
 - Host `localhost` dev servers are unreachable from the container unless they
   bind `0.0.0.0` (the vmnet gateway IP only works then); host attach covers
   the genuinely host-bound cases.
-- pi and pi-web-ui images grow by the browser layer's size (part of the
-  chain by decision); dsh and cmdc do not inherit it.
+- The pi and commandcode image chains grow by the browser layer's size (part
+  of the chains by decision); dsh does not inherit it.
 - No chrome-devtools-mcp debugging surface (performance traces, Lighthouse).
   If the need arises, the answer is a Playwright tracing script, not the old
   MCP server.
