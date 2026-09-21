@@ -35,12 +35,12 @@ RUN npm install -g "pnpm@${PNPM_VERSION}" "yarn@${YARN_VERSION}" \
     && yarn --version
 
 # glab — official GitLab CLI, pinned and sha256-verified.
-ARG GLAB_VERSION=1.112.0
+ARG GLAB_VERSION=1.118.0
 ARG TARGETARCH
 RUN set -eux; \
     case "${TARGETARCH}" in \
-      amd64) sha=f1c52907558b665f2032b615787d353cd06e54240b501a81f9489bfc8f6a8ebf;; \
-      arm64) sha=54a5fe7de0db23e34151c55e561c28e59e6ef6a7731f7d0ce8a00fa58cd8d8f8;; \
+      amd64) sha=f3782ddb62b6ab20d0031699ea7b43f345dc6f63e991883660e21343b9524931;; \
+      arm64) sha=0f6171766dd7f8246b7ce85bab18bd99d57ce2538e0ec9121c48fe004308eac4;; \
       *) echo "unsupported arch: ${TARGETARCH}" >&2; exit 1;; \
     esac; \
     curl -fsSL -o /tmp/glab.tar.gz \

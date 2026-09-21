@@ -52,13 +52,13 @@ fi
 # packages/cf/dist).
 "${SCRIPT_DIR}/package-cf.sh"
 
-echo "==> Building base image: ${CAGED_BASE_IMAGE} (GLAB_VERSION=${GLAB_VERSION:-1.112.0}, GH_VERSION=${GH_VERSION:-2.97.0}, JIRA_VERSION=${JIRA_VERSION:-1.7.0}, CFL_VERSION=${CFL_VERSION:-1.3.96}, cf=packages/cf, PNPM_VERSION=${PNPM_VERSION:-10.15.0}, YARN_VERSION=${YARN_VERSION:-1.22.22})..."
+echo "==> Building base image: ${CAGED_BASE_IMAGE} (GLAB_VERSION=${GLAB_VERSION:-1.118.0}, GH_VERSION=${GH_VERSION:-2.97.0}, JIRA_VERSION=${JIRA_VERSION:-1.7.0}, CFL_VERSION=${CFL_VERSION:-1.3.96}, cf=packages/cf, PNPM_VERSION=${PNPM_VERSION:-10.15.0}, YARN_VERSION=${YARN_VERSION:-1.22.22})..."
 
 # Repo root as the build context (same .dockerignore as the derived builds).
 container build \
   --tag "${CAGED_BASE_IMAGE}" \
   --file "${ROOT_DIR}/Containerfile.base" \
-  --build-arg GLAB_VERSION="${GLAB_VERSION:-1.112.0}" \
+  --build-arg GLAB_VERSION="${GLAB_VERSION:-1.118.0}" \
   --build-arg GH_VERSION="${GH_VERSION:-2.97.0}" \
   --build-arg JIRA_VERSION="${JIRA_VERSION:-1.7.0}" \
   --build-arg CFL_VERSION="${CFL_VERSION:-1.3.96}" \
