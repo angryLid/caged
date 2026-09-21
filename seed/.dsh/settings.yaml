@@ -1,10 +1,9 @@
 ui-onboarding:
   welcomeNoticeVersion: 2026-08-13.1
 agent-default-model:
-  provider: nube
-  model: DeepSeek-V4-Flash
-llm-deepseek:
-  baseURL: https://api.deepseek.com
+  provider: commandcode
+  model: deepseek/deepseek-v4.1-flash
+  reasoningEffort: medium
 # Model providers: the pi agent's seed/.pi/agent/models.json, migrated (tracked).
 # BYOK posture: configs reference keys by name only (apiKeyEnv, a bare POSIX
 # identifier; pi's "$VAR" refs drop the $). Keys are entered in the Web UI
@@ -12,37 +11,60 @@ llm-deepseek:
 # (no restart); an operator-injected env var of the same name shadows the
 # stored value, read-only.
 # Mapping notes vs models.json:
-#   * reasoning: true -> nearest dsh knob (profile reasoning: high + a known
+#   * reasoning: true -> nearest dsh knob (profile reasoning level + a known
 #     compat.thinkingFormat). local-llm leaves it unset so pi-ai's baseURL
 #     detection decides (pi also set no thinkingFormat there).
 llm-pi-ai:
   providers:
-    # 1:1 with models.json "DeepSeek-API".
-    DeepSeek-API:
-      displayName: DeepSeek API
-      apiKeyEnv: MY_DEEPSEEK_API_KEY
+    # CommandCode GOAT plan Provider API; all DeepSeek* models on the plan.
+    # Off-peak prices shown for the v4-flash family (peak 01-04 & 06-10 UTC
+    # Mon-Fri bills 2x input/output). V4.1 Flash and the (exp) model take images.
+    commandcode:
+      displayName: CommandCode
+      apiKeyEnv: COMMANDCODE_API_KEY
       api: openai-completions
-      baseURL: https://api.deepseek.com
+      baseURL: https://api.commandcode.ai/provider/v1
       compat:
         thinkingFormat: deepseek
-      reasoning: high
+        supportsReasoningEffort: true
+      reasoning: medium
       models:
-        - id: deepseek-v4-flash
-          name: DeepSeek V4 Flash
-        - id: deepseek-v4-pro
-          name: DeepSeek V4 Pro Preview
-    # 1:1 with models.json "my-openrouter".
-    my-openrouter:
-      displayName: OpenRouter
-      apiKeyEnv: MY_OPENROUTER_API_KEY
-      api: openai-completions
-      baseURL: https://openrouter.ai/api/v1
-      compat:
-        thinkingFormat: openrouter
-      reasoning: high
-      models:
-        - id: openai/gpt-5.6-luna
-          name: GPT-5.6 Luna (OpenRouter)
+        - id: deepseek/deepseek-v4-flash
+          name: DeepSeek V4 Flash (latest)
+          contextWindow: 1000000
+          maxTokens: 16384
+        - id: deepseek/deepseek-v4.1-flash
+          name: DeepSeek V4.1 Flash
+          input:
+            - text
+            - image
+          contextWindow: 1000000
+          maxTokens: 16384
+          # DeepSeek's own level mapping (api-docs.deepseek.com/guides/thinking_mode):
+          # off: null, minimal: low, low: low, medium: high, high: high, xhigh: high, max: max
+          reasoningEfforts:
+            off: null
+            minimal: low
+            low: low
+            medium: high
+            high: high
+            xhigh: high
+            max: max
+        - id: deepseek/deepseek-v4-flash-fast
+          name: DeepSeek V4 Flash Fast
+          contextWindow: 1000000
+          maxTokens: 16384
+        - id: deepseek/deepseek-v4-flash-vision-exp
+          name: DeepSeek V4 Flash Vision (exp)
+          input:
+            - text
+            - image
+          contextWindow: 1000000
+          maxTokens: 16384
+        - id: deepseek/deepseek-v4-pro
+          name: DeepSeek V4 Pro (latest)
+          contextWindow: 1000000
+          maxTokens: 16384
     # 1:1 with models.json "local-llm". Vision only on Qwen3.8-flash-next;
     # GLM-5.3-Flash has vision and prefill cache disabled to free VRAM for the
     # KV cache (poor fit for RAG). contextWindow/maxTokens stay at the caged
@@ -68,4 +90,4 @@ llm-pi-ai:
 agent-presets:
   default: standard
 ui-theme:
-  preference: dark
+  preference: light
