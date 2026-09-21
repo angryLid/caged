@@ -3,7 +3,7 @@ ui-onboarding:
 agent-default-model:
   provider: commandcode
   model: deepseek/deepseek-v4.1-flash
-  reasoningEffort: medium
+  reasoningEffort: max
 # Model providers: the pi agent's seed/.pi/agent/models.json, migrated (tracked).
 # BYOK posture: configs reference keys by name only (apiKeyEnv, a bare POSIX
 # identifier; pi's "$VAR" refs drop the $). Keys are entered in the Web UI
@@ -90,4 +90,4 @@ llm-pi-ai:
 agent-presets:
   default: standard
 ui-theme:
-  preference: light
+  preference: dark
