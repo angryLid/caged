@@ -308,8 +308,8 @@ the Web UI's history all scan the same files. Deleting `seed/.pi/agent` or
 `seed/.pi/` mirrors pi's config home `~/.pi` on the host and is mounted live
 (not baked into the image):
 
-* `.pi/agent/models.json` — providers: **DeepSeek**, **OpenRouter**,
-  **JustWoker**, **Local** (private, env-configured base URL + key; models
+* `.pi/agent/models.json` — providers: **OpenRouter**, **CommandCode**,
+  **Local** (private, env-configured base URL + key; models
   `Coding` — DeepSeek V4 Flash, `GLM-5.3-Flash`, `Qwen3.8-flash-next`, all
   ¤0.75/¤0.75 in and out, all pinned to 270k context / 16k output. Only
   `Qwen3.8-flash-next` takes images; `GLM-5.3-Flash` runs with vision and
@@ -333,7 +333,7 @@ round-trip.
 ## Provider keys
 
 `models.json` references keys by env var name (`$MY_DEEPSEEK_API_KEY`,
-`$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`, `$JUSTWOKER_API_KEY`, and for
+`$VOLCENGINE_API_KEY`, `$MY_OPENROUTER_API_KEY`, `$COMMANDCODE_API_KEY`, and for
 the local provider `$LOCAL_API_KEY`); pi expands these from the container
 environment at runtime. The local provider's `baseUrl` is the host
 `caddy-dev-server` proxy `http://192.168.64.1:8765/v1` — the Apple
@@ -677,8 +677,8 @@ works too.
 #### Models: pi provider set migrated (+ BYOK)
 
 The image ships three of the pi agent's four provider routes from
-`seed/.pi/agent/models.json` (volcengine was dropped) plus a dsh-only Nube.sh
-gateway, tracked in the home settings document
+`seed/.pi/agent/models.json` (volcengine was dropped), tracked in the home
+settings document
 `seed/.dsh/settings.yaml` (the `llm-pi-ai` section; the file is un-ignored
 in `seed/.dsh/.gitignore`, and `$DSH_HOME` is the live bind of `seed/.dsh`):
 
@@ -686,9 +686,7 @@ in `seed/.dsh/.gitignore`, and `$DSH_HOME` is the live bind of `seed/.dsh`):
 |---|---|---|
 | `DeepSeek-API` | `MY_DEEPSEEK_API_KEY` | openai-completions (`api.deepseek.com`) |
 | `my-openrouter` | `MY_OPENROUTER_API_KEY` | openai-completions |
-| `justwoker` | `JUSTWOKER_API_KEY` | openai-completions (`api.justwoker.icu/v1`) |
 | `local-llm` | `LOCAL_API_KEY` | openai-completions (host `192.168.64.1:8765`; `Coding` / `GLM-5.3-Flash` / `Qwen3.8-flash-next`, 270k/16k) |
-| `nube` | `NUBE_KEY` | openai-completions (`ai.nube.sh/api/v1`, model `DeepSeek-V4-Flash` 270k/16k) |
 
 **BYOK works out of the box**: dsh configs reference keys by name
 (`apiKeyEnv`, no value ever in config/settings). Users paste their own key in
@@ -880,8 +878,7 @@ listed.
 | `VOLCENGINE_API_KEY` | *(unset)* | Volcengine Ark provider key (passed into container) |
 | `MY_OPENROUTER_API_KEY` | *(unset)* | OpenRouter provider key (passed into container) |
 | `LOCAL_API_KEY` | *(unset)* | Local LLM provider key (passed into container) |
-| `NUBE_KEY` | *(unset)* | Nube.sh gateway provider key (`ai.nube.sh/api/v1`, dsh mode) |
-| `JUSTWOKER_API_KEY` | *(unset)* | JustWoker gateway provider key (`api.justwoker.icu`, pi mode) |
+| `COMMANDCODE_API_KEY` | *(unset)* | CommandCode provider key (`api.commandcode.ai/provider/v1`, pi mode) |
 | `GITLAB_TOKEN` | *(unset)* | `glab` (GitLab CLI) API token (passed into container) |
 | `GITLAB_HOST` | *(unset)* | `glab` GitLab instance host (default `https://gitlab.com`) |
 | `GH_TOKEN` | *(unset)* | `gh` (GitHub CLI) API token (passed into container) |

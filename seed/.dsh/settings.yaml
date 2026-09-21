@@ -65,16 +65,7 @@ llm-pi-ai:
           name: Qwen3.8 Flash Next (Local)
           contextWindow: 270000
           maxTokens: 16384
-    # Nube.sh OpenAI-compatible gateway (dsh-only; not in pi's models.json).
-    nube:
-      displayName: Nube.sh
-      apiKeyEnv: NUBE_KEY
-      api: openai-completions
-      baseURL: https://ai.nube.sh/api/v1
-      models:
-        - id: DeepSeek-V4-Flash
-          name: DeepSeek V4 Flash (Nube.sh)
-          contextWindow: 270000
-          maxTokens: 16384
 agent-presets:
   default: standard
+ui-theme:
+  preference: dark

@@ -4,9 +4,9 @@
     "npm:pi-mcp-adapter",
     "npm:pi-web-access"
   ],
-  "lastChangelogVersion": "0.84.2",
+  "lastChangelogVersion": "0.86.1",
   "theme": "dark",
-  "defaultProvider": "justwoker",
-  "defaultModel": "claude-opus-5-thinking",
+  "defaultProvider": "my-openrouter",
+  "defaultModel": "z-ai/glm-5.3-flash",
   "defaultThinkingLevel": "medium"
 }
