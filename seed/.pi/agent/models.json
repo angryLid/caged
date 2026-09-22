@@ -62,44 +62,57 @@
           "input": [
             "text"
           ],
-          "contextWindow": 270000,
+          "contextWindow": 1000000,
           "maxTokens": 16384,
           "cost": {
             "input": 0.75,
             "output": 0.75,
             "cacheRead": 0.75,
             "cacheWrite": 0.75
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "supportsReasoningEffort": true,
+            "requiresReasoningContentOnAssistantMessages": true
+          },
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "low",
+            "low": "low",
+            "medium": "high",
+            "high": "high",
+            "xhigh": "high",
+            "max": "max"
           }
         },
         {
-          "id": "GLM-5.3-Flash",
-          "name": "GLM-5.3 Flash (Local)",
+          "id": "DeepSeekV4Flash",
+          "name": "DeepSeek V4 Flash (Local)",
+          "reasoning": true,
           "input": [
             "text"
           ],
-          "contextWindow": 270000,
+          "contextWindow": 1000000,
           "maxTokens": 16384,
           "cost": {
             "input": 0.75,
             "output": 0.75,
             "cacheRead": 0.75,
             "cacheWrite": 0.75
-          }
-        },
-        {
-          "id": "Qwen3.8-flash-next",
-          "name": "Qwen3.8 Flash Next (Local)",
-          "input": [
-            "text",
-            "image"
-          ],
-          "contextWindow": 270000,
-          "maxTokens": 16384,
-          "cost": {
-            "input": 0.75,
-            "output": 0.75,
-            "cacheRead": 0.75,
-            "cacheWrite": 0.75
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "supportsReasoningEffort": true,
+            "requiresReasoningContentOnAssistantMessages": true
+          },
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "low",
+            "low": "low",
+            "medium": "high",
+            "high": "high",
+            "xhigh": "high",
+            "max": "max"
           }
         }
       ]
