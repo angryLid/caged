@@ -111,6 +111,51 @@
       "apiKey": "$COMMANDCODE_API_KEY",
       "models": [
         {
+          "id": "deepseek/deepseek-v4.1-flash",
+          "name": "DeepSeek V4.1 Flash (CommandCode GOAT)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "supportsReasoningEffort": true
+          },
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "low",
+            "low": "low",
+            "medium": "high",
+            "high": "high",
+            "xhigh": "high",
+            "max": "max"
+          }
+        },
+        {
+          "id": "xiaomi/mimo-v2.6-flash",
+          "name": "MiMo V2.6 Flash (CommandCode GOAT)",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0.14,
+            "output": 0.28,
+            "cacheRead": 0.0028,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "thinkingFormat": "deepseek",
+            "requiresReasoningContentOnAssistantMessages": true
+          }
+        },
+        {
           "id": "z-ai/glm-5.3-flash",
           "name": "GLM-5.3 Flash (CommandCode GOAT)",
           "reasoning": true,
